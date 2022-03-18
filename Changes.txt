@@ -1,0 +1,118 @@
+================================================================================================
+							HBSources (HBXtreme) Release history
+Development Team: Zero, KLKS, Hypnotoad, ArchAngel
+================================================================================================
+2.10
+- Added Party code
+- Added Upgrade code
+- Added command /goto
+- Added command /unsummonboss
+- Added command /setforcerecalltime
+- Added command /enableadmincommand
+- Added command /MonsterCount
+- Added command /begincrusadetotalwar
+- Added command /endcrusadetotalwar 
+- Added new Mob generator code
+- Added new Drop code
+- Added party chat '$'
+- Added mining code
+- Added multidrop for Wyvern/Fire-Wyvern/Abaddon
+- Added Blizzard
+- Added Cancellation
+- Added Earth-Worm-Strike
+- Added Armor-Break
+- Fixed Unfreeze pot
+- Fixed GMShield, shows "GM" when equipt (only works for GM's)
+- Fixed /who command, Only GM's can use
+- Fixed Single Sell/Repair item bug
+- Fixed bug when meeting items on ground
+- Fixed bug when NPC uses magic to attack causing crash
+- Fixed aura effect being removed when un/equipting weapon/armour
+- Fixed party exp sharing, works properly now i think 
+- Fixed recall time mapname bug
+- Fixed other small misc bugs
+- Fixed guildname not showing properly
+- Fixed /fi command, shows properly now
+- Fixed Crusade, no more crashing
+- Fixed Quests, shouldnt crash hg anymore
+- Enabled back old commands
+- Enabled Candy drops during december
+- Changed /enableadmincreateitem 147258 to /enableadmincreateitem
+- Updated Npc.cfg, Item(123).cfg Magic.cfg
+- SP bonus for less than level 60
+
+2.07
+- Added GM chat "^"
+- Enabled "Test Server" so exp ban will no longer happen and skills will be raised faster (will be disabled in 2.08)
+- Protection-From-Magic, Protection-From-Arrow, Absolute-Magic-Protection, Defense-Shield, Greater-Defense-Shield auras working
+- Fixed Fire Bow bug causing Server to crash
+- Direction Bow partially implemented
+- Snow on certain maps instead of rain
+- Civilians can't hit Combatants and vice versa
+- Fixed random occuring annoying crash
+- Hero items obtainable from city hall
+- Fixed Kloness Wands, you can now cast with them
+- Fixed Storm Bringer, now does ranged damage
+- Fixed MP spike bug
+- Fixed client crashing when meeting mobs
+
+2.06
+- Added Router Support - New lines in gserver.cfg:
+game-server-internal-address        = IP
+game-server-external-address        = IP
+game-server-mode           = lan/LAN/internet/INTERNET
+- Fixed drop rates
+- Combatant/Civilian mode works 100% now
+- Fixed some Init data messing up some stats and data
+- Fixed fullswing bug
+- Fixed npcs disapearing when logging in or changing maps
+- Fixed random mob spawns
+- RE-Fixed level up system
+
+2.05
+- Npcs now properly show Enemy and stats (like AM/AP/Clair/etc..)
+- Fall down bug fixed 99%. You should only falldown about once an hour if even 
+
+2.041
+- Level up system works 100% 
+
+2.04
+- New Commands:
+/weather 1|2|3|4|5|6
+weather command is to change the weather in the maps characters are connected.
+(/weather 4 10) this means light snow (4) for 10 secs (10). heres all the weather i found.
+0 = normal, 1, 2, 3 = rain( 1 light, 3 heavy), 4, 5, 6 = snow (4 light, 6 heavy).
+- Level up System ALMOST works fully. So far you can level up and spend points(only right after login).
+- Gateserver SHOULD connect every time now with no error. (if it does then please tell us(Tested on a winxp machine and it has yet to fail, so as far as we know it works)).
+- Hero items available at William (not tested)
+- AncientTablet drops added 
+- Misc Arrow/bow fixes 
+- More drop balancing 
+- All monsters, except dummy, drop ancientslates 
+- Fixes to Fire-Wyvern (drop firebow) 
+- Drop ratio balanced, harder to drop xelima/merian items 
+- Now 2.03->3.51 monsters spawn 
+- Fixed Orge spawning 
+- Fixed WereWolf spawning 
+- Fixed Stalker spawning 
+- 2.03->3.51 monsters also spawn in berserk now
+- Abaddon no longer spawns in groups
+- Wyvern attacks with Blizzard, Fire-Wyvern with BSW/MFS, Centaur with ES and paralyze
+- New monsters are clairvoient/explosive/etc.. (Does not show due to Side bug for npcs)
+- Blizzard does damage, Ressurect actually ressurects
+
+
+2.031
+- New Commands:
+/summonplayer charname
+/summonall aresden|elvine|NONE
+/summondeath <- (summons a Wyvern like /summondemon)
+/storm magic# amount1-30
+/kill charname damageoverhead
+/revive charname damageoverhead hptheywillhave
+/setzerk 0|1
+/setfreeze 0|1
+- 90% of the initial data sent on connect works
+- You can level up in game but can't spend points
+- Black and White map fixed
+- Sockets to gate and logs connect (xp may|may not have a problem)
