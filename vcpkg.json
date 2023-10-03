@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "x-server",
+  "version": "0.0.1",
+  "homepage": "https://helbreathx.net",
+  "dependencies": [
+    "ixwebsocket",
+    "openssl",
+    "zlib",
+    "fmt",
+    "libsodium",
+    "libpqxx",
+    "nlohmann-json",
+    "spdlog",
+    "asyncplusplus"
+  ],
+  "builtin-baseline": "423d9f01a7195a9fd13998500d57f532344eae38"
+}
