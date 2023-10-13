@@ -1,15 +1,12 @@
-// DelayEvent.h: interface for the CDelayEvent class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
-#if !defined(AFX_DELAYEVENT_H__047EB960_D8C0_11D2_B145_00001C7030A6__INCLUDED_)
-#define AFX_DELAYEVENT_H__047EB960_D8C0_11D2_B145_00001C7030A6__INCLUDED_
+#pragma once
 
 #include <windows.h>
-
-#if _MSC_VER >= 1000
-#pragma once
-#endif // _MSC_VER >= 1000
 
 #define DEF_DELAYEVENTTYPE_DAMAGEOBJECT				1
 #define DEF_DELAYEVENTTYPE_MAGICRELEASE				2
@@ -22,8 +19,8 @@
 class CDelayEvent  
 {										  
 public:
-	CDelayEvent();
-	virtual ~CDelayEvent();
+	CDelayEvent() = default;
+	~CDelayEvent() = default;
 
 	int m_iDelayType;
 	int m_iEffectType;
@@ -37,5 +34,3 @@ public:
 
 	DWORD m_dwTriggerTime;
 };
-
-#endif // !defined(AFX_DELAYEVENT_H__047EB960_D8C0_11D2_B145_00001C7030A6__INCLUDED_)

@@ -4,6 +4,8 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
+#pragma once
+
 #include <iostream>
 #include <fstream>
 
@@ -107,12 +109,12 @@ public:
 };
 
 #define verify_data if (data == 0) throw -192
-#define verify_size(a) if (position+a > size) { uint32_t oldsize = size; if ((uint32_t)(float(size)*1.15) < oldsize+a) { size = (uint32_t)(float(size)*1.15)+a; } else { size = (uint32_t)(float(size)*1.15); } char * temp = new char[size]; memset(temp, 0, size); memcpy(temp, data, oldsize); delete[] data; data = temp; }
+#define verify_size(a) if (position+a > size) { std::size_t oldsize = size; if ((std::size_t)(float(size)*1.15) < oldsize+a) { size = (std::size_t)(float(size)*1.15)+a; } else { size = (std::size_t)(float(size)*1.15); } char * temp = new char[size]; memset(temp, 0, size); memcpy(temp, data, oldsize); delete[] data; data = temp; }
 #define verify_length(a) if (position+a > size) { throw -193; }
 class stream_write
 {
 public:
-    stream_write(uint32_t initsize = 100)
+    stream_write(std::size_t initsize = 100)
     {
         size = initsize;
         position = 0;
@@ -127,8 +129,8 @@ public:
     }
 
     char * data;
-    uint32_t position;
-    uint32_t size;
+    std::size_t position;
+    std::size_t size;
 
     void clear()
     {
@@ -139,7 +141,7 @@ public:
         position = 0;
     }
 
-    uint32_t write_size()
+    std::size_t write_size()
     {
         verify_data;
         memcpy(data, &position, 2);
@@ -256,7 +258,7 @@ public:
         position += value.length();
     };
 
-    void write_string(const std::string & value, uint16_t length)
+    void write_string(const std::string & value, std::size_t length)
     {
         verify_data;
         verify_size(length);
@@ -271,7 +273,7 @@ public:
 class file_read
 {
 public:
-    file_read(char * input, uint32_t in)
+    file_read(char * input, std::size_t in)
         : position(0)
         , data(input)
         , size(in)
@@ -283,8 +285,8 @@ public:
     }
 
     char * data;
-    uint32_t position;
-    uint32_t size;
+    std::size_t position;
+    std::size_t size;
 
     char read_byte()
     {
@@ -295,7 +297,7 @@ public:
         return *cp;
     }
 
-    void read_bytes(char * p, uint32_t sz)
+    void read_bytes(char * p, std::size_t sz)
     {
         verify_data;
         verify_length(sz);
@@ -377,7 +379,7 @@ public:
 
     std::string read_string()
     {
-        uint16_t sz = read_int16();
+        std::size_t sz = read_int16();
         if (sz == 0)
         {
             return "";
@@ -397,24 +399,30 @@ public:
 class stream_read
 {
 public:
-    stream_read(const char * input, uint32_t in)
+    stream_read(const char * input, std::size_t in)
         : position(0)
-        , data(input)
         , size(in)
     {
+        data = new char[size];
+        memcpy(data, input, size);
         //size += 4;
     }
 
     ~stream_read()
     {
+        if (data) delete[] data;
     }
 
-    const char * data;
-    uint32_t position;
-    uint32_t size;
+    char * data{};
+    std::size_t position{};
+    std::size_t size{};
 
+    void reset_pos()
+    {
+        position = 0;
+    }
 
-    uint32_t read_size()
+    std::size_t read_size()
     {
         verify_data;
         return *(uint32_t *)(data);
@@ -431,7 +439,7 @@ public:
         return temp;
     }
 
-    void read_bytes(char * p, uint32_t sz)
+    void read_bytes(char * p, std::size_t sz)
     {
         verify_data;
         verify_length(sz);
@@ -538,7 +546,7 @@ public:
 
     std::string read_string()
     {
-        uint16_t sz = read_uint16();
+        std::size_t sz = read_uint16();
         if (sz == 0)
         {
             return "";
@@ -555,7 +563,7 @@ public:
         return str;
     }
 
-    std::string read_string(uint16_t sz)
+    std::string read_string(std::size_t sz)
     {
         verify_data;
         verify_length(sz);

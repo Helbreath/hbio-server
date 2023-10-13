@@ -1,8 +1,10 @@
-#include "Teleport.h"
+//
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
+#include "Teleport.h"
 
 CTeleport::CTeleport()
 {
@@ -21,9 +23,3 @@ CTeleport::CTeleport()
 	m_bTeleportNtrl = FALSE;
 	m_bTeleportCrmnl = FALSE;
 }
-
-CTeleport::~CTeleport()
-{										    
-
-}
-

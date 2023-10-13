@@ -1,22 +1,19 @@
-// Client.cpp: implementation of the CClient class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
 #include "Client.h"
+#include "streams.h"
 
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
-
-extern int32_t timeGetTime();
-
-CClient::CClient(HWND hWnd)
+CClient::CClient()
 {
     int i;
 
     socknum = 0;
-    disconnecttime = std::chrono::steady_clock::now();
-    lastpackettime = std::chrono::steady_clock::now();
+    disconnecttime = steady_clock::now();
+    lastpackettime = steady_clock::now();
 
 	ZeroMemory(m_cProfile, sizeof(m_cProfile));
 	strcpy(m_cProfile, "__________");
@@ -37,7 +34,6 @@ CClient::CClient(HWND hWnd)
 	m_iLU_Pool = 0;
 	m_cAura = 0;
 
-	// v1.432 »ç¿ëÇÏÁö ¾Ê´Â´Ù.
 	//m_iHitRatio_ItemEffect_SM = 0;
 	//m_iHitRatio_ItemEffect_L  = 0;
 	m_cVar = 0;
@@ -47,31 +43,25 @@ CClient::CClient(HWND hWnd)
 	m_iCurWeightLoad = 0;
 	m_dwLogoutHackCheck = 0;
 
-	// Charges
 	m_iAddTransMana = 0;
 	m_iAddChargeCritical = 0;
 
 	m_bIsSafeAttackMode  = FALSE;
 
-	// ¾ÆÀÌÅÛ ÀåÂø »óÅÂ ÃÊ±âÈ­ÇÑ ÈÄ ¼³Á¤ÇÑ´Ù.
 	for (i = 0; i < DEF_MAXITEMEQUIPPOS; i++) 
 		m_sItemEquipmentStatus[i] = -1;
 	
-	// ¾ÆÀÌÅÛ ¸®½ºÆ® ÃÊ±âÈ­ 
 	for (i = 0; i < DEF_MAXITEMS; i++) {
 		m_pItemList[i]       = NULL;
 		m_ItemPosList[i].x   = 40;
 		m_ItemPosList[i].y   = 30;
 		m_bIsItemEquipped[i] = FALSE;
 	}
-	m_cArrowIndex = -1;	// È­»ì ¾ÆÀÌÅÛ ÀÎµ¦½º´Â ÇÒ´çµÇÁö ¾ÊÀº »óÅÂ 
+	m_cArrowIndex = -1;
 
-	// ¸Ã°Ü³í ¾ÆÀÌÅÛ ¸®½ºÆ® ÃÊ±âÈ­.
-	for (i = 0; i < DEF_MAXBANKITEMS; i++) {
+	for (i = 0; i < DEF_MAXBANKITEMS; i++)
 		m_pItemInBankList[i] = NULL;
-	}
 
-	// Magic - Skill ¼÷·Ãµµ ¸®½ºÆ® ÃÊ±âÈ­ 
 	for (i = 0; i < DEF_MAXMAGICTYPE; i++)
 		m_cMagicMastery[i] = NULL;
 	
@@ -83,7 +73,6 @@ CClient::CClient(HWND hWnd)
 		m_iSkillUsingTimeID[i] = NULL;
 	}
 
-	// testcode
 	m_cMapIndex = -1;
 	m_sX = -1;
 	m_sY = -1;
@@ -94,7 +83,7 @@ CClient::CClient(HWND hWnd)
 	m_sAppr2  = 0;
 	m_sAppr3  = 0;
 	m_sAppr4  = 0;
-	m_iApprColor = 0; // v1.4
+	m_iApprColor = 0;
 	m_iStatus = 0;
 
 	m_cSex  = 0;
@@ -103,14 +92,13 @@ CClient::CClient(HWND hWnd)
 	m_cHairColor  = 0;
 	m_cUnderwear  = 0;
 
-	m_cAttackDiceThrow_SM = 0;	// °ø°ÝÄ¡ ÁÖ»çÀ§ ´øÁö´Â È¸¼ö @@@@@@@@@@@@@
+	m_cAttackDiceThrow_SM = 0;
 	m_cAttackDiceRange_SM = 0;
-	m_cAttackDiceThrow_L = 0;	// °ø°ÝÄ¡ ÁÖ»çÀ§ ´øÁö´Â È¸¼ö @@@@@@@@@@@@@
+	m_cAttackDiceThrow_L = 0;
 	m_cAttackDiceRange_L = 0;
 	m_cAttackBonus_SM    = 0;
 	m_cAttackBonus_L     = 0;
 	
-	// ÇÃ·¹ÀÌ¾îÀÇ ¼Ò¼Ó ¸¶À»¿¡ µû¶ó¼­ »çÀÌµå°¡ °áÁ¤µÇ¸ç ÀÌ°ÍÀ» º¸°í NPC°¡ °ø°Ý¿©ºÎ¸¦ °áÁ¤ÇÒ °ÍÀÌ´Ù. 
 	m_cSide = 0;
 
 	m_iHitRatio = 0;
@@ -128,7 +116,7 @@ CClient::CClient(HWND hWnd)
 	m_iWhisperPlayerIndex = -1;
 	ZeroMemory(m_cWhisperPlayerName, sizeof(m_cWhisperPlayerName));
 
-	m_iHungerStatus  = 100;  // ÃÖ´ë°ªÀº 100
+	m_iHungerStatus  = 100;
 	
 	m_bIsWarLocation = FALSE;
 
@@ -160,7 +148,7 @@ CClient::CClient(HWND hWnd)
 	m_iSuperAttackLeft  = 0;
 	m_iSuperAttackCount = 0;
 
-	m_sUsingWeaponSkill = 5; // ±âº»ÀûÀ¸·Î ¸Ç¼Õ°ÝÅõ 
+	m_sUsingWeaponSkill = 5;
 
 	m_iManaSaveRatio   = 0;
 	m_iAddResistMagic  = 0;
@@ -169,7 +157,7 @@ CClient::CClient(HWND hWnd)
 	m_bIsLuckyEffect     = FALSE;
 	m_iSideEffect_MaxHPdown = 0;
 
-	m_iAddAbsAir   = 0;	// ¼Ó¼ºº° ´ë¹ÌÁö Èí¼ö
+	m_iAddAbsAir   = 0;
 	m_iAddAbsEarth = 0;
 	m_iAddAbsFire  = 0;
 	m_iAddAbsWater = 0;
@@ -182,13 +170,12 @@ CClient::CClient(HWND hWnd)
 
 	m_sCharIDnum1 = m_sCharIDnum2 = m_sCharIDnum3 = 0;
 
-	// New 06/05/2004
 	m_iPartyID = 0;
 	m_iPartyStatus = 0;
 	m_iReqJoinPartyClientH = 0;
 	ZeroMemory(m_cReqJoinPartyName,sizeof(m_cReqJoinPartyName));
 
-	/*m_iPartyRank = -1; // v1.42
+	/*m_iPartyRank = -1;
 	m_iPartyMemberCount = 0;
 	m_iPartyGUID        = 0;
 
@@ -201,17 +188,15 @@ CClient::CClient(HWND hWnd)
 	m_bIsBWMonitor    = FALSE;
 	m_bIsExchangeMode = FALSE;
 
-	//hbest
 	isForceSet = FALSE;
 
-	// v1.4311-3 Ãß°¡ º¯¼ö ÃÊ±âÈ­ »çÅõÀå ¿¹¾à °ü·Ã º¯¼ö 
     m_iFightZoneTicketNumber =	m_iFightzoneNumber = m_iReserveTime = 0 ;            
 
-	m_iPenaltyBlockYear = m_iPenaltyBlockMonth = m_iPenaltyBlockDay = 0; // v1.4
+	m_iPenaltyBlockYear = m_iPenaltyBlockMonth = m_iPenaltyBlockDay = 0;
 
-	m_iExchangeH = NULL;											// ±³È¯ÇÒ ´ë»óÀÇ ÀÎµ¦½º 
-	ZeroMemory(m_cExchangeName, sizeof(m_cExchangeName));			// ±³È¯ÇÒ ´ë»óÀÇ ÀÌ¸§ 
-	ZeroMemory(m_cExchangeItemName, sizeof(m_cExchangeItemName));	// ±³È¯ÇÒ ¾ÆÀÌÅÛ ÀÌ¸§ 
+	m_iExchangeH = NULL;
+	ZeroMemory(m_cExchangeName, sizeof(m_cExchangeName));
+	ZeroMemory(m_cExchangeItemName, sizeof(m_cExchangeItemName));
 
 	for(i=0; i<4; i++){
 		m_cExchangeItemIndex[i]  = -1; 
@@ -220,35 +205,34 @@ CClient::CClient(HWND hWnd)
 
 	m_bIsExchangeConfirm = FALSE;
 
-	m_iQuest		 = NULL; // ÇöÀç ÇÒ´çµÈ Quest 
-	m_iQuestID       = NULL; // QuestID
-	m_iAskedQuest	 = NULL; // ¹°¾îº» Äù½ºÆ® 
-	m_iCurQuestCount = NULL; // ÇöÀç Äù½ºÆ® »óÅÂ 
+	m_iQuest		 = NULL;
+	m_iQuestID       = NULL;
+	m_iAskedQuest	 = NULL;
+	m_iCurQuestCount = NULL;
 
-	m_iQuestRewardType	 = NULL; // Äù½ºÆ® ÇØ°á½Ã »óÇ° Á¾·ù -> ¾ÆÀÌÅÛÀÇ ID°ªÀÌ´Ù.
-	m_iQuestRewardAmount = NULL; // »óÇ° °¹¼ö 
+	m_iQuestRewardType	 = NULL;
+	m_iQuestRewardAmount = NULL;
 
-	m_iContribution = NULL;			// °øÇåµµ 
-	m_bQuestMatchFlag_Loc = FALSE;  // Äù½ºÆ® Àå¼Ò È®ÀÎ¿ë ÇÃ·¡±×.
+	m_iContribution = NULL;
+	m_bQuestMatchFlag_Loc = FALSE;
 	m_bIsQuestCompleted   = FALSE;
 
-	m_cHeroArmourBonus = 0;
+	m_cHeroArmorBonus = 0;
 
 	m_bIsNeutral      = FALSE;
 	m_bIsObserverMode = FALSE;
 
-	// 2000.8.1 ÀÌº¥Æ® »óÇ° ¼ö¿© È®ÀÎ¿ë 
 	m_iSpecialEventID = 200081;
 
-	m_iSpecialWeaponEffectType  = 0;	// Èñ±Í ¾ÆÀÌÅÛ È¿°ú Á¾·ù: 0-None 1-ÇÊ»ì±â´ë¹ÌÁöÃß°¡ 2-Áßµ¶È¿°ú 3-Á¤ÀÇÀÇ 4-ÀúÁÖÀÇ
-	m_iSpecialWeaponEffectValue = 0;	// Èñ±Í ¾ÆÀÌÅÛ È¿°ú °ª
+	m_iSpecialWeaponEffectType  = 0;
+	m_iSpecialWeaponEffectValue = 0;
 
 	m_iAddHP = m_iAddSP = m_iAddMP = 0; 
 	m_iAddAR = m_iAddPR = m_iAddDR = 0;
 	m_iAddAbsPD = m_iAddAbsMD = 0;
 	m_iAddCD = m_iAddExp = m_iAddGold = 0;
 		
-	m_iSpecialAbilityTime = DEF_SPECABLTYTIMESEC;		// DEF_SPECABLTYTIMESEC ÃÊ¸¶´Ù ÇÑ¹ø¾¿ Æ¯¼ö ´É·ÂÀ» ¾µ ¼ö ÀÖ´Ù.
+	m_iSpecialAbilityTime = DEF_SPECABLTYTIMESEC;
 	m_iSpecialAbilityType = NULL;
 	m_bIsSpecialAbilityEnabled = FALSE;
 	m_iSpecialAbilityLastSec   = 0;
@@ -347,36 +331,51 @@ BOOL CClient::bCreateNewParty()
 	return TRUE;
 }
 
-
 void CClient::set_disconnected(bool s)
 {
     disconnected = s;
     auto conn = get_connection_state();
     if (conn) conn->disconnected = s;
+    if (s) set_disconnect_time(now());
 }
-void CClient::set_connect_time(std::chrono::time_point<std::chrono::steady_clock> t)
+
+void CClient::set_connect_time(time_point<steady_clock> t)
 {
     connecttime = t;
     auto conn = get_connection_state();
     if (conn) conn->connecttime = t;
+    connect_counter++;
 }
-void CClient::set_disconnect_time(std::chrono::time_point<std::chrono::steady_clock> t)
+
+void CClient::set_disconnect_time(time_point<steady_clock> t)
 {
     disconnecttime = t;
     auto conn = get_connection_state();
     if (conn) conn->disconnecttime = t;
+    disconnect_counter++;
 }
-void CClient::set_last_packet_time(std::chrono::time_point<std::chrono::steady_clock> t)
+
+void CClient::set_last_packet_time(time_point<steady_clock> t)
 {
     lastpackettime = t;
     auto conn = get_connection_state();
     if (conn) conn->lastpackettime = t;
+    packet_counter++;
 }
-void CClient::set_last_check_time(std::chrono::time_point<std::chrono::steady_clock> t)
+
+void CClient::set_last_check_time(time_point<steady_clock> t)
 {
     lastchecktime = t;
     auto conn = get_connection_state();
     if (conn) conn->lastchecktime = t;
+}
+
+void CClient::set_login_time(time_point<steady_clock> t)
+{
+    logintime = t;
+    auto conn = get_connection_state();
+    if (conn) conn->logintime = t;
+    login_counter++;
 }
 
 bool CClient::get_disconnected()
@@ -388,7 +387,7 @@ bool CClient::get_disconnected()
     return false;
 }
 
-std::chrono::time_point<std::chrono::steady_clock> CClient::get_connect_time()
+time_point<steady_clock> CClient::get_connect_time()
 {
     auto conn = get_connection_state();
     if (!conn) return connecttime;
@@ -397,7 +396,7 @@ std::chrono::time_point<std::chrono::steady_clock> CClient::get_connect_time()
     return connecttime;
 }
 
-std::chrono::time_point<std::chrono::steady_clock> CClient::get_disconnect_time()
+time_point<steady_clock> CClient::get_disconnect_time()
 {
     auto conn = get_connection_state();
     if (!conn) return disconnecttime;
@@ -406,7 +405,7 @@ std::chrono::time_point<std::chrono::steady_clock> CClient::get_disconnect_time(
     return connecttime;
 }
 
-std::chrono::time_point<std::chrono::steady_clock> CClient::get_last_packet_time()
+time_point<steady_clock> CClient::get_last_packet_time()
 {
     auto conn = get_connection_state();
     if (!conn) return lastpackettime;
@@ -415,11 +414,37 @@ std::chrono::time_point<std::chrono::steady_clock> CClient::get_last_packet_time
     return lastpackettime;
 }
 
-std::chrono::time_point<std::chrono::steady_clock> CClient::get_last_check_time()
+time_point<steady_clock> CClient::get_last_check_time()
 {
     auto conn = get_connection_state();
     if (!conn) return lastchecktime;
     if (conn->lastchecktime > lastchecktime)
         return conn->lastchecktime;
     return lastchecktime;
+}
+
+time_point<steady_clock> CClient::get_login_time()
+{
+    auto conn = get_connection_state();
+    if (!conn) return logintime;
+    if (conn->logintime > logintime)
+        return conn->logintime;
+    return logintime;
+}
+
+// todo - improve this heavily
+std::size_t CClient::write(stream_write & sw)
+{
+    if (connection_state.expired() == true)
+        return 0;
+
+    auto connection = connection_state.lock();
+    if (connection == nullptr)
+        return 0;
+    //outgoingqueue.push_back(new StreamWrite(sw));
+    connection_state_hb * conn_state = reinterpret_cast<connection_state_hb *>(connection.get());
+    ix::IXWebSocketSendData data{ sw.data, sw.position };
+    auto ws = conn_state->websocket.lock();
+    if (ws) return ws->sendBinary(data).payloadSize;
+    return 0;
 }

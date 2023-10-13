@@ -1,24 +1,21 @@
-// Teleport.h: interface for the CTeleport class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
-#if !defined(AFX_TELEPORT_H__A9554BE2_A96B_11D2_B143_00001C7030A6__INCLUDED_)
-#define AFX_TELEPORT_H__A9554BE2_A96B_11D2_B143_00001C7030A6__INCLUDED_
+#pragma once
 
 #include <windows.h>
-
-#if _MSC_VER > 1000
-#pragma once
-#endif // _MSC_VER > 1000
 
 class CTeleport  
 {
 public:
 	CTeleport(); 
-	virtual ~CTeleport();
+	~CTeleport() = default;
 
 	char  m_cTeleportNum;
-	char  m_cTeleportNpcName[21];								// The npc with teleport ability.
+	char  m_cTeleportNpcName[30];								// The npc with teleport ability.
 	char  m_cSourceMap[10];										// The map the teleport npc is located in.
 	char  m_cTargetMap[10];											// The map the player will be teleported to.
 	short m_sDestinationX, m_sDestinationY;						// The destination coordinates on the map.
@@ -30,5 +27,3 @@ public:
 			// aresden
 	BOOL m_bTeleportHunt, m_bTeleportNtrl, m_bTeleportCrmnl;	// Check if player is a Civilian, Neutral, or Criminal.
 };
-
-#endif // AFX_TELEPORT_H__A9554BE2_A96B_11D2_B143_00001C7030A6__INCLUDED_

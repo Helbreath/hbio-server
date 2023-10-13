@@ -1,18 +1,15 @@
-// TeleportLoc.cpp: implementation of the CTeleportLoc class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
 #include "TeleportLoc.h"
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 CTeleportLoc::CTeleportLoc()
 {
 
 	ZeroMemory(m_cDestMapName, sizeof(m_cDestMapName));
-	//ZeroMemory(m_cDestMapName2, sizeof(m_cDestMapName2));
 	m_sSrcX   = -1;
 	m_sSrcY	  = -1;
 	m_sDestX  = -1;								    
@@ -24,10 +21,5 @@ CTeleportLoc::CTeleportLoc()
 	m_iV2     = NULL;
 	m_dwTime  = NULL;
 	m_dwTime2 = NULL;
-
-}
-
-CTeleportLoc::~CTeleportLoc()
-{
 
 }

@@ -1,13 +1,10 @@
-// Game.h: interface for the CGame class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
-#if !defined(AFX_GAME_H__C3D29FC5_755B_11D2_A8E6_00001C7030A6__INCLUDED_)
-#define AFX_GAME_H__C3D29FC5_755B_11D2_A8E6_00001C7030A6__INCLUDED_
-
-#if _MSC_VER >= 1000
 #pragma once
-#endif
 
 #include <windows.h>
 #include <winbase.h>
@@ -24,39 +21,33 @@
 #include <string>
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
-//#include "utility.h"
-//#include "filewatcher.h"
 #include <ixwebsocket/IXWebSocketServer.h>
 #include <pqxx/pqxx>
 #include <pqxx/except>
 #include <shared_mutex>
-//#include "defines.h"
-//#include "funcs.h"
+#include <deque>
+#include "socket_defines.h"
 
 #include "StrTok.h"
 #include "Client.h"
 #include "Npc.h"
 #include "Map.h"
 #include "ActionID.h"
-#include "UserMessages.h"
 #include "NetMessages.h"
 #include "MessageIndex.h"
 #include "Misc.h"
-#include "Msg.h"
 #include "Magic.h"
 #include "Skill.h"
 #include "DynamicObject.h"
 #include "DelayEvent.h"
-#include "Version.h"
 #include "Fish.h"
 #include "DynamicObject.h"
 #include "DynamicObjectID.h"
-#include "Portion.h"
+#include "Potion.h"
 #include "Mineral.h"
 #include "Quest.h"
 #include "BuildItem.h"
 #include "TeleportLoc.h"
-#include "GlobalDef.h"
 #include "TempNpcItem.h"
 
 #define DEF_MAXADMINS				50
@@ -81,37 +72,36 @@
 #define DEF_AUTOSAVETIME			600000
 #define MAX_HELDENIANTOWER			200
 
-#define DEF_EXPSTOCKTIME		1000*10		// ExpStockÀ» °è»êÇÏ´Â ½Ã°£ °£°Ý 
-#define DEF_MSGQUENESIZE		100000		// ¸Þ½ÃÁö Å¥ »çÀÌÁî 10¸¸°³ 
-#define DEF_AUTOEXPTIME			1000*60*6	// ÀÚµ¿À¸·Î °æÇèÄ¡°¡ ¿Ã¶ó°¡´Â ½Ã°£°£°Ý 
-#define DEF_TOTALLEVELUPPOINT	3			// ·¹º§¾÷½Ã ÇÒ´çÇÏ´Â ÃÑ Æ÷ÀÎÆ® ¼ö 
-
+#define DEF_EXPSTOCKTIME		1000*10
+#define DEF_MSGQUENESIZE		100000
+#define DEF_AUTOEXPTIME			1000*60*6
+#define DEF_TOTALLEVELUPPOINT	3
 
 #define DEF_MAXDYNAMICOBJECTS	60000
 #define DEF_MAXDELAYEVENTS		60000
 #define DEF_GUILDSTARTRANK		12
 
-#define DEF_SSN_LIMIT_MULTIPLY_VALUE	2	// SSN-limit °öÇÏ´Â ¼ö 
+#define DEF_SSN_LIMIT_MULTIPLY_VALUE	2
 
-#define DEF_MAXNOTIFYMSGS		300			// ÃÖ´ë °øÁö»çÇ× ¸Þ½ÃÁö 
-#define DEF_MAXSKILLPOINTS		700			// ½ºÅ³ Æ÷ÀÎÆ®ÀÇ ÃÑÇÕ 
+#define DEF_MAXNOTIFYMSGS		300
+#define DEF_MAXSKILLPOINTS		700
 #define DEF_NIGHTTIME			40
 
-#define DEF_CHARPOINTLIMIT		1000		// °¢°¢ÀÇ Æ¯¼ºÄ¡ÀÇ ÃÖ´ë°ª 
-#define DEF_RAGPROTECTIONTIME	7000		// ¸î ÃÊ ÀÌ»ó Áö³ª¸é ·¢À¸·Î ºÎÅÍ º¸È£¸¦ ¹Þ´ÂÁö 
-#define DEF_MAXREWARDGOLD		99999999	// Æ÷»ó±Ý ÃÖ´ëÄ¡ 
+#define DEF_CHARPOINTLIMIT		1000
+#define DEF_RAGPROTECTIONTIME	7000
+#define DEF_MAXREWARDGOLD		99999999
 
-#define DEF_ATTACKAI_NORMAL				1	// ¹«Á¶°Ç °ø°Ý 
-#define DEF_ATTACKAI_EXCHANGEATTACK		2	// ±³È¯ °ø°Ý - ÈÄÅð 
-#define DEF_ATTACKAI_TWOBYONEATTACK		3	// 2-1 °ø°Ý, ÈÄÅð 
+#define DEF_ATTACKAI_NORMAL				1
+#define DEF_ATTACKAI_EXCHANGEATTACK		2
+#define DEF_ATTACKAI_TWOBYONEATTACK		3
 
 #define DEF_MAXFISHS					200
 #define DEF_MAXMINERALS					200
 #define	DEF_MAXCROPS					200
-#define DEF_MAXENGAGINGFISH				30  // ÇÑ ¹°°í±â¿¡ ³¬½Ã¸¦ ½ÃµµÇÒ ¼ö ÀÖ´Â ÃÖ´ë ÀÎ¿ø 
-#define DEF_MAXPORTIONTYPES				500 // ÃÖ´ë Æ÷¼Ç Á¤ÀÇ °¹¼ö 
+#define DEF_MAXENGAGINGFISH				30
+#define DEF_MAXPORTIONTYPES				500
 
-#define DEF_SPECIALEVENTTIME			300000 //600000 // 10ºÐ
+#define DEF_SPECIALEVENTTIME			300000
 #define DEF_MAXQUESTTYPE				200
 #define DEF_DEF_MAXHELDENIANDOOR			10
 
@@ -122,7 +112,6 @@
 #define DEF_ITEMLOG_NEWGENDROP			5
 #define DEF_ITEMLOG_DUPITEMID			6
 
-// New 07/05/2004
 #define DEF_ITEMLOG_BUY					7
 #define DEF_ITEMLOG_SELL				8
 #define DEF_ITEMLOG_RETRIEVE			9
@@ -138,8 +127,8 @@
 
 #define DEF_MAXDUPITEMID				100
 
-#define DEF_MAXGUILDS					1000 // µ¿½Ã¿¡ Á¢¼ÓÇÒ ¼ö ÀÖ´Â ±æµå¼ö 
-#define DEF_MAXONESERVERUSERS			800	// 800 // ÇÑ ¼­¹ö¿¡¼­ Çã¿ëÇÒ ¼ö ÀÖ´Â ÃÖ´ë »ç¿ëÀÚ¼ö. ÃÊ°úµÈ °æ¿ì ºÎÈ°Á¸ È¤Àº ºí¸®µù ¾ÆÀÏ, ³ó°æÁö·Î º¸³»Áø´Ù.
+#define DEF_MAXGUILDS					1000
+#define DEF_MAXONESERVERUSERS			800
 
 #define DEF_MAXGATESERVERSTOCKMSGSIZE	10000
 
@@ -148,40 +137,20 @@
 #define DEF_MAXAPOCALYPSE				7
 #define DEF_MAXHELDENIAN				10
 
-//v1.4311-3  »çÅõÀåÀÇ ÃÖ´ë ¼ýÀÚ
 #define DEF_MAXFIGHTZONE 10 
 
-//============================
-#define DEF_LEVELLIMIT		20				// Ã¼ÇèÆÇ ·¹º§ Á¦ÇÑÄ¡!!!			
-//============================
+#define DEF_LEVELLIMIT		20
+#define DEF_MINIMUMHITRATIO 15
+#define DEF_MAXIMUMHITRATIO	99
+#define DEF_PLAYERMAXLEVEL	180
+#define DEF_GMGMANACONSUMEUNIT	15
 
-//============================
-#define DEF_MINIMUMHITRATIO 15				// ÃÖÀú ¸íÁß È®·ü 
-//============================		
-
-//============================
-#define DEF_MAXIMUMHITRATIO	99				// ÃÖ´ë ¸íÁß È®·ü
-//============================
-
-//============================
-#define DEF_PLAYERMAXLEVEL	180				// ÃÖ´ë ·¹º§: Npc.cfg ÆÄÀÏ¿¡ ¼³Á¤µÇ¾î ÀÖÁö ¾ÊÀ» °æ¿ì m_iPlayerMaxLevel¿¡ ÀÔ·ÂµÈ´Ù.
-//============================
-
-//============================
-// New Changed 12/05/2004
-#define DEF_GMGMANACONSUMEUNIT	15			// Grand Magic Generator ¸¶³ª Èí¼ö ´ÜÀ§.
-//============================
-
-#define DEF_MAXCONSTRUCTIONPOINT 30000		// ÃÖ´ë ¼ÒÈ¯ Æ÷ÀÎÆ® 
+#define DEF_MAXCONSTRUCTIONPOINT 30000
 #define DEF_MAXSUMMONPOINTS		 30000
 #define DEF_MAXWARCONTRIBUTION	 200000
 
 
-// MOG Definitions - 3.51
-// Level up MSG
 #define MSGID_LEVELUPSETTINGS				0x11A01000
-// 2003-04-14 ÁöÁ¸ Æ÷ÀÎÆ®¸¦ ·¹º§ ¼öÁ¤¿¡ ¾µ¼ö ÀÖ´Ù...
-// Stat Point Change MSG
 #define MSGID_STATECHANGEPOINT				0x11A01001
 
 //#define DEF_NOTIFY_STATECHANGE_FAILED 0x11A01002
@@ -189,10 +158,8 @@
 //#define DEF_NOTIFY_STATECHANGE_SUCCESS 0x11A01004
 //#define DEF_NOTIFY_SETTING_SUCCESS 0x11A01005
 
-//Mine
 //#define DEF_NOTIFY_SETTING_FAILED 0x11A01003
 //#define DEF_NOTIFY_SETTING_SUCCESS 0x11A01005
-//2.24
 //#define DEF_NOTIFY_SETTING_FAILED 0xBB4
 //#define DEF_NOTIFY_SETTING_SUCCESS 0xBB3
 
@@ -205,26 +172,25 @@
 #define DEF_CHR 0x06
 
 #define DEF_TEST 0xFFFF0000
-//#define DEF_TESTSERVER
 
 #define NO_MSGSPEEDCHECK
 
-#define DEF_XSOCKEVENT_SOCKETMISMATCH			-121	// ¼ÒÄÏ ÀÌº¥Æ®¿Í ¼ÒÄÏÀÌ ¼­·Î ´Ù¸£´Ù. (ÀÌ·± °æ¿ì°¡?)
-#define DEF_XSOCKEVENT_CONNECTIONESTABLISH		-122	// Á¢¼ÓÀÌ ÀÌ·ç¾î Á³´Ù.
-#define DEF_XSOCKEVENT_RETRYINGCONNECTION		-123	// Á¢¼ÓÀ» ´Ù½Ã ½ÃµµÇÏ´Â ÁßÀÌ´Ù.
-#define DEF_XSOCKEVENT_ONREAD					-124	// ¸Þ½ÃÁö¸¦ ÀÐ´Â ÁßÀÌ´Ù. 
-#define DEF_XSOCKEVENT_READCOMPLETE				-125	// ÇÏ³ªÀÇ ¸Þ½ÃÁö¸¦ ¿ÏÀüÈ÷ ¼ö½ÅÇß´Ù.
-#define DEF_XSOCKEVENT_UNKNOWN					-126	// ¾Ë¼ö¾ø´Â ÀÌº¥Æ®ÀÌ´Ù.
-#define DEF_XSOCKEVENT_SOCKETCLOSED				-127	// ¼ÒÄÏÀÌ ´ÝÇû´Ù. 
-#define DEF_XSOCKEVENT_BLOCK					-128	// ¸Þ½ÃÁö¸¦ º¸³»´Ù°¡ ¼ÒÄÏÀÌ ºí·°µÈ »óÅÂÀÌ´Ù.
-#define DEF_XSOCKEVENT_SOCKETERROR				-129	// ¼ÒÄÏ¿¡ ¿¡·¯°¡ ¹ß»ýÇß´Ù. ÀÌ°æ¿ì Å¬·¡½º¸¦ »èÁ¦ÇÏ¿©¾ß ÇÑ´Ù.
-#define DEF_XSOCKEVENT_CRITICALERROR			-130    // Ä¡¸íÀûÀÎ ¿¡·¯·Î ÇÁ·Î±×·¥ ÀüÃ¼°¡ ¸ØÃç¾ß ÇÑ´Ù.
-#define DEF_XSOCKEVENT_NOTINITIALIZED			-131	// Å¬·¡½º°¡ ÃÊ±âÈ­ µÇÁö ¾ÊÀº »óÅÂ·Î »ç¿ëµÆ´Ù.
-#define DEF_XSOCKEVENT_MSGSIZETOOLARGE			-132	// º¸³»°íÀÚ ÇÏ´Â ¸Þ½ÃÁöÀÇ »çÀÌÁî°¡ ³Ê¹« Å©´Ù.
-#define DEF_XSOCKEVENT_CONFIRMCODENOTMATCH		-133	// È®ÀÎÄÚµå°¡ ÀÏÄ¡ÇÏÁö ¾Ê´Â´Ù. »èÁ¦µÇ¾î¾ß ÇÑ´Ù.
-#define DEF_XSOCKEVENT_QUENEFULL                -134    // ºí·Ï Å¥ÀÇ °ø°£ÀÌ ¾ø´Ù.
-#define DEF_XSOCKEVENT_UNSENTDATASENDBLOCK		-135    // Å¥¿¡ ÀÖ´Â µ¥ÀÌÅÍ¸¦ º¸³»´Ù°¡ ¶Ç ºí·ÏÀÌ °É·È´Ù. 
-#define DEF_XSOCKEVENT_UNSENTDATASENDCOMPLETE	-136	// Å¥¿¡ ÀÖ´Â ¸ðµç µ¥ÀÌÅÍ¸¦ º¸³Â´Ù.
+#define DEF_XSOCKEVENT_SOCKETMISMATCH			-121
+#define DEF_XSOCKEVENT_CONNECTIONESTABLISH		-122
+#define DEF_XSOCKEVENT_RETRYINGCONNECTION		-123
+#define DEF_XSOCKEVENT_ONREAD					-124
+#define DEF_XSOCKEVENT_READCOMPLETE				-125
+#define DEF_XSOCKEVENT_UNKNOWN					-126
+#define DEF_XSOCKEVENT_SOCKETCLOSED				-127
+#define DEF_XSOCKEVENT_BLOCK					-128
+#define DEF_XSOCKEVENT_SOCKETERROR				-129
+#define DEF_XSOCKEVENT_CRITICALERROR			-130
+#define DEF_XSOCKEVENT_NOTINITIALIZED			-131
+#define DEF_XSOCKEVENT_MSGSIZETOOLARGE			-132
+#define DEF_XSOCKEVENT_CONFIRMCODENOTMATCH		-133
+#define DEF_XSOCKEVENT_QUENEFULL                -134
+#define DEF_XSOCKEVENT_UNSENTDATASENDBLOCK		-135
+#define DEF_XSOCKEVENT_UNSENTDATASENDCOMPLETE	-136
 
 enum class server_status
 {
@@ -255,6 +221,18 @@ enum class login_server_status
 class CGame  
 {
 public:
+
+    //todo: fix this dumb shit
+    void * operator new (size_t size)
+    {
+        return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+    };
+
+    void operator delete(void * mem)
+    {
+        HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, mem);
+    };
+
     std::vector<spdlog::sink_ptr> sinks;
     std::shared_ptr<spdlog::logger> log;
 
@@ -269,16 +247,28 @@ public:
 
     std::string world_name;
 
-    std::string sqluser;
-    std::string sqlpass;
-    std::string sqldb;
-    std::string sqlhost;
-    uint16_t sqlport;
+    std::string login_sqluser;
+    std::string login_sqlpass;
+    std::string login_sqldb;
+    std::string login_sqlhost;
+    uint16_t login_sqlport;
+
+    std::string game_sqluser;
+    std::string game_sqlpass;
+    std::string game_sqldb;
+    std::string game_sqlhost;
+    uint16_t game_sqlport;
+
+    std::string login_auth_url;
+    std::string login_auth_key;
+
     std::string bindip;
     uint16_t bindport;
 
     std::unique_ptr<pqxx::connection> pq_login;
     std::unique_ptr<pqxx::connection> pq_game;
+    std::shared_mutex login_sql_mtx;
+    std::shared_mutex game_sql_mtx;
 
     void load_config();
     void run();
@@ -297,6 +287,35 @@ public:
     login_server_status login_status_ = login_server_status::uninitialized;
 
     void on_message(std::shared_ptr<ix::ConnectionState> connection_state, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message);
+    void process_binary_message(socket_message sm);
+    void load_configs();
+
+    void handle_login_server_message(socket_message & sm);
+
+    std::deque<std::unique_ptr<socket_message>> packet_queue;
+    std::mutex packet_mtx;
+
+    bool check_account_auth(CClient * client, std::string & account, std::string & pass, int64_t & account_id);
+    std::set<std::shared_ptr<CClient>> client_list;
+    std::set<std::shared_ptr<CNpc>> npc_list;
+    std::recursive_mutex client_list_mtx;
+    std::shared_mutex npc_list_mtx;
+    std::vector<std::string> maps_loaded;
+
+    void build_character_list(CClient * client, stream_write & sw);
+    bool RequestLogin(std::string account, std::string password);
+    void create_character(CClient * client, stream_read & sr);
+    void delete_character(CClient * client, stream_read & sr);
+    void enter_game(CClient * client, stream_read & sr);
+
+    int64_t create_db_character(pqxx::transaction_base & t, character_db & character);
+    void update_db_character(pqxx::transaction_base & t, character_db & character);
+    void delete_db_character(pqxx::transaction_base & t, character_db & character);
+    void prepare_login_statements();
+    void prepare_game_statements();
+    bool is_account_in_use(int64_t account_id);
+
+    //////////////////////////////////////////////////////////////////////////
 
 
 
@@ -348,10 +367,8 @@ public:
 	void GlobalStartApocalypseMode(int iClientH, char *pData, DWORD dwMsgSize);
 	void OpenApocalypseGate(int iClientH);
 
-	// KLKS clean tiles
 	void AdminOrder_CleanMap(int iClientH, char * pData, DWORD dwMsgSize);
 	
-	// Lists
 	BOOL bReadBannedListConfigFile(char *pFn);
 	BOOL bReadAdminListConfigFile(char *pFn);
 
@@ -360,8 +377,7 @@ public:
 	void Command_BlueBall(int iClientH, char *pData,DWORD dwMsgSize);
 	void Command_YellowBall(int iClientH, char* pData, DWORD dwMsgSize);
 
-	// Crusade
-	void ManualEndCrusadeMode(int iWinnerSide); // 2.17 (x) 2.14 ( )
+	void ManualEndCrusadeMode(int iWinnerSide);
 	void CrusadeWarStarter();
 	BOOL bReadCrusadeGUIDFile(char * cFn);
 	void _CreateCrusadeGUID(DWORD dwCrusadeGUID, int iWinnerSide);
@@ -412,21 +428,19 @@ public:
 
 	void AdminOrder_ClearNpc(int iClientH);
 
-	// Settings.cfg
 	BOOL bReadSettingsConfigFile(char * cFn);
 
-	//  BOOL bReadTeleportConfigFile(char * cFn);
-	//	void RequestTeleportD2Handler(int iClientH, char * pData);
+//   BOOL bReadTeleportConfigFile(char * cFn);
+//   void RequestTeleportD2Handler(int iClientH, char * pData);
 	
 	BOOL bReadAdminSetConfigFile(char * cFn);
 
 
-	// Hack Checks
 	BOOL bCheckClientMoveFrequency(int iClientH, DWORD dwClientTime);
 	BOOL bCheckClientMagicFrequency(int iClientH, DWORD dwClientTime);
 	BOOL bCheckClientAttackFrequency(int iClientH, DWORD dwClientTime);
 
-	// BOOL bCheckClientInvisibility(short iClientH);
+//   BOOL bCheckClientInvisibility(short iClientH);
 
 	void SetDefenseShieldFlag(short sOwnerH, char cOwnerType, BOOL bStatus);
 	void SetMagicProtectionFlag(short sOwnerH, char cOwnerType, BOOL bStatus);
@@ -474,13 +488,13 @@ public:
 	void AdminOrder_CallGuard(int iClientH, char * pData, DWORD dwMsgSize);
 	void AdminOrder_DisconnectAll(int iClientH, char * pData, DWORD dwMsgSize);
 
-	BOOL bCopyItemContents(class CItem * pOriginal, class CItem * pCopy);
+	BOOL bCopyItemContents(CItem * pOriginal, CItem * pCopy);
 	int  iGetMapLocationSide(char * pMapName);
 	void ChatMsgHandlerGSM(int iMsgType, int iV1, char * pName, char * pData, DWORD dwMsgSize);
 	void RemoveClientShortCut(int iClientH);
 	BOOL bAddClientShortCut(int iClientH);
 
-	void GSM_RequestFindCharacter(WORD wReqServerID, WORD wReqClientH, char *pName, char * pFinder); // New 16/05/2001 Changed
+	void GSM_RequestFindCharacter(WORD wReqServerID, WORD wReqClientH, char *pName, char * pFinder);
 	void ServerStockMsgHandler(char * pData);
 	void SendStockMsgToGateServer();
 	BOOL bStockMsgToGateServer(char * pData, DWORD dwSize);
@@ -491,7 +505,7 @@ public:
 	void AgingMapSectorInfo();
 	void UpdateMapSectorInfo();
 	BOOL bGetItemNameWhenDeleteNpc(int & iItemID, short sNpcType);
-	int iGetItemWeight(class CItem * pItem, int iCount);
+	int iGetItemWeight(CItem * pItem, int iCount);
 	void CancelQuestHandler(int iClientH);
 	void ActivateSpecialAbilityHandler(int iClientH);
 	void EnergySphereProcessor(BOOL bIsAdminCreate = FALSE, int iClientH = NULL);
@@ -510,8 +524,8 @@ public:
 	void SetIceFlag(short sOwnerH, char cOwnerType, BOOL bStatus);
 	void _bDecodeNoticementFileContents(char * pData, DWORD dwMsgSize);
 	void RequestNoticementHandler(int iClientH, char * pData);
-	void _AdjustRareItemValue(class CItem * pItem);
-	BOOL _bCheckDupItemID(class CItem * pItem);
+	void _AdjustRareItemValue(CItem * pItem);
+	BOOL _bCheckDupItemID(CItem * pItem);
 	BOOL _bDecodeDupItemIDFileContents(char * pData, DWORD dwMsgSize);
 	void NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType);
 	int  iGetPlayerABSStatus(int iWhatH, int iRecvH);
@@ -525,8 +539,8 @@ public:
 	int  iGetMaxMP(int iClientH);
 	int  iGetMaxSP(int iClientH);
 	void _ClearQuestStatus(int iClientH);
-	BOOL _bCheckItemReceiveCondition(int iClientH, class CItem * pItem);
-	void SendItemNotifyMsg(int iClientH, WORD wMsgType, class CItem * pItem, int iV1);
+	BOOL _bCheckItemReceiveCondition(int iClientH, CItem * pItem);
+	void SendItemNotifyMsg(int iClientH, WORD wMsgType, CItem * pItem, int iV1);
 	
 	int _iTalkToNpcResult_WTower(int iClientH, int * pQuestType, int * pMode, int * pRewardType, int * pRewardAmount, int * pContribution, char * pTargetName, int * pTargetType, int * pTargetCount, int * pX, int * pY, int * pRange);
 	int _iTalkToNpcResult_WHouse(int iClientH, int * pQuestType, int * pMode, int * pRewardType, int * pRewardAmount, int * pContribution, char * pTargetName, int * pTargetType, int * pTargetCount, int * pX, int * pY, int * pRange);
@@ -540,7 +554,7 @@ public:
 	BOOL _bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize);
 	
 	void CancelExchangeItem(int iClientH);
-	BOOL bAddItem(int iClientH, class CItem * pItem, char cMode);
+	BOOL bAddItem(int iClientH, CItem * pItem, char cMode);
 	void ConfirmExchangeItem(int iClientH);
 	void SetExchangeItem(int iClientH, int iItemIndex, int iAmount);
 	void ExchangeItemHandler(int iClientH, short sItemIndex, int iAmount, short dX, short dY, WORD wObjectID, char * pItemName);
@@ -589,7 +603,7 @@ public:
 	void FishProcessor();
 	int iCheckFish(int iClientH, char cMapIndex, short dX, short dY);
 	BOOL bDeleteFish(int iHandle, int iDelMode);
-	int  iCreateFish(char cMapIndex, short sX, short sY, short sDifficulty, class CItem * pItem, int iDifficulty, DWORD dwLastTime);
+	int  iCreateFish(char cMapIndex, short sX, short sY, short sDifficulty, CItem * pItem, int iDifficulty, DWORD dwLastTime);
 	void UserCommand_DissmissGuild(int iClientH, char * pData, DWORD dwMsgSize);
 	void UserCommand_BanGuildsman(int iClientH, char * pData, DWORD dwMsgSize);
 	int iGetExpLevel(int iExp);
@@ -635,7 +649,7 @@ public:
 	void OnKeyUp(WPARAM wParam, LPARAM lParam);
 	void OnKeyDown(WPARAM wParam, LPARAM lParam);
 	BOOL bCheckTotalSkillMasteryPoints(int iClientH, int iSkill);
-	BOOL bSetItemToBankItem(int iClientH, class CItem * pItem);
+	BOOL bSetItemToBankItem(int iClientH, CItem * pItem);
 	void NpcMagicHandler(int iNpcH, short dX, short dY, short sType);
 	BOOL bCheckResistingIceSuccess(char cAttackerDir, short sTargetH, char cTargetType, int iHitRatio);
 	BOOL bCheckResistingMagicSuccess(char cAttackerDir, short sTargetH, char cTargetType, int iHitRatio);
@@ -668,7 +682,6 @@ public:
 	void RequestCivilRightHandler(int iClientH, char * pData);
 	BOOL bCheckLimitedUser(int iClientH);
 	void LevelUpSettingsHandler(int iClientH, char * pData, DWORD dwMsgSize);
-	// v1.4311-3 ¼±¾ð ÇÔ¼ö  »çÅõÀå ¿¹¾à ÇÔ¼ö ¼±¾ð FightzoneReserveHandler
 	void FightzoneReserveHandler(int iClientH, char * pData, DWORD dwMsgSize);
 	BOOL bCheckLevelUp(int iClientH);
 	int iGetLevelExp(int iLevel);
@@ -697,7 +710,7 @@ public:
 	void CalculateGuildEffect(int iVictimH, char cVictimType, short sAttackerH);
 	void OnStartGameSignal();
 	int iDice(int iThrow, int iRange);
-	BOOL _bInitNpcAttr(class CNpc * pNpc, char * pNpcName, short sClass, char cSA);
+	BOOL _bInitNpcAttr(CNpc * pNpc, char * pNpcName, short sClass, char cSA);
 	BOOL _bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize);
 	void ReleaseItemHandler(int iClientH, short sItemIndex, BOOL bNotice);
 	void ClientKilledHandler(int iClientH, int iAttackerH, char cAttackerType, short sDamage);
@@ -718,13 +731,12 @@ public:
 	int  iClientMotion_Stop_Handler(int iClientH, short sX, short sY, char cDir);
 	
 	BOOL bEquipItemHandler(int iClientH, short sItemIndex, BOOL bNotify = TRUE);
-	BOOL _bAddClientItemList(int iClientH, class CItem * pItem, int * pDelReq);
+	BOOL _bAddClientItemList(int iClientH, CItem * pItem, int * pDelReq);
 	int  iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char cDir);
 	void DropItemHandler(int iClientH, short sItemIndex, int iAmount, char * pItemName, BOOL bByPlayer = TRUE);
 	void ClientCommonHandler(int iClientH, char * pData);
-	BOOL __fastcall bGetMsgQuene(char * pFrom, char * pData, DWORD * pMsgSize, int * pIndex, char * pKey);
 	void MsgProcess();
-	BOOL __fastcall bPutMsgQuene(char cFrom, char * pData, DWORD dwMsgSize, int iIndex, char cKey);
+	void PutMsgQueue(std::unique_ptr<socket_message> & sm);
 	void NpcBehavior_Flee(int iNpcH);
 	int iGetDangerValue(int iNpcH, short dX, short dY);
 	void NpcBehavior_Dead(int iNpcH);
@@ -745,14 +757,14 @@ public:
 	BOOL _bReadMapInfoFiles(int iMapIndex);
 	
 	BOOL _bGetIsStringIsNumber(char * pStr);
-	BOOL _bInitItemAttr(class CItem * pItem, char * pItemName);
+	BOOL _bInitItemAttr(CItem * pItem, char * pItemName);
 	BOOL bReadProgramConfigFile(char * cFn);
 	void GameProcess();
 	void InitPlayerData(int iClientH, char * pData, DWORD dwSize);
 	void ResponsePlayerDataHandler(char * pData, DWORD dwSize);
 	//BOOL bSendMsgToLS(DWORD dwMsg, int iClientH, BOOL bFlag = TRUE, char *pData = NULL);
 	void CheckClientResponseTime();
-	void OnTimer(char cType);
+	void OnTimer();
 	int iComposeMoveMapData(short sX, short sY, int iClientH, char cDir, char * pData);
 	void SendEventToNearClient_TypeB(DWORD dwMsgID, WORD wMsgType, char cMapIndex, short sX, short sY, short sV1, short sV2, short sV3, short sV4 = NULL);
 	void SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, DWORD dwMsgID, WORD wMsgType, short sV1, short sV2, short sV3);
@@ -762,22 +774,16 @@ public:
 	void RequestInitPlayerHandler(int iClientH, char * pData, char cKey);
 	int iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDir, char cMoveType);
 	void ClientMotionHandler(int iClientH, char * pData);
-	void DisplayInfo(HDC hdc);
-	void OnClientRead(int iClientH);
 	BOOL bInit();
 	void GetFightzoneTicketHandler(int iClientH);
 	void FightzoneReserveProcessor() ;
 
-	// New 06/05/2004
-	// Upgrades
 	BOOL bCheckIsItemUpgradeSuccess(int iClientH, int iItemIndex, int iSomH, BOOL bBonus = FALSE);
 	void RequestItemUpgradeHandler(int iClientH, int iItemIndex);
 
-	// ArchAngle's Codes
 	void StormBringer(int iClientH, short dX, short dY);
 	void FireBow(short iClientH, short dX, short dY);
 	
-	//Party Codes
 	void RequestCreatePartyHandler(int iClientH);
 	void PartyOperationResultHandler(char *pData);
 	void PartyOperationResult_Create(int iClientH, char *pName, int iResult, int iPartyID);
@@ -792,30 +798,23 @@ public:
 	void RequestAcceptJoinPartyHandler(int iClientH, int iResult);
 	void GetExp(int iClientH, int iExp, BOOL bIsAttackerOwn = FALSE);
 
-	// New 07/05/2004
-	// Guild Codes
 	void RequestGuildNameHandler(int iClientH, int iObjectID, int iIndex);
 
-	// Item Logs
-	BOOL _bItemLog(int iAction,int iClientH , char * cName, class CItem * pItem);
-	BOOL _bItemLog(int iAction,int iGiveH, int iRecvH, class CItem * pItem,BOOL bForceItemLog = FALSE);
-	BOOL _bCheckGoodItem( class CItem * pItem );
+	BOOL _bItemLog(int iAction,int iClientH , char * cName, CItem * pItem);
+	BOOL _bItemLog(int iAction,int iGiveH, int iRecvH, CItem * pItem,BOOL bForceItemLog = FALSE);
+	BOOL _bCheckGoodItem(CItem * pItem );
 
 	BOOL bCheckAndConvertPlusWeaponItem(int iClientH, int iItemIndex);
 	void ArmorLifeDecrement(int iAttackerH, int iTargetH, char cOwnerType, int iValue);
 
-	// MultiDrops
 	BOOL bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability, int iMin, int iMax, short sBaseX, short sBaseY,
 											   int iItemSpreadType, int iSpreadRange,
 											   int *iItemIDs, POINT *BasePos, int *iNumItem);
 
-	// Player shutup
 	void GSM_RequestShutupPlayer(char * pGMName,WORD wReqServerID, WORD wReqClientH, WORD wTime,char * pPlayer );
 
-	// PK Logs
 	BOOL _bPKLog(int iAction,int iAttackerH , int iVictumH, char * pNPC);
 
-	//HBest code
 	void CritInc(int iClientH);
 	void AddGizon(int iClientH);
 	void CheckTimeOut(int iClientH);
@@ -840,7 +839,6 @@ public:
 
 	int  m_iLimitedUserExp, m_iLevelExp20;
 
-//private:
 	BOOL _bDecodeItemConfigFileContents(char * pData, DWORD dwMsgSize);
 	int _iComposePlayerDataFileContents(int iClientH, char * pData);
 	BOOL _bDecodePlayerDatafileContents(int iClientH, char * pData, DWORD dwSize);
@@ -848,12 +846,11 @@ public:
 
 	CClient * m_pClientList[DEF_MAXCLIENTS];
 	CNpc    * m_pNpcList[DEF_MAXNPCS];
-	class CMap    * m_pMapList[DEF_MAXMAPS];
+	CMap    * m_pMapList[DEF_MAXMAPS];
 	CNpcItem * m_pTempNpcItem[DEF_MAXNPCITEMS];
 	CDynamicObject * m_pDynamicObjectList[DEF_MAXDYNAMICOBJECTS];
 	CDelayEvent    * m_pDelayEventList[DEF_MAXDELAYEVENTS];
 
-	CMsg    * m_pMsgQuene[DEF_MSGQUENESIZE];
 	int             m_iQueneHead, m_iQueneTail;
 	int             m_iTotalMaps;
 	CMisc     m_Misc;
@@ -865,7 +862,7 @@ public:
 	CMagic  * m_pMagicConfigList[DEF_MAXMAGICTYPE];
 	CSkill  * m_pSkillConfigList[DEF_MAXSKILLTYPE];
 	CQuest  * m_pQuestConfigList[DEF_MAXQUESTTYPE];
-	//class CTeleport * m_pTeleportConfigList[DEF_MAXTELEPORTTYPE];
+	//CTeleport * m_pTeleportConfigList[DEF_MAXTELEPORTTYPE];
 
 	char            m_pMsgBuffer[DEF_MSGBUFFERSIZE+1];
 
@@ -888,24 +885,23 @@ public:
 	BOOL  m_cDayOrNight;
  	int   m_iSkillSSNpoint[102];
 
-	class CMsg * m_pNoticeMsgList[DEF_MAXNOTIFYMSGS];
 	int   m_iTotalNoticeMsg, m_iPrevSendNoticeMsg;
 	DWORD m_dwNoticeTime, m_dwSpecialEventTime;
 	BOOL  m_bIsSpecialEventTime;
 	char  m_cSpecialEventType;
 
-	int m_iLevelExpTable[200];	//New 22/10/04
+	int m_iLevelExpTable[200];
 
- 	class CFish * m_pFish[DEF_MAXFISHS];
-	class CPortion * m_pPortionConfigList[DEF_MAXPORTIONTYPES];
+ 	CFish * m_pFish[DEF_MAXFISHS];
+	CPotion * m_pPortionConfigList[DEF_MAXPORTIONTYPES];
 
 	BOOL  m_bIsServerShutdowned;
 	char  m_cShutDownCode;
-	class CMineral * m_pMineral[DEF_MAXMINERALS];
+	CMineral * m_pMineral[DEF_MAXMINERALS];
 
 	int   m_iMiddlelandMapIndex; 
-	int   m_iAresdenMapIndex;		// ¾Æ·¹½ºµ§ ¸Ê ÀÎµ¦½º 
-	int	  m_iElvineMapIndex;		// ¿¤¹ÙÀÎ ¸Ê ÀÎµ¦½º
+	int   m_iAresdenMapIndex;
+	int	  m_iElvineMapIndex;
 	int   m_iBTFieldMapIndex;
 	int   m_iGodHMapIndex;
 	int   m_iAresdenOccupyTiles;
@@ -926,8 +922,8 @@ public:
 	
 	int	  m_iStrategicStatus;
 	
-	class CBuildItem * m_pBuildItemList[DEF_MAXBUILDITEMS];
-	class CItem * m_pDupItemIDList[DEF_MAXDUPITEMID];
+	CBuildItem * m_pBuildItemList[DEF_MAXBUILDITEMS];
+	CItem * m_pDupItemIDList[DEF_MAXDUPITEMID];
 
 	char * m_pNoticementData;
 	DWORD  m_dwNoticementDataSize;
@@ -935,11 +931,10 @@ public:
 	DWORD  m_dwMapSectorInfoTime;
 	int    m_iMapSectorInfoUpdateCount;
 
-	// Crusade Ã³¸®¿ë
 	int	   m_iCrusadeCount;	
 	BOOL   m_bIsCrusadeMode;		
 	BOOL   m_bIsApocalypseMode;
-	// Daryl - Chat logging option
+
 	BOOL m_bLogChatOption;
 
 	struct {
@@ -953,14 +948,13 @@ public:
 	int m_iCollectedMana[3];
 	int m_iAresdenMana, m_iElvineMana;
 
-	class CTeleportLoc m_pGuildTeleportLoc[DEF_MAXGUILDS];
-	//
+	CTeleportLoc m_pGuildTeleportLoc[DEF_MAXGUILDS];
 
 	WORD  m_wServerID_GSS;
 	char  m_cGateServerStockMsg[DEF_MAXGATESERVERSTOCKMSGSIZE];
 	int   m_iIndexGSS;
 
-	int m_iLastCrusadeWinner; 	// New 13/05/2004
+	int m_iLastCrusadeWinner;
 	struct {
 		int iCrashedStructureNum;
 		int iStructureDamageAmount;
@@ -974,14 +968,13 @@ public:
 	} m_stMiddleCrusadeStructureInfo[DEF_MAXCRUSADESTRUCTURES];
 
 	struct {
-		char m_cBannedIPaddress[21];
+		char m_cBannedIPaddress[30];
 	} m_stBannedList[DEF_MAXBANNED];
 
 	struct {
 		char m_cGMName[11];
 	} m_stAdminList[DEF_MAXADMINS];
 
-	// Crusade Scheduler
 	struct {
 		int iDay;
 		int iHour;
@@ -1023,7 +1016,6 @@ public:
 		int iIndex[9];
 	}m_stPartyInfo[DEF_MAXCLIENTS];
 
-	// Daryl - Admin level adjustments
 	int m_iAdminLevelWho;
 	int m_iAdminLevelGMKill;
 	int m_iAdminLevelGMRevive;
@@ -1068,24 +1060,18 @@ public:
 	int m_iAdminLevelCheckStatus;
 	int m_iAdminLevelCleanMap;
 
-	// 09/26/2004
 	short m_sSlateSuccessRate;
 
-	// 17/05/2004
 	short m_sForceRecallTime;
 
-	// 22/05/2004
 	int	 m_iPrimaryDropRate, m_iSecondaryDropRate;
 
-	// 25/05/2004
 	int m_iFinalShutdownCount;
 
-	// New 06/07/2004
 	BOOL m_bEnemyKillMode;
 	int m_iEnemyKillAdjust;
 	BOOL m_bAdminSecurity;
 	
-	// Configurable Raid Time 
 	short m_sRaidTimeMonday; 
 	short m_sRaidTimeTuesday; 
 	short m_sRaidTimeWednesday; 
@@ -1097,7 +1083,6 @@ public:
 	BOOL m_bManualTime;
 	int m_iSummonGuildCost;
 	
-	// Apocalypse
 	BOOL	m_bIsApocalyseMode;
 	BOOL	m_bIsHeldenianMode;
 	BOOL	m_bIsHeldenianTeleport;
@@ -1105,10 +1090,8 @@ public:
 
 	DWORD m_dwApocalypseGUID;
 	
-	// Slate exploit
 	int m_sCharPointLimit;
 
-	// Limit Checks
 	short m_sCharStatLimit;
 	BOOL m_bAllow100AllSkill;
 	short m_sCharSkillLimit;
@@ -1140,7 +1123,7 @@ public:
 	void RemoveCrusadeRecallTime(void);
 	BOOL _bCrusadeLog(int iAction,int iClientH,int iData, char * cName);
 	int iGetPlayerABSStatus(int iClientH);
-	BOOL _bInitItemAttr(class CItem * pItem, int iItemID);
+	BOOL _bInitItemAttr(CItem * pItem, int iItemID);
 	void ReqCreateSlateHandler(int iClientH, char* pData);
 	void SetSlateFlag(int iClientH, short sType, bool bFlag);
 	void CheckForceRecallTime(int iClientH);
@@ -1156,5 +1139,3 @@ public:
 	void CheckAngelUnequip(int iClientH, int iAngelID);
 	int iAngelEquip(int iClientH);*/
 };
-
-#endif // !defined(AFX_GAME_H__C3D29FC5_755B_11D2_A8E6_00001C7030A6__INCLUDED_)

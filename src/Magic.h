@@ -1,13 +1,10 @@
-// Magic.h: interface for the CMagic class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
-#if !defined(AFX_MAGIC_H__CD611900_EF3A_11D2_9B6C_00001C7030A6__INCLUDED_)
-#define AFX_MAGIC_H__CD611900_EF3A_11D2_9B6C_00001C7030A6__INCLUDED_
-
-#if _MSC_VER >= 1000
 #pragma once
-#endif // _MSC_VER >= 1000
 
 #include <windows.h>
 
@@ -34,10 +31,8 @@
 #define DEF_MAGICTYPE_DAMAGE_AREA_NOSPOT		21 // Meteor-Strike, Mass-Magic-Missile
 #define DEF_MAGICTYPE_TREMOR					22
 #define DEF_MAGICTYPE_ICE						23
-// 24 
 #define DEF_MAGICTYPE_DAMAGE_AREA_NOSPOT_SPDOWN	25
 #define DEF_MAGICTYPE_ICE_LINEAR				26 // Blizzard
-// 27
 #define DEF_MAGICTYPE_DAMAGE_AREA_ARMOR_BREAK   28
 #define DEF_MAGICTYPE_CANCELLATION				29
 #define DEF_MAGICTYPE_DAMAGE_LINEAR_SPDOWN		30 // Earth-Shock-Wave
@@ -50,8 +45,19 @@
 class CMagic  
 {									 
 public:
-	CMagic();
-	virtual ~CMagic();
+	CMagic() = default;
+	~CMagic() = default;
+
+    //todo: fix this dumb shit
+    void * operator new (size_t size)
+    {
+        return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+    };
+
+    void operator delete(void * mem)
+    {
+        HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, mem);
+    };
 
 	char m_cName[31];
 
@@ -62,9 +68,6 @@ public:
 	short m_sIntLimit;
 	int   m_iGoldCost;
 	
-	char  m_cCategory; // ¸¶aý Ál·u: RDaÝ ¸¶aý 0, °r°Ý¸¶aý 1, aclî ¸¶aý 2 
-	int   m_iAttribute; // ¸¶aý LÓLs:  ¶A 1 ÇD´A 2 sN 3 a° 4  
+	char  m_cCategory;
+	int   m_iAttribute;
 };
-
-#endif // !defined(AFX_MAGIC_H__CD611900_EF3A_11D2_9B6C_00001C7030A6__INCLUDED_)
-

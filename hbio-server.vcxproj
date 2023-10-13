@@ -23,13 +23,12 @@
     <ClInclude Include="src\BuildItem.h" />
     <ClInclude Include="src\Client.h" />
     <ClInclude Include="src\connection_state_hb.h" />
-    <ClInclude Include="src\CrusadeCore.h" />
+    <ClInclude Include="src\defines.h" />
     <ClInclude Include="src\DelayEvent.h" />
     <ClInclude Include="src\DynamicObject.h" />
     <ClInclude Include="src\DynamicObjectID.h" />
     <ClInclude Include="src\Fish.h" />
     <ClInclude Include="src\Game.h" />
-    <ClInclude Include="src\GlobalDef.h" />
     <ClInclude Include="src\GuildsMan.h" />
     <ClInclude Include="src\Item.h" />
     <ClInclude Include="src\Magic.h" />
@@ -37,57 +36,96 @@
     <ClInclude Include="src\MessageIndex.h" />
     <ClInclude Include="src\Mineral.h" />
     <ClInclude Include="src\Misc.h" />
-    <ClInclude Include="src\Msg.h" />
     <ClInclude Include="src\NetMessages.h" />
     <ClInclude Include="src\Npc.h" />
     <ClInclude Include="src\OccupyFlag.h" />
-    <ClInclude Include="src\Player.h" />
-    <ClInclude Include="src\Portion.h" />
+    <ClInclude Include="src\Potion.h" />
     <ClInclude Include="src\Quest.h" />
-    <ClInclude Include="src\resource.h" />
     <ClInclude Include="src\Skill.h" />
-    <ClInclude Include="src\SkillNum.h" />
+    <ClInclude Include="src\socket_defines.h" />
     <ClInclude Include="src\StrategicPoint.h" />
     <ClInclude Include="src\streams.h" />
     <ClInclude Include="src\StrTok.h" />
-    <ClInclude Include="src\Structure.h" />
     <ClInclude Include="src\Teleport.h" />
     <ClInclude Include="src\TeleportLoc.h" />
     <ClInclude Include="src\TempNpcItem.h" />
     <ClInclude Include="src\Tile.h" />
-    <ClInclude Include="src\UserMessages.h" />
-    <ClInclude Include="src\Version.h" />
+    <ClInclude Include="src\time_utils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\account_management.cpp" />
+    <ClCompile Include="src\admin_commands.cpp" />
+    <ClCompile Include="src\apocalypse.cpp" />
+    <ClCompile Include="src\basic_login.cpp" />
+    <ClCompile Include="src\binary_messages.cpp" />
+    <ClCompile Include="src\binary_messages_legacy.cpp" />
     <ClCompile Include="src\BuildItem.cpp" />
+    <ClCompile Include="src\character_management.cpp" />
     <ClCompile Include="src\Client.cpp" />
+    <ClCompile Include="src\client_motion_handlers.cpp" />
+    <ClCompile Include="src\config_loader.cpp" />
+    <ClCompile Include="src\config_parsing.cpp" />
     <ClCompile Include="src\connection_state_hb.cpp" />
-    <ClCompile Include="src\CrusadeCore.cpp" />
-    <ClCompile Include="src\DelayEvent.cpp" />
+    <ClCompile Include="src\core.cpp" />
+    <ClCompile Include="src\crusade.cpp" />
     <ClCompile Include="src\DynamicObject.cpp" />
+    <ClCompile Include="src\effect_handlers.cpp" />
+    <ClCompile Include="src\event_handlers.cpp" />
     <ClCompile Include="src\Fish.cpp" />
     <ClCompile Include="src\Game.cpp" />
-    <ClCompile Include="src\GuildsMan.cpp" />
+    <ClCompile Include="src\hbx_login.cpp" />
+    <ClCompile Include="src\heldenian.cpp" />
     <ClCompile Include="src\Item.cpp" />
-    <ClCompile Include="src\Magic.cpp" />
+    <ClCompile Include="src\login_server.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Map.cpp" />
     <ClCompile Include="src\Mineral.cpp" />
     <ClCompile Include="src\Misc.cpp" />
-    <ClCompile Include="src\Msg.cpp" />
     <ClCompile Include="src\Npc.cpp" />
-    <ClCompile Include="src\NpcItem.cpp" />
+    <ClCompile Include="src\npc_behaviors.cpp" />
+    <ClCompile Include="src\npc_dead_item_generator.cpp" />
+    <ClCompile Include="src\npc_talking.cpp" />
     <ClCompile Include="src\OccupyFlag.cpp" />
-    <ClCompile Include="src\Portion.cpp" />
-    <ClCompile Include="src\Quest.cpp" />
-    <ClCompile Include="src\Skill.cpp" />
-    <ClCompile Include="src\StrategicPoint.cpp" />
+    <ClCompile Include="src\party_operations.cpp" />
+    <ClCompile Include="src\Potion.cpp" />
+    <ClCompile Include="src\request_handlers.cpp" />
+    <ClCompile Include="src\response_handlers.cpp" />
+    <ClCompile Include="src\sockets.cpp" />
+    <ClCompile Include="src\sql.cpp" />
     <ClCompile Include="src\StrTok.cpp" />
-    <ClCompile Include="src\Structure.cpp" />
     <ClCompile Include="src\Teleport.cpp" />
     <ClCompile Include="src\TeleportLoc.cpp" />
-    <ClCompile Include="src\TempNpcItem.cpp" />
     <ClCompile Include="src\Tile.cpp" />
+    <ClCompile Include="src\user_commands.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".editorconfig" />
+    <None Include=".gitattributes" />
+    <None Include=".gitignore" />
+    <None Include="bin\config.json" />
+    <None Include="bin\Crusade.cfg" />
+    <None Include="bin\GameConfigs\AdminList.cfg" />
+    <None Include="bin\GameConfigs\AdminSettings.cfg" />
+    <None Include="bin\GameConfigs\BannedList.cfg" />
+    <None Include="bin\GameConfigs\BuildItem.cfg" />
+    <None Include="bin\GameConfigs\Item.cfg" />
+    <None Include="bin\GameConfigs\Item2.cfg" />
+    <None Include="bin\GameConfigs\Item3.cfg" />
+    <None Include="bin\GameConfigs\Magic.cfg" />
+    <None Include="bin\GameConfigs\NPC.cfg" />
+    <None Include="bin\GameConfigs\Potion.cfg" />
+    <None Include="bin\GameConfigs\Quest.cfg" />
+    <None Include="bin\GameConfigs\Settings.cfg" />
+    <None Include="bin\GameConfigs\Skill.cfg" />
+    <None Include="bin\GServer.cfg" />
+    <None Include="bin\NpcItem.cfg" />
+    <None Include="bin\Schedule.cfg" />
+    <None Include="bin\Scheduler.cfg" />
+    <None Include="bin\TeleportList.cfg" />
+    <None Include="bin\TopPlayers.cfg" />
+    <None Include="bin\WarSchedule.cfg" />
+    <None Include="DCO.md" />
+    <None Include="vcpkg.json" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -115,6 +153,8 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
+    <EnableASAN>false</EnableASAN>
+    <EnableFuzzer>false</EnableFuzzer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -190,12 +230,12 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_SILENCE_CXX20_CISO646_REMOVED_WARNING;HELBREATHX;NOMINMAX;WIN32_LEAN_AND_MEAN;FMT_HEADER_ONLY;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;WIN32;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HELBREATHX;_SILENCE_CXX20_CISO646_REMOVED_WARNING;NOMINMAX;WIN32_LEAN_AND_MEAN;FMT_HEADER_ONLY;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;WIN32;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <StringPooling>true</StringPooling>
+      <StringPooling>false</StringPooling>
       <ControlFlowGuard>false</ControlFlowGuard>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
@@ -204,7 +244,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>winmm.lib;crypt32.lib;;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>crypt32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -213,7 +253,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;FMT_HEADER_ONLY;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;WIN32;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HELBREATHX;_SILENCE_CXX20_CISO646_REMOVED_WARNING;NOMINMAX;WIN32_LEAN_AND_MEAN;FMT_HEADER_ONLY;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;WIN32;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -227,7 +267,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>winmm.lib;crypt32.lib;;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>crypt32.lib;;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

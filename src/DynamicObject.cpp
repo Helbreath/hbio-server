@@ -1,12 +1,10 @@
-// DynamicObject.cpp: implementation of the CDynamicObject class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
 #include "DynamicObject.h"
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 CDynamicObject::CDynamicObject(short sOwner, char cOwnerType, short sType, char cMapIndex, short sX, short sY, DWORD dwRegisterTime, DWORD dwLastTime, int iV1)
 {
@@ -25,8 +23,3 @@ CDynamicObject::CDynamicObject(short sOwner, char cOwnerType, short sType, char 
 	m_iCount         = 0;
 	m_iV1            = iV1;
 }										   
-
-CDynamicObject::~CDynamicObject()
-{
-
-}

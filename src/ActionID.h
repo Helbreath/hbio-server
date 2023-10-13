@@ -1,3 +1,9 @@
+//
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
+
 #define DEF_TOTALACTION			10
 
 #define DEF_OBJECTSTOP			0

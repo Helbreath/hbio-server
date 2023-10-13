@@ -1,3 +1,8 @@
+//
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
 #define DEF_DYNAMICOBJECT_FIRE			1
 #define DEF_DYNAMICOBJECT_FISH			2

@@ -1,13 +1,10 @@
-// StrTok.cpp: implementation of the CStrTok class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
 #include "StrTok.h"
-extern void PutLogFileList(char * cStr);
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 CStrTok::CStrTok(char * pData, char * pSeps)
 {
@@ -16,11 +13,6 @@ CStrTok::CStrTok(char * pData, char * pSeps)
 
 	m_iDataLength = strlen(pData);
 	m_iCurLoc     = 0;
-}
-
-CStrTok::~CStrTok()
-{
-
 }
 
 char * CStrTok::pGet()
@@ -38,13 +30,11 @@ char * CStrTok::pGet()
 		else cNextData = NULL;
 
 		if (_bIsSeperator(m_pData[m_iCurLoc], cNextData) == FALSE) {
-			// separator°¡ ¾Æ´Ï¸é ÅäÅ«À» ÀÛ¼º  
 			m_cToken[i] = m_pData[m_iCurLoc];
 			i++;
 			m_iCurLoc++;
 		}
 		else {
-			// ´ÙÀ½ ÅäÅ«±îÁö Æ÷ÀÎÅÍ¸¦ ÀÌµ¿½ÃÅ²ÈÄ ÅäÅ«À» ¹ÝÈ¯ÇÑ´Ù.
 			bFlag = FALSE;
 			while (bFlag == FALSE) {
 				if (m_iCurLoc <= (m_iDataLength - 2))

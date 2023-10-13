@@ -1,14 +1,12 @@
-// Fish.cpp: implementation of the CFish class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
 #include "Fish.h"
 
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
-
-CFish::CFish(char cMapIndex, short sX, short sY, short sType, class CItem * pItem, int iDifficulty)
+CFish::CFish(char cMapIndex, short sX, short sY, short sType, CItem * pItem, int iDifficulty)
 {
 	m_cMapIndex		= cMapIndex;
 	m_sX			= sX;
@@ -21,6 +19,8 @@ CFish::CFish(char cMapIndex, short sX, short sY, short sType, class CItem * pIte
 	
 	if (m_iDifficulty <= 0) 
 		m_iDifficulty = 1;
+
+    m_sDynamicObjectHandle = 0;
 }
 
 CFish::~CFish()

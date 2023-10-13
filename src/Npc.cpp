@@ -1,12 +1,10 @@
-// Npc.cpp: implementation of the CNpc class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
 #include "Npc.h"
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 CNpc::CNpc(char * pName5)
 {
@@ -53,38 +51,3 @@ CNpc::CNpc(char * pName5)
 	m_iNpcItemMax = 0;
 
 }
-
-CNpc::~CNpc()
-{
-
-}
-
-
-/*// .text:004BAFD0
-// xfers to: m_vNpcItem.at, bGetItemNameWhenDeleteNpc, sub_4BC360
-void CNpc::m_vNpcItem.size()
-{
- int iRet;
- class CNpcItem * pTempNpcItem;
-	
-	if (pTempNpcItem->m_cName == NULL) {
-		iRet = 0;
-	}
-	else {
-		iRet = pTempNpcItem->8 - (pTempNpcItem->m_cName >> 5);
-	}
-	return iRet;
-
-}
-
-// .text:.text:004BB010
-// xfers to: bGetItemNameWhenDeleteNpc
-// xfers from: sub_4BB3D0, sub_4BB340, m_vNpcItem.size
-void CNpc::m_vNpcItem.at(int iResult)
-{ 
-	if (iResult < m_vNpcItem.size()) {
-		sub_4BB3D0();
-	}
-	sub_4BB340() += (iResult << 5);
-
-}*/

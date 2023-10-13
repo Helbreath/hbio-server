@@ -1,12 +1,10 @@
-// OccupyFlag.cpp: implementation of the COccupyFlag class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
 #include "OccupyFlag.h"
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 COccupyFlag::COccupyFlag(int dX, int dY, char cSide, int iEKNum, int iDOI)
 {
@@ -17,9 +15,4 @@ COccupyFlag::COccupyFlag(int dX, int dY, char cSide, int iEKNum, int iDOI)
 	m_iEKCount = iEKNum;
 
 	m_iDynamicObjectIndex = iDOI;
-}
-
-COccupyFlag::~COccupyFlag()
-{
-
 }

@@ -1,13 +1,10 @@
-// TeleportLoc.h: interface for the CTeleportLoc class.
 //
-//////////////////////////////////////////////////////////////////////
+// Copyright (c) Sharon Fox (sharon at sharonfox dot dev)
+//
+// Distributed under the MIT License. (See accompanying file LICENSE)
+//
 
-#if !defined(AFX_TELEPORTLOC_H__D4288400_F8C0_11D2_9B6C_00001C7030A6__INCLUDED_)
-#define AFX_TELEPORTLOC_H__D4288400_F8C0_11D2_9B6C_00001C7030A6__INCLUDED_
-
-#if _MSC_VER >= 1000
 #pragma once
-#endif // _MSC_VER >= 1000
 
 #include <windows.h>
 
@@ -15,7 +12,7 @@ class CTeleportLoc
 {
 public:
 	CTeleportLoc(); 
-	virtual ~CTeleportLoc();
+	~CTeleportLoc() = default;
 												  
 	short m_sSrcX, m_sSrcY;
 
@@ -28,5 +25,3 @@ public:
 	DWORD m_dwTime, m_dwTime2;
 
 };
-
-#endif // !defined(AFX_TELEPORTLOC_H__D4288400_F8C0_11D2_9B6C_00001C7030A6__INCLUDED_)

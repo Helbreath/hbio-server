@@ -25,10 +25,6 @@ int main(int argc, char * argv[])
     CGame * game = new CGame();
     game->run();
 
-//     core core_{};
-// 
-//     core_.run();
-
 #if defined(WIN32)
     ix::uninitNetSystem();
 #endif
