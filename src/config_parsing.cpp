@@ -179,12 +179,12 @@ void CGame::load_config()
 
 #if defined(HELBREATHX)
             if (!cfg["login_auth_url"].is_null())
-                login_auth_url = cfg["login_auth_url"].get<uint16_t>();
+                login_auth_url = cfg["login_auth_url"].get<std::string>();
             else
                 throw std::runtime_error("No login_auth_url set");
 
             if (!cfg["login_auth_key"].is_null())
-                login_auth_key = cfg["login_auth_key"].get<uint16_t>();
+                login_auth_key = cfg["login_auth_key"].get<std::string>();
             else
                 throw std::runtime_error("No login_auth_key set");
 #endif
@@ -223,8 +223,15 @@ void CGame::load_config()
                     throw std::runtime_error(fmt::format("Unable to connect to SQL - {}", ex.what()));
                 }
 
-                prepare_login_statements();
-                prepare_game_statements();
+                try
+                {
+                    prepare_login_statements();
+                    prepare_game_statements();
+                }
+                catch (std::exception & ex)
+                {
+                    throw std::runtime_error(std::format("Unable to prepare SQL statements - {}", ex.what()));
+                }
 
                 log->info("Connected to SQL");
             }
@@ -269,7 +276,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                     switch (cReadModeB)
                     {
                         case 1:
-                            // Â¾Ã†Ã€ÃŒÃ…Ã› Ã€ÃŒÂ¸Â§ 
                             ZeroMemory(m_pBuildItemList[iIndex]->m_cName, sizeof(m_pBuildItemList[iIndex]->m_cName));
                             memcpy(m_pBuildItemList[iIndex]->m_cName, token, strlen(token));
 
@@ -277,7 +283,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 2:
-                            // Â½ÂºÃ…Â³ ÃÂ¦Ã‡Ã‘Ã„Â¡ 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format(1).");
@@ -291,7 +296,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 3:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format.");
@@ -331,7 +335,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 6:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format.");
@@ -371,7 +374,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 9:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format.");
@@ -412,7 +414,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
 
 
                         case 12:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format.");
@@ -452,7 +453,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 15:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format.");
@@ -494,7 +494,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
 
 
                         case 18:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format.");
@@ -537,7 +536,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
 
 
                         case 21:
-                            // m_iAverageValue
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format.");
@@ -552,7 +550,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 22:
-                            // m_iMaxSkill
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format.");
@@ -567,7 +564,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 23:
-                            // m_wAttribute
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! BuildItem configuration file error - Wrong Data format.");
@@ -584,10 +580,8 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                             pItem = new CItem;
                             if (_bInitItemAttr(pItem, m_pBuildItemList[iIndex]->m_cName) == TRUE)
                             {
-                                // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Ã‡ ÃÂ¸Ã€Ã§Â°Â¡ ÃˆÂ®Ã€ÃŽÂµÃ‡Â¾ÃºÂ´Ã™.
                                 m_pBuildItemList[iIndex]->m_sItemID = pItem->m_sIDnum;
 
-                                // ÃƒÃ–Â´Ã« Â°Â¡ÃÃŸÃ„Â¡Â°Âª Â°Ã¨Â»Ãª
                                 for (i = 0; i < 6; i++)
                                     m_pBuildItemList[iIndex]->m_iMaxValue += (m_pBuildItemList[iIndex]->m_iMaterialItemValue[i] * 100);
 
@@ -595,7 +589,6 @@ BOOL CGame::_bDecodeBuildItemConfigFileContents(char * pData, DWORD dwMsgSize)
                             }
                             else
                             {
-                                // Ã€ÃŒÂ·Â± Ã€ÃŒÂ¸Â§Ã€Â» Â°Â¡ÃÃ¸ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ ÃÂ¸Ã€Ã§Ã‡ÃÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™. Â¿Â¡Â·Â¯ 
                                 wsprintf(G_cTxt, "(!!!) CRITICAL ERROR! BuildItem configuration file error - Not Existing Item(%s)", m_pBuildItemList[iIndex]->m_cName);
                                 log->info(G_cTxt);
 
@@ -669,7 +662,6 @@ BOOL CGame::_bDecodeDupItemIDFileContents(char * pData, DWORD dwMsgSize)
                     switch (cReadModeB)
                     {
                         case 1:
-                            // ½ºÅ³ ¹øÈ£ 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) ERROR! DupItemID configuration file error - Wrong Data format.");
@@ -680,7 +672,6 @@ BOOL CGame::_bDecodeDupItemIDFileContents(char * pData, DWORD dwMsgSize)
 
                             if (m_pDupItemIDList[atoi(token)] != NULL)
                             {
-                                // ÀÌ¹Ì ÇÒ´çµÈ ¹øÈ£°¡ ÀÖ´Ù. ¿¡·¯ÀÌ´Ù.
                                 log->info("(!!!) ERROR! DupItemID configuration file error - Duplicate magic number.");
                                 delete pContents;
                                 delete pStrTok;
@@ -693,7 +684,6 @@ BOOL CGame::_bDecodeDupItemIDFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 2:
-                            // m_sTouchEffectType
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) ERROR! DupItemID configuration file error - Wrong Data format.");
@@ -706,7 +696,6 @@ BOOL CGame::_bDecodeDupItemIDFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 3:
-                            // m_sTouchEffectValue1
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) ERROR! DupItemID configuration file error - Wrong Data format.");
@@ -719,7 +708,6 @@ BOOL CGame::_bDecodeDupItemIDFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 4:
-                            // m_sTouchEffectValue2
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) ERROR! DupItemID configuration file error - Wrong Data format.");
@@ -732,7 +720,6 @@ BOOL CGame::_bDecodeDupItemIDFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 5:
-                            // m_sTouchEffectValue3
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) ERROR! DupItemID configuration file error - Wrong Data format.");
@@ -745,7 +732,6 @@ BOOL CGame::_bDecodeDupItemIDFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 6:
-                            // m_wPrice
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) ERROR! DupItemID configuration file error - Wrong Data format.");
@@ -756,10 +742,6 @@ BOOL CGame::_bDecodeDupItemIDFileContents(char * pData, DWORD dwMsgSize)
                             m_pDupItemIDList[iIndex]->m_wPrice = (WORD)atoi(token);
                             cReadModeA = 0;
                             cReadModeB = 0;
-
-                            //testcode
-                            //wsprintf(G_cTxt, "(%d) %d %d %d %d", iIndex, m_pDupItemIDList[iIndex]->m_sTouchEffectType, m_pDupItemIDList[iIndex]->m_sTouchEffectValue1, m_pDupItemIDList[iIndex]->m_sTouchEffectValue2, m_pDupItemIDList[iIndex]->m_sTouchEffectValue3); 
-                            //log->info(G_cTxt);
                             break;
                     }
                     break;
@@ -1201,7 +1183,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
 
     pStrTok = new CStrTok(pContents, seps);
     token = pStrTok->pGet();
-    //token = strtok(pContents, seps);
     while (token != NULL)
     {
         if (cReadModeA != 0)
@@ -1212,7 +1193,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                     switch (cReadModeB)
                     {
                         case 1:
-                            // Â¸Â¶Â¹Ã½ Â¹Ã¸ÃˆÂ£ 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1223,7 +1203,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
 
                             if (m_pMagicConfigList[atoi(token)] != NULL)
                             {
-                                // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃˆ Â¹Ã¸ÃˆÂ£Â°Â¡ Ã€Ã–Â´Ã™. Â¿Â¡Â·Â¯Ã€ÃŒÂ´Ã™.
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Duplicate magic number.");
                                 delete pContents;
                                 delete pStrTok;
@@ -1236,14 +1215,12 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 2:
-                            // Â¸Â¶Â¹Ã½ Ã€ÃŒÂ¸Â§ 
                             ZeroMemory(m_pMagicConfigList[iMagicConfigListIndex]->m_cName, sizeof(m_pMagicConfigList[iMagicConfigListIndex]->m_cName));
                             memcpy(m_pMagicConfigList[iMagicConfigListIndex]->m_cName, token, strlen(token));
                             cReadModeB = 3;
                             break;
 
                         case 3:
-                            // Â¸Â¶Â¹Ã½ ÃÂ¾Â·Ã¹ m_sType
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1256,7 +1233,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 4:
-                            // Â¸Â¶Â¹Ã½ ÂµÃ´Â·Â¹Ã€ÃŒ Â½ÃƒÂ°Â£ m_dwDelayTime
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1269,7 +1245,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 5:
-                            // Â¸Â¶Â¹Ã½ ÃÃ¶Â¼Ã“Â½ÃƒÂ°Â£ m_dwLastTime
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1282,7 +1257,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 6:
-                            // m_sValue1
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1295,7 +1269,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 7:
-                            // m_sValue2
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1308,7 +1281,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 8:
-                            // m_sValue3
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1321,7 +1293,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 9:
-                            // m_sValue4
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1334,7 +1305,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 10:
-                            // m_sValue5
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1347,7 +1317,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 11:
-                            // m_sValue6
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1360,7 +1329,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 12:
-                            // m_sValue7
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1373,7 +1341,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 13:
-                            // m_sValue8
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1386,7 +1353,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 14:
-                            // m_sValue9
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1399,7 +1365,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 15:
-                            // m_sValue10
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1412,7 +1377,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 16:
-                            // m_sValue11
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1425,7 +1389,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 17:
-                            // m_sValue12
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1438,7 +1401,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 18:
-                            // m_sIntLimit
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1451,7 +1413,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 19:
-                            // m_iGoldCost
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1465,7 +1426,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 20:
-                            // m_cCategory
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1478,7 +1438,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 21:
-                            // m_iAttribute
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -1507,7 +1466,6 @@ BOOL CGame::_bDecodeMagicConfigFileContents(char * pData, DWORD dwMsgSize)
 
         }
         token = pStrTok->pGet();
-        //token = strtok(NULL, seps);
     }
 
     delete pStrTok;
@@ -1541,7 +1499,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
 
     pStrTok = new CStrTok(pContents, seps);
     token = pStrTok->pGet();
-    //token = strtok(pContents, seps);
     while (token != NULL)
     {
         if (cReadModeA != 0)
@@ -1552,7 +1509,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
                     switch (cReadModeB)
                     {
                         case 1:
-                            // Â½ÂºÃ…Â³ Â¹Ã¸ÃˆÂ£ 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! SKILL configuration file error - Wrong Data format.");
@@ -1563,7 +1519,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
 
                             if (m_pSkillConfigList[atoi(token)] != NULL)
                             {
-                                // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃˆ Â¹Ã¸ÃˆÂ£Â°Â¡ Ã€Ã–Â´Ã™. Â¿Â¡Â·Â¯Ã€ÃŒÂ´Ã™.
                                 log->info("(!!!) CRITICAL ERROR! SKILL configuration file error - Duplicate magic number.");
                                 delete pContents;
                                 delete pStrTok;
@@ -1576,14 +1531,12 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 2:
-                            // Â½ÂºÃ…Â³ Ã€ÃŒÂ¸Â§ 
                             ZeroMemory(m_pSkillConfigList[iSkillConfigListIndex]->m_cName, sizeof(m_pSkillConfigList[iSkillConfigListIndex]->m_cName));
                             memcpy(m_pSkillConfigList[iSkillConfigListIndex]->m_cName, token, strlen(token));
                             cReadModeB = 3;
                             break;
 
                         case 3:
-                            // Â½ÂºÃ…Â³ ÃÂ¾Â·Ã¹ m_sType
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! SKILL configuration file error - Wrong Data format.");
@@ -1596,7 +1549,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 4:
-                            // m_sValue1
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! SKILL configuration file error - Wrong Data format.");
@@ -1609,7 +1561,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 5:
-                            // m_sValue2
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! SKILL configuration file error - Wrong Data format.");
@@ -1622,7 +1573,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 6:
-                            // m_sValue3
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! SKILL configuration file error - Wrong Data format.");
@@ -1635,7 +1585,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 7:
-                            // m_sValue4
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! SKILL configuration file error - Wrong Data format.");
@@ -1648,7 +1597,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 8:
-                            // m_sValue5
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! SKILL configuration file error - Wrong Data format.");
@@ -1661,7 +1609,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 9:
-                            // m_sValue6
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! SKILL configuration file error - Wrong Data format.");
@@ -1690,7 +1637,6 @@ BOOL CGame::_bDecodeSkillConfigFileContents(char * pData, DWORD dwMsgSize)
 
         }
         token = pStrTok->pGet();
-        //token = strtok(NULL, seps);
     }
 
     delete pStrTok;
@@ -1745,7 +1691,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
 
     pStrTok = new CStrTok(pContents, seps);
     token = pStrTok->pGet();
-    //token = strtok(pContents, seps);
     while (token != NULL)
     {
         if (cReadModeA != 0)
@@ -1756,7 +1701,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                     switch (cReadModeB)
                     {
                         case 1:
-                            // NPC
                             if (strlen(token) > 20)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Too long Npc name.");
@@ -1769,7 +1713,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             cReadModeB = 2;
                             break;
                         case 2:
-                            // m_sType
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1781,7 +1724,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             cReadModeB = 3;
                             break;
                         case 3:
-                            // m_iHitDice
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1793,7 +1735,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             cReadModeB = 4;
                             break;
                         case 4:
-                            // m_iDefenseRatio
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1805,7 +1746,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             cReadModeB = 5;
                             break;
                         case 5:
-                            // m_iHitRatio
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1817,7 +1757,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             cReadModeB = 6;
                             break;
                         case 6:
-                            // m_iMinBravery
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1829,7 +1768,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             cReadModeB = 7;
                             break;
                         case 7:
-                            // m_iExpDiceMin
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1842,7 +1780,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 8:
-                            // m_iExpDiceMax
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1855,7 +1792,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 9:
-                            // m_iGoldDiceMin
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1868,7 +1804,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 10:
-                            // m_iGoldDiceMax
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1881,7 +1816,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 11:
-                            // m_cAttackDiceThrow
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1894,7 +1828,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 12:
-                            // m_cAttackDiceRange
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1907,7 +1840,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 13:
-                            // m_cSize
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1932,7 +1864,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 15:
-                            // ActionLimit 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1945,7 +1876,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 16:
-                            // Action Time
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1958,7 +1888,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 17:
-                            // ResistMagic
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1971,7 +1900,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 18:
-                            // cMagicLevel
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1984,7 +1912,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 19:
-                            // cGenDayWeekLimit  // Ã†Â¯ÃÂ¤ Â¿Ã¤Ã€ÃÂ¿Â¡Â¸Â¸ Â»Ã½Â¼ÂºÂµÃ‡Â´Ã‚ Â¸Ã³Â½ÂºÃ…ÃÂ¿Â©ÂºÃŽ 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -1997,7 +1924,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 20:
-                            // cChatMsgPresence
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -2009,15 +1935,11 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
 
                             if (m_pNpcConfigList[iNpcConfigListIndex]->m_cChatMsgPresence == 1)
                             {
-                                // Â¿Â¬Â°Ã¡ÂµÃˆ ÃƒÂ¤Ã†Ãƒ Â¸ÃžÂ½ÃƒÃÃ¶Â°Â¡ ÃÂ¸Ã€Ã§Ã‡Ã‘Â´Ã™. Â³Â»Â¿Ã«Ã€Â» Ã€ÃÂ¾Ã® Ã€ÃºÃ€Ã¥Ã‡Ã‘Â´Ã™. 
-
-
                             }
                             cReadModeB = 21;
                             break;
 
                         case 21:
-                            // m_cTargetSearchRange
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -2031,7 +1953,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 22:
-                            // Npc Ã€Ã§ Â»Ã½Â¼ÂºÂ±Ã®ÃÃ¶Ã€Ã‡ Â½ÃƒÂ°Â£
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -2045,7 +1966,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 23:
-                            // Attribute
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -2059,7 +1979,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 24:
-                            // Absorb Magic Damage
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -2073,7 +1992,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 25:
-                            // Maximum Mana Point
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -2087,7 +2005,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 26:
-                            // MagicHitRatio
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -2101,7 +2018,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 27:
-                            // AttackRange
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! NPC configuration file error - Wrong Data format.");
@@ -2144,7 +2060,6 @@ BOOL CGame::_bDecodeNpcConfigFileContents(char * pData, DWORD dwMsgSize)
             }
         }
         token = pStrTok->pGet();
-        //token = strtok(NULL, seps);
     }
 
     delete pStrTok;
@@ -2198,7 +2113,6 @@ BOOL CGame::_bDecodeOccupyFlagSaveFileContents(char * pData, DWORD dwMsgSize)
                     switch (cReadModeB)
                     {
                         case 1:
-                            // Side
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! OccupyFlag save file error - Wrong Data format.");
@@ -2212,7 +2126,6 @@ BOOL CGame::_bDecodeOccupyFlagSaveFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 2:
-                            // X ÃÃ‚Ã‡Â¥ 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! OccupyFlag save file error - Wrong Data format.");
@@ -2226,7 +2139,6 @@ BOOL CGame::_bDecodeOccupyFlagSaveFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 3:
-                            // Y ÃÃ‚Ã‡Â¥  
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! OccupyFlag save file error - Wrong Data format.");
@@ -2240,7 +2152,6 @@ BOOL CGame::_bDecodeOccupyFlagSaveFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 4:
-                            // EKNum
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! OccupyFlag save file error - Wrong Data format.");
@@ -2251,7 +2162,6 @@ BOOL CGame::_bDecodeOccupyFlagSaveFileContents(char * pData, DWORD dwMsgSize)
 
                             iEKNum = atoi(token);
 
-                            // ÂµÂ¥Ã€ÃŒÃ…ÃÂ¸Â¦ Â¸Ã°ÂµÃŽ Â¸Â¸ÂµÃ©Â¾ÃºÃ€Â¸Â¹Ã‡Â·ÃŽ Â±ÃªÂ¹ÃŸÃ€Â» ÂµÃ®Â·ÃÃ‡Ã‘Â´Ã™. (!!! Master FlagÂ·ÃŽ ÃƒÂ³Â¸Â®Ã‡Ã˜Â¾ÃŸÂ¸Â¸ Â¼Â³Ã„Â¡Ã‡Ã’ Â¼Ã¶ Ã€Ã–Â´Ã™)
                             if (__bSetOccupyFlag(m_iMiddlelandMapIndex, dX, dY, iSide, iEKNum, -1, TRUE) == TRUE)
                                 iTotalFlags++;
 
@@ -2405,7 +2315,7 @@ BOOL CGame::_bDecodePlayerDatafileContents(int iClientH, char * pData, DWORD dwS
 
                             if (_bInitItemAttr(m_pClientList[iClientH]->m_pItemList[iItemIndex], token) == FALSE)
                             {
-                                wsprintf(cTxt, "(!!!) Client(%s)-Item(%s) is not existing Item! Conection closed.", m_pClientList[iClientH]->m_cCharName, token);
+                                wsprintf(cTxt, "(!!!) Client(%s)-Item(%s) is not existing Item! Connection closed.", m_pClientList[iClientH]->m_cCharName, token);
                                 log->info(cTxt);
 
                                 HANDLE hFile;
@@ -4178,7 +4088,6 @@ BOOL CGame::_bDecodePortionConfigFileContents(char * pData, DWORD dwMsgSize)
                     switch (cReadModeB)
                     {
                         case 1:
-                            // Æ÷¼Ç ¹øÈ£ 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! POTION configuration file error - Wrong Data format(1).");
@@ -4189,7 +4098,6 @@ BOOL CGame::_bDecodePortionConfigFileContents(char * pData, DWORD dwMsgSize)
 
                             if (m_pPortionConfigList[atoi(token)] != NULL)
                             {
-                                // ÀÌ¹Ì ÇÒ´çµÈ ¹øÈ£°¡ ÀÖ´Ù. ¿¡·¯ÀÌ´Ù.
                                 log->info("(!!!) CRITICAL ERROR! POTION configuration file error - Duplicate portion number.");
                                 delete pContents;
                                 delete pStrTok;
@@ -4202,14 +4110,12 @@ BOOL CGame::_bDecodePortionConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 2:
-                            // Æ÷¼Ç ÀÌ¸§ 
                             ZeroMemory(m_pPortionConfigList[iPortionConfigListIndex]->m_cName, sizeof(m_pPortionConfigList[iPortionConfigListIndex]->m_cName));
                             memcpy(m_pPortionConfigList[iPortionConfigListIndex]->m_cName, token, strlen(token));
                             cReadModeB = 3;
                             break;
 
                         default:
-                            // ¸¶¹ý Á¾·ù m_sArray[0~10]
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -4222,7 +4128,6 @@ BOOL CGame::_bDecodePortionConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 14:
-                            // ¸¶Áö¸· m_sArray[11]
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -4235,7 +4140,6 @@ BOOL CGame::_bDecodePortionConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 15:
-                            // ½ºÅ³ Á¦ÇÑÄ¡ 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -4248,7 +4152,6 @@ BOOL CGame::_bDecodePortionConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 16:
-                            // ³­ÀÌµµ
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! MAGIC configuration file error - Wrong Data format.");
@@ -4320,7 +4223,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                     switch (cReadModeB)
                     {
                         case 1:
-                            // Ã„Ã¹Â½ÂºÃ†Â® Â¹Ã¸ÃˆÂ£ 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4331,7 +4233,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
 
                             if (m_pQuestConfigList[atoi(token)] != NULL)
                             {
-                                // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃˆ Â¹Ã¸ÃˆÂ£Â°Â¡ Ã€Ã–Â´Ã™. Â¿Â¡Â·Â¯Ã€ÃŒÂ´Ã™.
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Duplicate quest number.");
                                 delete pContents;
                                 delete pStrTok;
@@ -4344,7 +4245,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 2:
-                            // Ã„Ã¹Â½ÂºÃ†Â® Â»Ã§Ã€ÃŒÂµÃ¥  
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4357,7 +4257,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 3:
-                            // Ã„Ã¹Â½ÂºÃ†Â® ÃÂ¾Â·Ã¹  
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4370,7 +4269,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 4:
-                            // TargetType
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4383,7 +4281,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 5:
-                            // MaxCount
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4396,7 +4293,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 6:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4409,7 +4305,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 7:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4422,7 +4317,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 8:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4435,7 +4329,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 9:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4448,7 +4341,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 10:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4461,7 +4353,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 11:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4474,7 +4365,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 12:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4487,7 +4377,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 13:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4500,7 +4389,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 14:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4513,7 +4401,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 15:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4526,7 +4413,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 16:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4539,7 +4425,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 17:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4552,7 +4437,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 18:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4565,7 +4449,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 19:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4578,7 +4461,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 20:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4591,7 +4473,6 @@ BOOL CGame::_bDecodeQuestConfigFileContents(char * pData, DWORD dwMsgSize)
                             break;
 
                         case 21:
-                            // 
                             if (_bGetIsStringIsNumber(token) == FALSE)
                             {
                                 log->info("(!!!) CRITICAL ERROR! QUEST configuration file error - Wrong Data format.");
@@ -4732,7 +4613,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
 
         pStrTok = new CStrTok(cp, seps);
         token = pStrTok->pGet();
-        //token = strtok( cp, seps );   
         while (token != NULL)
         {
 
@@ -4752,7 +4632,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 2:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4764,7 +4643,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 3:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4776,7 +4654,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 4:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4788,7 +4665,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 5:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4800,7 +4676,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 6:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4812,7 +4687,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 7:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4824,7 +4698,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 8:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4836,7 +4709,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 9:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4848,7 +4720,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 10:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4860,7 +4731,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 11:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4872,7 +4742,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------		   
                     case 12:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4884,7 +4753,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 13:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4896,7 +4764,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 14:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4908,7 +4775,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 15:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4920,7 +4786,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 16:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4932,7 +4797,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 17:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4944,7 +4808,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 18:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4956,7 +4819,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 19:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4968,7 +4830,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 20:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4980,7 +4841,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 21:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -4992,7 +4852,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------				
                     case 22:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5004,7 +4863,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 23:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5016,7 +4874,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 24:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5028,7 +4885,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 25:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5040,7 +4896,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------			
                     case 26:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5052,7 +4907,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 27:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5064,7 +4918,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 28:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5076,7 +4929,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 29:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5088,7 +4940,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------			
                     case 30:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5100,7 +4951,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 31:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5112,7 +4962,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 32:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5124,7 +4973,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 33:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5136,7 +4984,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 34:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5148,7 +4995,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 35:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5160,7 +5006,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------			
                     case 36:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5172,7 +5017,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 37:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5184,7 +5028,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------	
                     case 38:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5196,7 +5039,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------				
                     case 39:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5208,7 +5050,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //----------------------------------------------------------------
                     case 40:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5220,7 +5061,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //-----------------------------------------------------------------
                     case 41:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5232,7 +5072,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //-----------------------------------------------------------------
                     case 42:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5244,7 +5083,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //-----------------------------------------------------------------
                     case 43:
                         if ((strlen(token) > 0) && (strlen(token) < 9))
                         {
@@ -5256,7 +5094,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
                         }
                         cReadMode = 0;
                         break;
-                        //-----------------------------------------------------------------
                 }
             }
             else
@@ -5307,7 +5144,6 @@ BOOL CGame::bReadAdminSetConfigFile(char * cFn)
             }
 
             token = pStrTok->pGet();
-            //token = strtok( NULL, seps );
         }
         delete pStrTok;
         delete cp;
@@ -5339,7 +5175,6 @@ BOOL CGame::bReadAdminListConfigFile(char * pFn)
     pFile = fopen(pFn, "rt");
     if (pFile == NULL)
     {
-        // °ÔÀÓ¼­¹öÀÇ ÃÊ±âÈ­ ÆÄÀÏÀ» ÀÐÀ» ¼ö ¾ø´Ù.
         log->info("(!) Cannot open AdminList.cfg file.");
         return FALSE;
     }
@@ -5416,7 +5251,6 @@ BOOL CGame::bReadBannedListConfigFile(char * pFn)
     pFile = fopen(pFn, "rt");
     if (pFile == NULL)
     {
-        // °ÔÀÓ¼­¹öÀÇ ÃÊ±âÈ­ ÆÄÀÏÀ» ÀÐÀ» ¼ö ¾ø´Ù.
         log->info("(!) Cannot open BannedList.cfg file.");
         return FALSE;
     }
@@ -6057,7 +5891,6 @@ BOOL CGame::bReadNotifyMsgListFile(char * cFn)
 
         pStrTok = new CStrTok(cp, seps);
         token = pStrTok->pGet();
-        //token = strtok( cp, seps );   
         while (token != NULL)
         {
 
@@ -6066,14 +5899,14 @@ BOOL CGame::bReadNotifyMsgListFile(char * cFn)
                 switch (cReadMode)
                 {
                     case 1:
-                        //                     for (i = 0; i < DEF_MAXNOTIFYMSGS; i++)
-                        //                         if (m_pNoticeMsgList[i] == NULL)
-                        //                         {
-                        //                             m_pNoticeMsgList[i] = new CMsg;
-                        //                             m_pNoticeMsgList[i]->bPut(NULL, token, strlen(token), NULL, NULL);
-                        //                             m_iTotalNoticeMsg++;
-                        //                             goto LNML_NEXTSTEP1;
-                        //                         }
+                    for (i = 0; i < DEF_MAXNOTIFYMSGS; i++)
+//                         if (m_pNoticeMsgList[i] == NULL)
+//                         {
+//                             m_pNoticeMsgList[i] = new CMsg;
+//                             m_pNoticeMsgList[i]->bPut(NULL, token, strlen(token), NULL, NULL);
+//                             m_iTotalNoticeMsg++;
+//                             goto LNML_NEXTSTEP1;
+//                         }
                         LNML_NEXTSTEP1:;
                         cReadMode = 0;
                         break;
@@ -6085,7 +5918,6 @@ BOOL CGame::bReadNotifyMsgListFile(char * cFn)
             }
 
             token = pStrTok->pGet();
-            //token = strtok( NULL, seps );
         }
 
         delete pStrTok;
@@ -6114,7 +5946,6 @@ BOOL CGame::bReadCrusadeGUIDFile(char * cFn)
     pFile = fopen(cFn, "rt");
     if (pFile == NULL)
     {
-        // Â°Ã”Ã€Ã“Â¼Â­Â¹Ã¶Ã€Ã‡ ÃƒÃŠÂ±Ã¢ÃˆÂ­ Ã†Ã„Ã€ÃÃ€Â» Ã€ÃÃ€Â» Â¼Ã¶ Â¾Ã¸Â´Ã™.
         log->info("(!) Cannot open CrusadeGUID file.");
         return FALSE;
     }
@@ -6188,7 +6019,6 @@ BOOL CGame::bReadScheduleConfigFile(char * pFn)
     pFile = fopen(pFn, "rt");
     if (pFile == NULL)
     {
-        // °ÔÀÓ¼­¹öÀÇ ÃÊ±âÈ­ ÆÄÀÏÀ» ÀÐÀ» ¼ö ¾ø´Ù.
         log->info("(!) Cannot open Schedule file.");
         return FALSE;
     }
@@ -6399,7 +6229,6 @@ BOOL CGame::bReadApocalypseGUIDFile(char * cFn)
     pFile = fopen(cFn, "rt");
     if (pFile == NULL)
     {
-        // Â°Ã”Ã€Ã“Â¼Â­Â¹Ã¶Ã€Ã‡ ÃƒÃŠÂ±Ã¢ÃˆÂ­ Ã†Ã„Ã€ÃÃ€Â» Ã€ÃÃ€Â» Â¼Ã¶ Â¾Ã¸Â´Ã™.
         log->info("(!) Cannot open ApocalypseGUID file.");
         return FALSE;
     }
@@ -6462,7 +6291,6 @@ BOOL CGame::bReadHeldenianGUIDFile(char * cFn)
     pFile = fopen(cFn, "rt");
     if (pFile == NULL)
     {
-        // Â°Ã”Ã€Ã“Â¼Â­Â¹Ã¶Ã€Ã‡ ÃƒÃŠÂ±Ã¢ÃˆÂ­ Ã†Ã„Ã€ÃÃ€Â» Ã€ÃÃ€Â» Â¼Ã¶ Â¾Ã¸Â´Ã™.
         log->info("(!) Cannot open HeldenianGUID file.");
         return FALSE;
     }
@@ -6510,6 +6338,2023 @@ BOOL CGame::bReadHeldenianGUIDFile(char * cFn)
         delete cp;
     }
     if (pFile != NULL) fclose(pFile);
+
+    return TRUE;
+}
+
+
+BOOL CGame::__bReadMapInfo(int iMapIndex)
+{
+    char * pContents, * token, * pTile, cTxt[250], cFn[255];
+    char seps[] = "= \t\n";
+    char cReadModeA = 0;
+    char cReadModeB = 0;
+    int  iTeleportLocIndex = 0;
+    int  iWayPointCfgIndex = 0;
+    int  iTotalNpcSetting = 0;
+    int  iMGARCfgIndex = 0;
+    int  iSMGRCfgIndex = 0;
+    int  iNMRCfgIndex = 0;
+    int  iFishPointIndex = 0;
+    int  iMineralPointIndex = 0;
+    int  iStrategicPointIndex = 0;
+    int  iIndex = 0;
+
+    int  iNamingValue;
+    CStrTok * pStrTok;
+    HANDLE hFile;
+    DWORD  dwFileSize, dwReadSize;
+    FILE * pFile;
+
+    char cName[6], cNpcName[30], cNpcMoveType, cNpcWaypointIndex[10]{}, cNamePrefix;
+    short sIPindex, dX, dY;
+
+    if (memcmp(m_pMapList[iMapIndex]->m_cName, "fightzone", 9) == 0)
+        m_pMapList[iMapIndex]->m_bIsFightZone = TRUE;
+
+    if (memcmp(m_pMapList[iMapIndex]->m_cName, "icebound", 8) == 0)
+        m_pMapList[iMapIndex]->m_bIsSnowEnabled = TRUE;
+
+    ZeroMemory(cFn, sizeof(cFn));
+    strcat(cFn, "mapdata\\");
+    strcat(cFn, m_pMapList[iMapIndex]->m_cName);
+    strcat(cFn, ".txt");
+
+    hFile = CreateFile(cFn, GENERIC_READ, NULL, NULL, OPEN_EXISTING, NULL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) return FALSE;
+    dwFileSize = GetFileSize(hFile, NULL);
+    CloseHandle(hFile);
+
+
+    pContents = new char[dwFileSize + 1];
+    ZeroMemory(pContents, dwFileSize + 1);
+
+    pFile = fopen(cFn, "rt");
+    if (pFile == NULL)
+    {
+        wsprintf(cTxt, "(!) Cannot open file : %s", cFn);
+        log->info(cTxt);
+        return FALSE;
+    }
+    else
+    {
+        wsprintf(cTxt, "(!) Reading Map info file : %s", cFn);
+        log->info(cTxt);
+        dwReadSize = fread(pContents, dwFileSize, 1, pFile);
+        fclose(pFile);
+    }
+
+    pStrTok = new CStrTok(pContents, seps);
+    token = pStrTok->pGet();
+    while (token != NULL)
+    {
+        if (cReadModeA != 0)
+        {
+            switch (cReadModeA)
+            {
+                case 1:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 1 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_sSrcX = atoi(token);
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 2 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_sSrcY = atoi(token);
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            ZeroMemory(m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_cDestMapName,
+                                sizeof(m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_cDestMapName));
+                            strcpy(m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_cDestMapName, token);
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 3 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_sDestX = atoi(token);
+                            cReadModeB = 5;
+                            break;
+
+                        case 5:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 4 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_sDestY = atoi(token);
+                            cReadModeB = 6;
+                            break;
+
+                        case 6:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 5 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_cDir = atoi(token);
+                            iTeleportLocIndex++;
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 2:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 6 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iWayPointCfgIndex = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_WaypointList[iWayPointCfgIndex].x != -1)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 7 - Duplicated waypoint");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 8 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_WaypointList[iWayPointCfgIndex].x = atoi(token);
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 9 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_WaypointList[iWayPointCfgIndex].y = atoi(token);
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 3:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            ZeroMemory(cNpcName, sizeof(cNpcName));
+                            strcpy(cNpcName, token);
+                            cReadModeB = 2;
+                            break;
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 10 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            cNpcMoveType = atoi(token);
+                            cReadModeB = 3;
+                            break;
+                        default:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 11 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            cNpcWaypointIndex[cReadModeB - 3] = atoi(token);
+                            cReadModeB++;
+                            break;
+                        case 13:
+                            cNamePrefix = token[0];
+
+                            iNamingValue = m_pMapList[iMapIndex]->iGetEmptyNamingValue();
+                            if (iNamingValue == -1)
+                            {
+                            }
+                            else
+                            {
+                                ZeroMemory(cName, sizeof(cName));
+                                wsprintf(cName, "XX%d", iNamingValue);
+                                cName[0] = cNamePrefix;
+                                cName[1] = iMapIndex + 65;
+
+                                if (bCreateNewNpc(cNpcName, cName, m_pMapList[iMapIndex]->m_cName, 0, 0, cNpcMoveType, NULL, NULL, cNpcWaypointIndex, NULL, NULL, -1, FALSE) == FALSE)
+                                {
+                                    m_pMapList[iMapIndex]->SetNamingValueEmpty(iNamingValue);
+                                }
+                            }
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            iTotalNpcSetting++;
+                            break;
+                    }
+                    break;
+
+                case 4:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 12 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_bRandomMobGenerator = (BOOL)atoi(token);
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 13 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_cRandomMobGeneratorLevel = atoi(token);
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 5:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error 14 - Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+
+                    m_pMapList[iMapIndex]->m_iMaximumObject = atoi(token);
+                    cReadModeA = 0;
+                    cReadModeB = 0;
+                    break;
+
+                case 6:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 15 - Wrong Data format(MGAR num).");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iMGARCfgIndex = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].left != -1)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 16 - Duplicated Mob Gen Rect Number!");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 17 - Wrong Data format(MGAR num).");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].left = atoi(token);
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 18 - Wrong Data format(MGAR num).");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].top = atoi(token);
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 19 - Wrong Data format(MGAR num).");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].right = atoi(token);
+                            cReadModeB = 5;
+                            break;
+
+                        case 5:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 20 - Wrong Data format(MGAR num).");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].bottom = atoi(token);
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 7:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 21 - Wrong Data format(MGAR num).");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iSMGRCfgIndex = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].bDefined == TRUE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error - ");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            cReadModeB = 2;
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].bDefined = TRUE;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 22 - Wrong Data format(SMGAR num).");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].cType = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].cType == 1)
+                                cReadModeB = 3;
+                            else if (m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].cType == 2)
+                                cReadModeB = 9;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 23 - Wrong Data format(SMGAR num).");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].rcRect.left = atoi(token);
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 24 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].rcRect.top = atoi(token);
+                            cReadModeB = 5;
+                            break;
+
+                        case 5:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 25 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].rcRect.right = atoi(token);
+                            cReadModeB = 6;
+                            break;
+
+                        case 6:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 26 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].rcRect.bottom = atoi(token);
+                            cReadModeB = 7;
+                            break;
+
+                        case 7:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 27 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iMobType = atoi(token);
+                            cReadModeB = 8;
+                            break;
+
+                        case 8:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 28 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iMaxMobs = atoi(token);
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iCurMobs = 0;
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+
+                        default:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 29 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].cWaypoint[cReadModeB - 9] = atoi(token);
+                            cReadModeB++;
+                            break;
+
+                        case 19:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 30 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iMobType = atoi(token);
+                            cReadModeB = 20;
+                            break;
+
+                        case 20:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 31 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iMaxMobs = atoi(token);
+                            m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iCurMobs = 0;
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 8:
+                    ZeroMemory(m_pMapList[iMapIndex]->m_cLocationName, sizeof(m_pMapList[iMapIndex]->m_cLocationName));
+                    memcpy(m_pMapList[iMapIndex]->m_cLocationName, token, 10);
+                    cReadModeA = 0;
+                    cReadModeB = 0;
+                    break;
+
+                case 9:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 32:1 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            sIPindex = atoi(token);
+                            if (m_pMapList[iMapIndex]->m_pInitialPoint[sIPindex].x != -1)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Duplicate Initial Point Index!");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 32 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_pInitialPoint[sIPindex].x = atoi(token);
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 33 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_pInitialPoint[sIPindex].y = atoi(token);
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 10:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 34 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iNMRCfgIndex = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].top != -1)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 35 - Duplicate No-Magic-Rect number");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 36 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].left = atoi(token);
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 37 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].top = atoi(token);
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 38 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].right = atoi(token);
+                            cReadModeB = 5;
+                            break;
+
+                        case 5:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 39 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].bottom = atoi(token);
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 11:
+                    m_pMapList[iMapIndex]->m_bIsFixedDayMode = (BOOL)atoi(token);
+                    if (m_pMapList[iMapIndex]->m_bIsFixedDayMode == TRUE)
+                        m_pMapList[iMapIndex]->m_bIsSnowEnabled = FALSE;
+                    cReadModeA = 0;
+                    break;
+
+                case 12:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 40 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iFishPointIndex = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_FishPointList[iFishPointIndex].x != -1)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 41 - Duplicate FishPoint number");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_iTotalFishPoint++;
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 42 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_FishPointList[iFishPointIndex].x = atoi(token);
+
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 43 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_FishPointList[iFishPointIndex].y = atoi(token);
+
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 13:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error 44 - Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_iMaxFish = atoi(token);
+
+                    cReadModeA = 0;
+                    break;
+
+                case 14:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error 45 - Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_cType = atoi(token);
+
+                    cReadModeA = 0;
+                    break;
+
+                case 15:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error 46 - Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_iLevelLimit = atoi(token);
+
+                    cReadModeA = 0;
+                    break;
+
+                case 16:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 47 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_bMineralGenerator = (BOOL)atoi(token);
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 48 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_cMineralGeneratorLevel = atoi(token);
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 17:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 49 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iMineralPointIndex = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_MineralPointList[iMineralPointIndex].x != -1)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 50 - Duplicate MineralPoint number");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_iTotalMineralPoint++;
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 51 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_MineralPointList[iMineralPointIndex].x = atoi(token);
+
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 52 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_MineralPointList[iMineralPointIndex].y = atoi(token);
+
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 18:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error 53 - Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_iMaxMineral = atoi(token);
+
+                    cReadModeA = 0;
+                    break;
+
+                case 19:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error 54 - Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_iUpperLevelLimit = atoi(token);
+
+                    cReadModeA = 0;
+                    break;
+
+                case 20:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 55 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iStrategicPointIndex = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex] != NULL)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 56 - Duplicate Strategic Point number");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex] = new CStrategicPoint;
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 57 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex]->m_iSide = atoi(token);
+
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 58 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex]->m_iValue = atoi(token);
+
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 59 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex]->m_iX = atoi(token);
+
+                            cReadModeB = 5;
+                            break;
+
+                        case 5:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 60 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex]->m_iY = atoi(token);
+
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 21:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 61 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iIndex = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_stEnergySphereCreationList[iIndex].cType != NULL)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 62 - Duplicate EnergySphereCreation number");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_iTotalEnergySphereCreationPoint++;
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 63 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stEnergySphereCreationList[iIndex].cType = atoi(token);
+
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 64 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stEnergySphereCreationList[iIndex].sX = atoi(token);
+
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 65 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stEnergySphereCreationList[iIndex].sY = atoi(token);
+
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 22:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 66 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iIndex = atoi(token);
+
+                            if (m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].cResult != NULL)
+                            {
+                                wsprintf(G_cTxt, "(!!!) CRITICAL ERROR! Map Info file error 67 - Duplicate EnergySphereGoal number(%d:%d)", iIndex, m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].cResult);
+                                log->info(G_cTxt);
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_iTotalEnergySphereGoalPoint++;
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 68 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].cResult = atoi(token);
+
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 69 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].aresdenX = atoi(token);
+
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 70 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].aresdenY = atoi(token);
+
+                            cReadModeB = 5;
+                            break;
+
+                        case 5:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 71 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].elvineX = atoi(token);
+
+                            cReadModeB = 6;
+                            break;
+
+                        case 6:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 72 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].elvineY = atoi(token);
+
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 23:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 73 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iIndex = atoi(token);
+
+                            if (strlen(m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].cRelatedMapName) != NULL)
+                            {
+                                wsprintf(G_cTxt, "(!!!) CRITICAL ERROR! Map Info file error 74 - Duplicate Strike Point number(%d)", iIndex);
+                                log->info(G_cTxt);
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 75 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].dX = atoi(token);
+
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 76 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].dY = atoi(token);
+
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iHP = atoi(token);
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iInitHP = atoi(token);
+                            cReadModeB = 5;
+                            break;
+
+
+                        case 5:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[0] = atoi(token);
+
+                            cReadModeB = 6;
+                            break;
+
+                        case 6:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[0] = atoi(token);
+
+                            cReadModeB = 7;
+                            break;
+
+                        case 7:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[1] = atoi(token);
+
+                            cReadModeB = 8;
+                            break;
+
+                        case 8:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[1] = atoi(token);
+
+                            cReadModeB = 9;
+                            break;
+
+                        case 9:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[2] = atoi(token);
+
+                            cReadModeB = 10;
+                            break;
+
+                        case 10:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[2] = atoi(token);
+
+                            cReadModeB = 11;
+                            break;
+
+                        case 11:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[3] = atoi(token);
+
+                            cReadModeB = 12;
+                            break;
+
+                        case 12:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[3] = atoi(token);
+
+                            cReadModeB = 13;
+                            break;
+
+                        case 13:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[4] = atoi(token);
+
+                            cReadModeB = 14;
+                            break;
+
+                        case 14:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[4] = atoi(token);
+
+                            cReadModeB = 15;
+                            break;
+
+                        case 15:
+                            ZeroMemory(m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].cRelatedMapName, sizeof(m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].cRelatedMapName));
+                            strcpy(m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].cRelatedMapName, token);
+
+                            m_pMapList[iMapIndex]->m_iTotalStrikePoints++;
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+
+                    }
+                    break;
+
+                case 24:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 78 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iIndex = atoi(token);
+
+                            if (strlen(m_pMapList[iMapIndex]->m_stItemEventList[iIndex].cItemName) != NULL)
+                            {
+                                wsprintf(G_cTxt, "(!!!) CRITICAL ERROR! Map Info file error 79 - Duplicate Item-Event number(%d:%s)", iIndex, m_pMapList[iMapIndex]->m_stItemEventList[iIndex].cItemName);
+                                log->info(G_cTxt);
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+
+                            m_pMapList[iMapIndex]->m_iTotalItemEvents++;
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            strcpy(m_pMapList[iMapIndex]->m_stItemEventList[iIndex].cItemName, token);
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 81 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stItemEventList[iIndex].iAmount = atoi(token);
+
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 82 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stItemEventList[iIndex].iTotalNum = atoi(token);
+
+                            cReadModeB = 5;
+                            break;
+
+                        case 5:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 83 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stItemEventList[iIndex].iMonth = atoi(token);
+
+                            cReadModeB = 6;
+                            break;
+
+                        case 6:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 83 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stItemEventList[iIndex].iDay = atoi(token);
+
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 25:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error 78 - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->sMobEventAmount = atoi(token);
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 26:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseMobGenType - Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_iApocalypseMobGenType = atoi(token);
+                    cReadModeA = 0;
+                    cReadModeB = 0;
+                    break;
+
+                case 27:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_iApocalypseBossMobNpcID = atoi(token);
+                            cReadModeB = 2;
+                            break;
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sApocalypseBossMobRectX1 = atoi(token);
+                            cReadModeB = 3;
+                            break;
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sApocalypseBossMobRectY1 = atoi(token);
+                            cReadModeB = 4;
+                            break;
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sApocalypseBossMobRectX2 = atoi(token);
+                            cReadModeB = 5;
+                            break;
+                        case 5:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sApocalypseBossMobRectY2 = atoi(token);
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 28:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error DynamicGateType - Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_cDynamicGateType = atoi(token);
+                    cReadModeA = 0;
+                    cReadModeB = 0;
+                    break;
+
+                case 29:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sDynamicGateCoordRectX1 = atoi(token);
+                            cReadModeB = 2;
+                            break;
+
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sDynamicGateCoordRectY1 = atoi(token);
+                            cReadModeB = 3;
+                            break;
+
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sDynamicGateCoordRectX2 = atoi(token);
+                            cReadModeB = 4;
+                            break;
+
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sDynamicGateCoordRectY2 = atoi(token);
+                            cReadModeB = 5;
+                            break;
+
+                        case 5:
+                            memcpy(m_pMapList[iMapIndex]->m_cDynamicGateCoordDestMap, token, strlen(token));
+                            cReadModeB = 6;
+                            break;
+
+                        case 6:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sDynamicGateCoordTgtX = atoi(token);
+                            cReadModeB = 7;
+                            break;
+
+                        case 7:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_sDynamicGateCoordTgtY = atoi(token);
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 30:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error RecallImpossible -  Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_bIsRecallImpossible = atoi(token);
+                    cReadModeA = 0;
+                    cReadModeB = 0;
+                    break;
+
+                case 31:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseMap -  Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_bIsApocalypseMap = atoi(token);
+                    cReadModeA = 0;
+                    cReadModeB = 0;
+                    break;
+
+                case 32:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error CitizenLimit -  Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_bIsCitizenLimit = atoi(token);
+                    cReadModeA = 0;
+                    cReadModeB = 0;
+                    break;
+
+                case 33:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error CitizenLimit -  Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_bIsHeldenianMap = atoi(token);
+                    cReadModeA = 0;
+                    cReadModeB = 0;
+                    break;
+
+                case 34:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian tower type id - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stHeldenianTower[iIndex].sTypeID = atoi(token);
+                            cReadModeB = 2;
+                            break;
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Tower Side - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stHeldenianTower[iIndex].cSide = atoi(token);
+                            cReadModeB = 3;
+                            break;
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Tower X pos - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stHeldenianTower[iIndex].dX = atoi(token);
+                            cReadModeB = 4;
+                            break;
+                        case 4:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Tower Y pos - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            iIndex++;
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 35:
+                    if (_bGetIsStringIsNumber(token) == FALSE)
+                    {
+                        log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Map Mode - Wrong Data format.");
+                        delete pContents;
+                        delete pStrTok;
+                        return FALSE;
+                    }
+                    m_pMapList[iMapIndex]->m_cHeldenianModeMap = atoi(token);
+                    cReadModeA = 0;
+                    cReadModeB = 0;
+                    break;
+
+                case 36:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Map Mode - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            dX = atoi(token);
+                            cReadModeB = 2;
+                            break;
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Map Mode - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            dY = atoi(token);
+                            pTile = 0;
+                            pTile = (char *)(m_pMapList[iMapIndex]->m_pTile + dX + dY * m_pMapList[iMapIndex]->m_sSizeY);
+                            if (pTile == 0)
+                            {
+                                wsprintf(cTxt, "(!!!) CRITICAL ERROR! Map Info file error HeldenianWinningZone - pTile is Null dx(%d), dy(%d).", dX, dY);
+                                log->info(cTxt);
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                case 37:
+                    switch (cReadModeB)
+                    {
+                        case 1:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error Heldenian Door Direction - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stHeldenianGateDoor[iIndex].cDir = atoi(token);
+                            cReadModeB = 2;
+                            break;
+                        case 2:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error Heldenian Door X pos - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stHeldenianGateDoor[iIndex].dX = atoi(token);
+                            cReadModeB = 3;
+                            break;
+                        case 3:
+                            if (_bGetIsStringIsNumber(token) == FALSE)
+                            {
+                                log->info("(!!!) CRITICAL ERROR! Map Info file error Heldenian Door Y pos - Wrong Data format.");
+                                delete pContents;
+                                delete pStrTok;
+                                return FALSE;
+                            }
+                            m_pMapList[iMapIndex]->m_stHeldenianGateDoor[iIndex].dY = atoi(token);
+                            iIndex++;
+                            cReadModeA = 0;
+                            cReadModeB = 0;
+                            break;
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+        }
+        else
+        {
+            if (memcmp(token, "teleport-loc", 12) == 0)
+            {
+                m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex] = new CTeleportLoc;
+                cReadModeA = 1;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "waypoint", 8) == 0)
+            {
+                cReadModeA = 2;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "npc", 3) == 0)
+            {
+                cReadModeA = 3;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "random-mob-generator", 20) == 0)
+            {
+                cReadModeA = 4;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "maximum-object", 14) == 0)
+                cReadModeA = 5;
+
+            if (memcmp(token, "npc-avoidrect", 13) == 0)
+            {
+                cReadModeA = 6;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "spot-mob-generator", 18) == 0)
+            {
+                cReadModeA = 7;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "map-location", 12) == 0)
+                cReadModeA = 8;
+
+            if (memcmp(token, "initial-point", 13) == 0)
+            {
+                cReadModeA = 9;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "no-attack-area", 14) == 0)
+            {
+                cReadModeA = 10;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "fixed-dayornight-mode", 21) == 0) cReadModeA = 11;
+
+            if (memcmp(token, "fish-point", 10) == 0)
+            {
+                cReadModeA = 12;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "max-fish", 8) == 0)		cReadModeA = 13;
+            if (memcmp(token, "type", 4) == 0)			cReadModeA = 14;
+            if (memcmp(token, "level-limit", 11) == 0)	cReadModeA = 15;
+
+            if (memcmp(token, "mineral-generator", 17) == 0)
+            {
+                cReadModeA = 16;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "mineral-point", 13) == 0)
+            {
+                cReadModeA = 17;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "max-mineral", 11) == 0)			cReadModeA = 18;
+            if (memcmp(token, "upper-level-limit", 17) == 0)	cReadModeA = 19;
+            if (memcmp(token, "strategic-point", 15) == 0)
+            {
+                cReadModeA = 20;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "energy-sphere-creation-point", 28) == 0)
+            {
+                cReadModeA = 21;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "energy-sphere-goal-point", 24) == 0)
+            {
+                cReadModeA = 22;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "strike-point", 12) == 0)
+            {
+                cReadModeA = 23;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "item-event", 10) == 0)
+            {
+                cReadModeA = 24;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "energy-sphere-auto-creation", 27) == 0)
+            {
+                cReadModeA = 0;
+                cReadModeB = 0;
+                m_pMapList[iMapIndex]->m_bIsEnergySphereAutoCreation = TRUE;
+            }
+
+            if (memcmp(token, "mobevent-amount", 15) == 0)
+            {
+                cReadModeA = 25;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "ApocalypseMobGenType", 20) == 0)
+            {
+                cReadModeA = 26;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "ApocalypseBossMob", 17) == 0)
+            {
+                cReadModeA = 27;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "DynamicGateType", 15) == 0)
+            {
+                cReadModeA = 28;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "DynamicGateCoord", 16) == 0)
+            {
+                cReadModeA = 29;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "RecallImpossible", 16) == 0)
+            {
+                cReadModeA = 30;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "ApocalypseMap", 13) == 0)
+            {
+                cReadModeA = 31;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "CitizenLimit", 12) == 0)
+            {
+                cReadModeA = 32;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "HeldenianMap", 12) == 0)
+            {
+                cReadModeA = 33;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "HeldenianTower", 14) == 0)
+            {
+                cReadModeA = 34;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "HeldenianModeMap", 16) == 0)
+            {
+                cReadModeA = 35;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "HeldenianWinningZone", 20) == 0)
+            {
+                cReadModeA = 36;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "HeldenianGateDoor", 17) == 0)
+            {
+                cReadModeA = 37;
+                cReadModeB = 1;
+            }
+
+            if (memcmp(token, "[END-MAP-INFO]", 14) == 0)
+            {
+                cReadModeA = 0;
+                cReadModeB = 0;
+                goto RMI_SKIPDECODING;
+            }
+        }
+        token = pStrTok->pGet();
+    }
+
+    RMI_SKIPDECODING:;
+
+    delete pStrTok;
+    delete pContents;
+
+    if ((cReadModeA != 0) || (cReadModeB != 0))
+    {
+        log->info("(!!!) CRITICAL ERROR! map info file contents error!");
+        return FALSE;
+    }
+
+    wsprintf(cTxt, "(!) Map info file decoding(%s) - success! TL(%d) WP(%d) LNPC(%d) MXO(%d) RMG(%d / %d)", cFn, iTeleportLocIndex, iWayPointCfgIndex, iTotalNpcSetting, m_pMapList[iMapIndex]->m_iMaximumObject, m_pMapList[iMapIndex]->m_bRandomMobGenerator, m_pMapList[iMapIndex]->m_cRandomMobGeneratorLevel);
+    log->info(cTxt);
+
+    m_pMapList[iMapIndex]->_SetupNoAttackArea();
 
     return TRUE;
 }

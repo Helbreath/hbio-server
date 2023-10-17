@@ -6,6 +6,8 @@
 
 #include "Game.h"
 
+extern char G_cTxt[512];
+
 BOOL CGame::_bNpcBehavior_ManaCollector(int iNpcH)
 {
     int dX, dY, iMaxMP, iTotal;
@@ -851,7 +853,7 @@ void CGame::NpcBehavior_Attack(int iNpcH)
 void CGame::NpcBehavior_Flee(int iNpcH)
 {
     char cDir;
-    short sX, sY, dX, dY;
+    short sX, sY, dX{}, dY{};
     short sTarget;
     char  cTargetType;
 
@@ -910,6 +912,7 @@ void CGame::NpcBehavior_Flee(int iNpcH)
             dY = m_pNpcList[m_pNpcList[iNpcH]->m_iTargetIndex]->m_sY;
             break;
     }
+    // when fleeing, target type can be 0 for some reason causing dx and dy to not be set
     dX = sX - (dX - sX);
     dY = sY - (dY - sY);
 
@@ -965,7 +968,6 @@ void CGame::NpcBehavior_Stop(int iNpcH)
 
                         if (bFlag == TRUE)
                         {
-                            // ÀûÀ» ¹ß°ßÇß´Ù. °ø°Ý µ¿ÀÛÀ¸·Î ¾Ë·Á¾ß ÇÑ´Ù.	
                             SendEventToNearClient_TypeA(iNpcH, DEF_OWNERTYPE_NPC, MSGID_EVENT_MOTION, DEF_OBJECTATTACK, m_pNpcList[iNpcH]->m_sX, m_pNpcList[iNpcH]->m_sY, 1);
                         }
                     }
@@ -982,7 +984,7 @@ void CGame::NpcBehavior_Stop(int iNpcH)
                     }
                     break;
 
-                case 42: // ManaStone: v2.05 Á¤±âÀûÀ¸·Î ¸¶³ª½ºÅæÀÇ ¿¡³ÊÁö¸¦ 5¾¿ »ý¼ºÇÑ´Ù.
+                case 42: // ManaStone
                     m_pNpcList[iNpcH]->m_sBehaviorTurnCount = 0;
                     m_pNpcList[iNpcH]->m_iV1 += 5;
                     if (m_pNpcList[iNpcH]->m_iV1 >= 5) m_pNpcList[iNpcH]->m_iV1 = 5;
@@ -997,13 +999,10 @@ void CGame::NpcBehavior_Stop(int iNpcH)
 
     if ((sTarget != NULL))
     {
-
-        // °ø°Ý¸ñÇ¥ ¹ß°ß. 
         m_pNpcList[iNpcH]->m_cBehavior = DEF_BEHAVIOR_ATTACK;
         m_pNpcList[iNpcH]->m_sBehaviorTurnCount = 0;
         m_pNpcList[iNpcH]->m_iTargetIndex = sTarget;
         m_pNpcList[iNpcH]->m_cTargetType = cTargetType;
-        // ¿©±â¼­ Ç¥È¿ µ¿ÀÛ°°Àº°ÍÀ» À§ÇÑ ¸Þ½ÃÁö ¹ß¼Û. 
         return;
     }
 }

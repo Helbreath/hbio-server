@@ -109,7 +109,4 @@ void CGame::load_configs()
         _bDecodeNoticementFileContents(cp, (uint32_t)length);
         delete[] cp;
     }
-
-//     log->info("(!) DupItemID file contents received. Now decoding...");
-//     _bDecodeDupItemIDFileContents((char *)(pData + DEF_INDEX2_MSGTYPE + 2), dwMsgSize);
 }

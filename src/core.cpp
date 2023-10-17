@@ -6,6 +6,185 @@
 
 #include "Game.h"
 
+void CGame::run()
+{
+    if (!state_valid)
+    {
+        std::cout << "Server state invalid. Errors occurred on creation. Exiting core::run()\n";
+        return;
+    }
+
+    try
+    {
+        std::unique_lock<std::shared_mutex> l(game_sql_mtx, std::defer_lock);
+        std::unique_lock<std::shared_mutex> l2(login_sql_mtx, std::defer_lock);
+        std::lock(l, l2);
+        pq_login = std::make_unique<pqxx::connection>(fmt::format("postgresql://{}:{}@{}:{}/{}", login_sqluser, login_sqlpass, login_sqlhost, login_sqlport, login_sqldb));
+        pq_game = std::make_unique<pqxx::connection>(fmt::format("postgresql://{}:{}@{}:{}/{}", game_sqluser, game_sqlpass, game_sqlhost, game_sqlport, game_sqldb));
+    }
+    catch (pqxx::broken_connection & ex)
+    {
+        throw std::runtime_error(fmt::format("Unable to connect to SQL - {}", ex.what()));
+    }
+
+    try
+    {
+        prepare_login_statements();
+        prepare_game_statements();
+    }
+    catch (std::exception & ex)
+    {
+        throw std::runtime_error(std::format("Unable to prepare SQL statements - {}", ex.what()));
+    }
+
+    log->info("Connected to SQL");
+
+    set_server_state(server_status::running);
+
+    // todo - make a way to change these externally - maybe by admin client?
+    set_login_server_state(login_server_status::running);
+    set_game_server_state(game_server_status::running);
+
+    server = std::make_unique<ix::WebSocketServer>(bindport, bindip);
+
+    auto res = server->listen();
+    if (!res.first)
+        throw std::runtime_error(res.second);
+
+    log->info(fmt::format("Listening on {}:{}", bindip, bindport));
+
+    server->setConnectionStateFactory([&]()
+        {
+            return std::make_shared<connection_state_hb>();
+        });
+
+    server->setOnClientMessageCallback(
+        [&](std::shared_ptr<ix::ConnectionState> connection_state, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message)
+        {
+            on_message(connection_state, websocket, message);
+        }
+    );
+
+    if (bInit() == FALSE)
+    {
+        log->critical("Server failed to start");
+        return;
+    }
+
+    load_configs();
+
+    server->start();
+
+    log->info("Server started");
+
+    OnStartGameSignal();
+
+    time_point current_time = now();
+    time_point player_timeout_timer = now();
+    time_point player_count_report_timer = now();
+    time_point game_timer = now();
+
+    while (get_server_state() == server_status::running)
+    {
+        // todo - better handle timers
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(1ms);
+        current_time = now();
+
+        if (duration_cast<milliseconds>(current_time - game_timer).count() > 300)
+        {
+            OnTimer();
+            game_timer = now();
+        }
+
+//         if (duration_cast<seconds>(current_time - player_count_report_timer).count() > 5)
+//         {
+//             log->info(std::format("Online - players: {} - sockets: {}", client_list.size(), websocket_clients.size()));
+//             player_count_report_timer = steady_clock::now();
+//         }
+
+        // check the client list every 10ms for timed out users - if this becomes a performance issue (unlikely) then change to a regular for
+        // so that it can do a full set iteration at once rather than break out of it when a single change is made. unfortunately ranged-for has
+        // iteration limitations
+        if (std::chrono::duration_cast<milliseconds>(current_time - player_timeout_timer).count() > 1)
+        {
+            std::unique_lock<std::recursive_mutex> l(websocket_list, std::defer_lock);
+            std::unique_lock<std::recursive_mutex> l2(client_list_mtx, std::defer_lock);
+            std::lock(l, l2);
+            // why can't anyone make a good ws library
+            auto wsclients = server->getClients();
+            for (auto & wspair : websocket_clients)
+            {
+                auto & ws = wspair.first;
+                auto & connstate = wspair.second;
+                if (wspair.second == nullptr)
+                {
+                    continue;
+                }
+                connection_state_hb * connection_state = reinterpret_cast<connection_state_hb *>(connstate.get());
+                auto & player = connection_state->client;
+
+                if (!player)
+                {
+                    if (time_count(current_time - connection_state->get_connect_time()) > 5)
+                    {
+                        log->info(std::format("Disconnecting socket - no client - timed out 20s [{}] account [{}]", connection_state->getId(), connection_state->getRemoteIp()));
+                        ws->close();
+                        websocket_clients.erase(wspair);
+                    }
+                    break;
+                }
+
+                if (time_count(current_time - player->get_last_check_time()) < 5) continue;
+                if (std::chrono::duration_cast<seconds>(current_time - player->get_last_packet_time()).count() > 20)
+                {
+                    log->info(std::format("Disconnecting player packet timed out 20s [{}] account [{}]", player->m_cCharName, player->account));
+                    delete_client_nolock(player, true, true);
+                    websocket_clients.erase(wspair);
+                    break;
+                }
+                if (!player->get_connected() && std::chrono::duration_cast<seconds>(current_time - player->get_disconnect_time()).count() > 5)
+                {
+                    log->info(std::format("Disconnecting player disconnected timed out 10s [{}] account [{}]", player->m_cCharName, player->account));
+                    delete_client_nolock(player, true, true);
+                    websocket_clients.erase(wspair);
+                    break;
+                }
+            }
+            for (auto & player : client_list)
+            {
+                auto connection_state = player->get_connection_state();
+
+                if (std::chrono::duration_cast<seconds>(current_time - player->get_last_packet_time()).count() > 20)
+                {
+                    log->info(std::format("Disconnecting player packet timed out 20s [{}] account [{}] - [{}]", player->m_cCharName, player->account, player->address));
+                    delete_client_nolock(player, true, true);
+                    break;
+                }
+
+                if (connection_state == nullptr && !player->logged_in)
+                {
+                    delete_client_nolock(player, true, true);
+                    break;
+                }
+
+                if (!connection_state) continue;
+
+                if (time_count(current_time - player->get_last_check_time()) < 5) continue;
+
+                if (!player->get_connected() && std::chrono::duration_cast<seconds>(current_time - player->get_disconnect_time()).count() > 10)
+                {
+                    log->info(std::format("Disconnecting player disconnected timed out 10s [{}] account [{}]", player->m_cCharName, player->account));
+                    delete_client_nolock(player, true, true);
+                    break;
+                }
+            }
+            player_timeout_timer = now();
+        }
+    }
+    Quit();
+}
+
 // todo - turn into its own request packet instead of part of login
 void CGame::build_character_list(CClient * client, stream_write & sw)
 {
@@ -83,7 +262,7 @@ void CGame::create_character(CClient * client, stream_read & sr)
 
         {
             pqxx::row r{
-                txn.exec_prepared1("check_character_count_by_account_id_wn", character.account_id, pq_game->quote(character.world_name))
+                txn.exec_prepared1("check_character_count_by_account_id_wn", character.account_id, character.world_name)
             };
             auto [charcount] = r.as<uint16_t>();
 
@@ -98,7 +277,7 @@ void CGame::create_character(CClient * client, stream_read & sr)
 
         {
             pqxx::row r{
-                txn.exec_prepared1("check_character_count_by_name_wn", pq_game->quote(character.name), pq_game->quote(character.world_name))
+                txn.exec_prepared1("check_character_count_by_name_wn", character.name, character.world_name)
             };
             auto [charcount] = r.as<uint16_t>();
 
@@ -168,7 +347,7 @@ void CGame::create_character(CClient * client, stream_read & sr)
         sw.write_uint32(MSGID_RESPONSE_LOG);
         sw.write_uint16(DEF_LOGRESMSGTYPE_NEWCHARACTERFAILED);
         client->write(sw);
-        //delete_client_lock(client, true);
+        delete_client_lock(client->shared_from_this(), true);
     }
 }
 
@@ -195,7 +374,7 @@ void CGame::delete_character(CClient * client, stream_read & sr)
         pqxx::work txn{ *pq_game };
 
         pqxx::row r{
-            txn.exec_prepared1("get_character_by_name_wn", pq_game->quote(character.name), pq_game->quote(character.world_name))
+            txn.exec_prepared1("get_character_by_name_wn", character.name, character.world_name)
         };
         auto charid = r["id"].as<uint32_t>();
         if (charid == 0)
@@ -230,7 +409,7 @@ void CGame::delete_character(CClient * client, stream_read & sr)
         sw.write_uint32(MSGID_RESPONSE_LOG);
         sw.write_uint16(DEF_LOGRESMSGTYPE_NOTEXISTINGCHARACTER);
         client->write(sw);
-        //delete_client_lock(client, true);
+        delete_client_lock(client->shared_from_this(), true);
     }
 }
 
@@ -272,20 +451,132 @@ void CGame::enter_game(CClient * client, stream_read & sr)
 
         uint8_t charcount = 0;
 
-        uint64_t charid = 0;
-        std::string mapname;
-
         try
         {
-            std::shared_lock<std::shared_mutex> l(login_sql_mtx);
-            pqxx::work txn{ *pq_login };
-            pqxx::row r{
-                txn.exec_params1("SELECT * FROM characters WHERE account_id=$1 AND name=$2 LIMIT 1", client->account_id, pq_login->quote(character_name))
+            std::shared_lock<std::shared_mutex> l(game_sql_mtx);
+            pqxx::work txn{ *pq_game};
+            pqxx::row row{
+                txn.exec_params1("SELECT * FROM characters WHERE account_id=$1 AND name=$2 LIMIT 1", client->account_id, character_name)
             };
+
+            client->id = row["id"].as<uint64_t>();
+
+            pqxx::result item_result{ txn.exec_params("SELECT * FROM items WHERE char_id=$1", client->id) };
             txn.commit();
 
-            charid = r["id"].as<uint64_t>();
-            mapname = r["maploc"].as<std::string>();
+
+            client->m_sX = row["locx"].as<int16_t>();
+            client->m_sY = row["locy"].as<int16_t>();
+
+            client->m_cSex = (uint8_t)row["gender"].as<uint16_t>();
+            client->m_cSkin = (uint8_t)row["skin"].as<uint16_t>();
+            client->m_cHairStyle = (uint8_t)row["hairstyle"].as<uint16_t>();
+            client->m_cHairColor = (uint8_t)row["haircolor"].as<uint16_t>();
+            client->m_cUnderwear = (uint8_t)row["underwear"].as<uint16_t>();
+            std::string temp = row["magicmastery"].as<std::string>();
+            for (int i = 0; i < temp.length(); ++i)
+            {
+                client->m_cMagicMastery[i] = (temp[i] == '1') ? 1 : 0;
+            }
+            ZeroMemory(client->m_cLocation, sizeof(client->m_cLocation));
+            memcpy(client->m_cLocation, row["nation"].as<std::string>().c_str(), 10);
+            if (strcmp(client->m_cLocation, "Aresden") == 0)
+                client->m_cSide = Side::ARESDEN;
+            else if (strcmp(client->m_cLocation, "Elvine") == 0)
+                client->m_cSide = Side::ELVINE;
+            else
+                client->m_cSide = Side::NEUTRAL;
+
+            ZeroMemory(client->m_cMapName, sizeof(client->m_cMapName));
+            memcpy(client->m_cMapName, row["maploc"].as<std::string>().c_str(), 10);
+
+            if (!row["lockmapname"].is_null())
+            {
+                ZeroMemory(client->m_cLockedMapName, sizeof(client->m_cLockedMapName));
+                memcpy(client->m_cLockedMapName, row["lockmapname"].as<std::string>().c_str(), 10);
+            }
+            client->m_iLockedMapTime = row["lockmaptime"].as<int32_t>();
+            ZeroMemory(client->m_cProfile, sizeof(client->m_cProfile));
+            memcpy(client->m_cProfile, row["profile"].as<std::string>().c_str(), 10);
+            //client->m_iGuildRank = (int8_t)row["guildrank"].as<int16_t>();
+            client->m_iHP = row["hp"].as<int32_t>();
+            client->m_iMP = row["mp"].as<int32_t>();
+            client->m_iSP = row["sp"].as<int32_t>();
+            client->m_iEnemyKillCount = row["ek"].as<int32_t>();
+            client->m_iPKCount = row["pk"].as<int32_t>();
+            client->m_iLevel = row["level"].as<int32_t>();
+            client->m_iExp = row["experience"].as<int32_t>();
+            client->m_iStr = row["strength"].as<int32_t>();
+            client->m_iInt = row["vitality"].as<int32_t>();
+            client->m_iVit = row["dexterity"].as<int32_t>();
+            client->m_iDex = row["intelligence"].as<int32_t>();
+            client->m_iMag = row["magic"].as<int32_t>();
+            client->m_iCharisma = row["charisma"].as<int32_t>();
+            client->m_iLuck = row["luck"].as<int32_t>();
+            client->m_iRewardGold = row["rewardgold"].as<int32_t>();
+            client->m_iHungerStatus = row["hunger"].as<int32_t>();
+            client->m_iAdminUserLevel = row["adminlevel"].as<int32_t>();
+            client->m_iTimeLeft_ShutUp = row["leftshutuptime"].as<int32_t>();
+            client->m_iTimeLeft_Rating = row["leftreptime"].as<int32_t>();
+            client->m_iRating = row["reputation"].as<int32_t>();
+            client->m_iGuildGUID = row["guild_id"].as<int32_t>();
+            client->m_iDownSkillIndex = row["downskillid"].as<int32_t>();
+            client->m_sCharIDnum1 = row["id1"].as<int32_t>();
+            client->m_sCharIDnum2 = row["id2"].as<int32_t>();
+            client->m_sCharIDnum3 = row["id3"].as<int32_t>();
+            client->m_iQuest = row["questnum"].as<int32_t>();
+            client->m_iCurQuestCount = row["questcount"].as<int32_t>();
+            client->m_iQuestRewardType = row["questrewardtype"].as<int32_t>();
+            client->m_iQuestRewardAmount = row["questrewardamount"].as<int32_t>();
+            client->m_iContribution = row["contribution"].as<int32_t>();
+            client->m_iQuestID = row["questid"].as<int32_t>();
+            client->m_bIsQuestCompleted = row["questcompleted"].as<bool>();
+            client->m_iTimeLeft_ForceRecall = row["leftforcerecalltime"].as<int32_t>();
+            client->m_iTimeLeft_FirmStaminar = row["leftfirmstaminatime"].as<int32_t>();
+            client->m_iSpecialEventID = row["eventid"].as<int32_t>();
+            client->m_iSuperAttackLeft = row["leftsac"].as<int32_t>();
+            client->m_iFightzoneNumber = row["fightnum"].as<int32_t>();
+            client->m_iReserveTime = row["fightdate"].as<int32_t>();
+            client->m_iFightZoneTicketNumber = row["fightticket"].as<int32_t>();
+            client->m_iSpecialAbilityTime = row["leftspectime"].as<int32_t>();
+            client->m_iWarContribution = row["warcon"].as<int32_t>();
+            client->m_iCrusadeDuty = row["crusadejob"].as<int32_t>();
+            client->m_iConstructionPoint = row["crusadeconstructpoint"].as<int32_t>();
+            client->m_dwCrusadeGUID = row["crusadeid"].as<int32_t>();
+            client->m_iLockedMapTime = row["leftdeadpenaltytime"].as<int32_t>();
+            uint64_t partyid = row["party_id"].as<int64_t>();
+            // if (partyid && partyMgr.PartyExists(partyid))
+            // {
+            //     client->SetParty(partyMgr.GetParty(partyid));
+            // }
+            client->m_iGizonItemUpgradeLeft = row["itemupgradeleft"].as<int32_t>();
+            //client->m_elo = row["elo"].as<int32_t>();
+            client->m_iEnemyKillCount = row["totalek"].as<int32_t>();
+            client->m_iPKCount = row["totalpk"].as<int32_t>();
+
+
+            if (client->m_cSex == MALE) client->m_sType = 1;
+            else if (client->m_cSex == FEMALE) client->m_sType = 4;
+            client->m_sType += client->m_cSkin - 1;
+            client->m_sAppr1 = (client->m_cHairStyle << 8) | (client->m_cHairColor << 4) | client->m_cUnderwear;
+
+            for (pqxx::row row : item_result)
+            {
+                std::string itemloc = row["itemloc"].as<std::string>();
+                if (itemloc == "bag")
+                {
+                    add_bag_item(client, row);
+                }
+                else if (itemloc == "bank")
+                {
+                    add_bank_item(client, row);
+                }
+                else if (itemloc == "mail")
+                {
+                    // do mail items with the mail record itself
+                    //add_mail_item(client, row);
+                }
+            }
         }
         catch (pqxx::unexpected_rows &)
         {
@@ -319,13 +610,17 @@ void CGame::enter_game(CClient * client, stream_read & sr)
                 // that way it continues iterating to find any other instance of the account connected
                 // this also lets the account have multiple connections to the character select screen as a side-effect
                 // todo - allow this?
-                if (clnt->account_id == client->account_id && clnt->m_cMapIndex > 0)
+                if (
+                    clnt->account_id == client->account_id
+                    && clnt->m_cMapIndex > 0
+                    && (clnt->currentstatus == client_status::dead || clnt->currentstatus == client_status::in_game)
+                    )
                 {
                     //BUG: potential bug point if charID == 0 - only occurs on unsuccessful login
                     // ^ is this still true?
                     //account found
                     accountfound = true;
-                    if (clnt->id == charid)
+                    if (clnt->id == client->id)
                     {
                         //exact char found
                         clientfound = clnt;
@@ -337,10 +632,10 @@ void CGame::enter_game(CClient * client, stream_read & sr)
 
         // set the map for the client
         for (auto & map : m_pMapList)
-            if (std::string(map->m_cName) == mapname)
+            if (map != nullptr && std::string(map->m_cName) == client->m_cMapName)
                 client->m_cMapIndex = map->m_cMapIndex;
 
-        if (clientfound && clientfound->get_disconnected())
+        if (clientfound && clientfound->get_connected())
         {
             //client has recently disconnected
             //at this point, can do some fancy swapping of socket and place this current active socket
@@ -360,7 +655,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             }
             else
             {
-                clientfound->set_disconnect_time(std::chrono::steady_clock::time_point());
+                clientfound->set_disconnect_time(system_clock::time_point());
                 clientfound->connection_state = client->connection_state;
                 auto connstate = clientfound->get_connection_state();
                 if (connstate)
@@ -386,15 +681,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
                     //pgs->clientlist.push_back(client);
                     //clientlist.remove(client);
 
-                    sw.write_uint32(MSGID_RESPONSE_ENTERGAME);
-                    sw.write_uint16(DEF_ENTERGAMERESTYPE_REJECT);
-                    sw.write_string("Character does not exist");
-                    sw.write_int32(0);
-                    sw.write_int32(0);
-                    sw.write_int32(0);
-                    sw.write_byte(4);
-                    client->write(sw);
-
+                    clientfound->m_bIsInitComplete = true;
                     sw.write_uint32(MSGID_RESPONSE_ENTERGAME);
                     sw.write_uint16(DEF_ENTERGAMERESTYPE_CONFIRM);
                     sw.write_string(std::string("127.0.0.1"), 16);
@@ -428,13 +715,10 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             {
                 client->currentstatus = client_status::in_game;
                 strcpy(client->m_cCharName, character_name.c_str());
-                client->id = charid;
 
+                client->m_bIsInitComplete = true;
                 sw.write_uint32(MSGID_RESPONSE_ENTERGAME);
                 sw.write_uint16(DEF_ENTERGAMERESTYPE_CONFIRM);
-                sw.write_string(std::string("127.0.0.1"), 16);
-                sw.write_uint16(2848);
-                sw.write_string(world_name, 20);
                 client->write(sw);
 
 //                 m_pMapList[client->m_cMapIndex]->clientlist.push_back(client);
@@ -455,7 +739,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
     }
     catch (std::exception & ex)
     {
-        log->critical(std::format("EnterGame() Exception: %s", std::string(ex.what())));
+        log->critical(std::format("EnterGame() Exception: {}", std::string(ex.what())));
         sw.write_uint32(MSGID_RESPONSE_ENTERGAME);
         sw.write_uint16(DEF_ENTERGAMERESTYPE_REJECT);
         sw.write_string("Unknown");
@@ -465,4 +749,188 @@ void CGame::enter_game(CClient * client, stream_read & sr)
         sw.write_byte(3);
         client->write(sw);
     }
+}
+
+void CGame::add_bag_item(CClient * client, pqxx::row & row)
+{
+    CItem * item{};
+    for (int i = 0; i < DEF_MAXITEMS; ++i)
+    {
+        if (client->m_pItemList[i] == nullptr)
+        {
+            item = new CItem();
+            item->id = row["id"].as<uint64_t>();
+            if (_bInitItemAttr(item, row["item_id"].as<int32_t>()) == FALSE)
+            {
+                delete item;
+                break;
+            }
+            item->m_dwCount = row["count"].as<uint32_t>();
+            item->m_sTouchEffectType = row["type"].as<int16_t>();
+            item->m_sTouchEffectValue1 = row["id1"].as<int16_t>();
+            item->m_sTouchEffectValue2 = row["id2"].as<int16_t>();
+            item->m_sTouchEffectValue3 = row["id3"].as<int16_t>();
+            item->m_cItemColor = (int8_t)row["color"].as<int16_t>();
+            item->m_sItemSpecEffectValue1 = row["effect1"].as<int16_t>();
+            item->m_sItemSpecEffectValue2 = row["effect2"].as<int16_t>();
+            item->m_sItemSpecEffectValue3 = row["effect3"].as<int16_t>();
+            item->m_wCurLifeSpan = row["durability"].as<uint16_t>();
+            item->m_dwAttribute = row["attribute"].as<uint32_t>();
+            item->m_cEquipPos = (int8_t)row["itemequip"].as<int16_t>();
+            client->m_ItemPosList[i].x = row["itemposx"].as<int16_t>();
+            client->m_ItemPosList[i].y = row["itemposy"].as<int16_t>();
+
+            if (item->m_sTouchEffectType == DEF_ITET_UNIQUE_OWNER)
+            {
+                if ((item->m_sTouchEffectValue1 != client->m_sCharIDnum1) ||
+                    (item->m_sTouchEffectValue2 != client->m_sCharIDnum2) ||
+                    (item->m_sTouchEffectValue3 != client->m_sCharIDnum3))
+                {
+                    log->info(
+                        std::format("(!) Non-matching IDs for unique item: Player({}) Item({}) {} {} {} - {} {} {}",
+                            client->m_cCharName,
+                            item->m_cName,
+                            item->m_sTouchEffectValue1,
+                            item->m_sTouchEffectValue2,
+                            item->m_sTouchEffectValue3,
+                            client->m_sCharIDnum1,
+                            client->m_sCharIDnum2,
+                            client->m_sCharIDnum3)
+                    );
+                }
+            }
+            client->m_pItemList[i] = item;
+            break;
+        }
+    }
+}
+
+void CGame::add_bank_item(CClient * client, pqxx::row & row)
+{
+    CItem * item{};
+    for (int i = 0; i < DEF_MAXBANKITEMS; ++i)
+    {
+        if (client->m_pItemInBankList[i] == nullptr)
+        {
+            item = new CItem();
+            item->id = row["id"].as<uint64_t>();
+            if (_bInitItemAttr(item, row["item_id"].as<int32_t>()) == FALSE)
+            {
+                delete item;
+                break;
+            }
+            item->m_dwCount = row["count"].as<uint32_t>();
+            item->m_sTouchEffectType = row["type"].as<int16_t>();
+            item->m_sTouchEffectValue1 = row["id1"].as<int16_t>();
+            item->m_sTouchEffectValue2 = row["id2"].as<int16_t>();
+            item->m_sTouchEffectValue3 = row["id3"].as<int16_t>();
+            item->m_cItemColor = (int8_t)row["color"].as<int16_t>();
+            item->m_sItemSpecEffectValue1 = row["effect1"].as<int16_t>();
+            item->m_sItemSpecEffectValue2 = row["effect2"].as<int16_t>();
+            item->m_sItemSpecEffectValue3 = row["effect3"].as<int16_t>();
+            item->m_wCurLifeSpan = row["durability"].as<uint16_t>();
+            item->m_dwAttribute = row["attribute"].as<uint32_t>();
+            item->m_cEquipPos = (int8_t)row["itemequip"].as<int16_t>();
+            client->m_ItemPosList[i].x = row["itemposx"].as<int16_t>();
+            client->m_ItemPosList[i].y = row["itemposy"].as<int16_t>();
+
+            if (item->m_sTouchEffectType == DEF_ITET_UNIQUE_OWNER)
+            {
+                if ((item->m_sTouchEffectValue1 != client->m_sCharIDnum1) ||
+                    (item->m_sTouchEffectValue2 != client->m_sCharIDnum2) ||
+                    (item->m_sTouchEffectValue3 != client->m_sCharIDnum3))
+                {
+                    log->info(
+                        std::format("(!) Non-matching IDs for unique item: Player({}) Item({}) {} {} {} - {} {} {}",
+                            client->m_cCharName,
+                            item->m_cName,
+                            item->m_sTouchEffectValue1,
+                            item->m_sTouchEffectValue2,
+                            item->m_sTouchEffectValue3,
+                            client->m_sCharIDnum1,
+                            client->m_sCharIDnum2,
+                            client->m_sCharIDnum3)
+                    );
+                }
+            }
+            client->m_pItemList[i] = item;
+            break;
+        }
+    }
+}
+
+void CGame::add_mail_item(CClient * client, pqxx::row & row)
+{
+    CItem * item{};
+
+}
+
+//how to delete client?
+//void Server::delete_client_lock(Client * client,
+//							bool save,//save player data
+//							bool notify,//notify surrounding players
+//							bool countlogout,//??
+//							bool forceclose)//apply bleeding isle "ban" effect
+//void Server::delete_client_lock(int iClientH, bool bSave, bool bNotify, bool bCountLogout, bool bForceCloseConn)
+
+// delete_client_lock only closes the socket with all intents and purposes of leaving
+// their character in game unless they are not fully logged in, in which case this
+// would kill the client object as well unless param is passed to also delete the object
+// a proper logout would get the deleteobj flag passed
+// 
+// originally Gate server code - moved to login server functionality
+
+void CGame::delete_client_nolock(std::shared_ptr<CClient> client, bool save /*= false*/, bool deleteobj /*= false*/)
+{
+    if (!client) return;
+
+    std::shared_ptr<ix::ConnectionState> ixconnstate = client->connection_state;
+    connection_state_hb * connection_state = reinterpret_cast<connection_state_hb *>(ixconnstate.get());
+    if (connection_state)
+    {
+        for (auto & wspair : websocket_clients)
+            if (wspair.second == ixconnstate)
+            {
+                wspair.first->close();
+                break;
+            }
+
+        DeleteClient(connection_state->client_handle, save, deleteobj);
+        client->connection_state.reset();
+    }
+    else
+    {
+        client_list.erase(client);
+    }
+    // else // already closed?
+
+    //delete_client(client, save, deleteobj);
+}
+
+void CGame::delete_client_lock(std::shared_ptr<CClient> client, bool save /*= false*/, bool deleteobj /*= false*/)
+{
+    if (!client) return;
+
+    std::shared_ptr<ix::ConnectionState> ixconnstate = client->connection_state;
+    connection_state_hb * connection_state = reinterpret_cast<connection_state_hb *>(ixconnstate.get());
+    if (connection_state)
+    {
+        std::lock_guard<std::recursive_mutex> l(websocket_list);
+
+        for (auto & wspair : websocket_clients)
+            if (wspair.second == ixconnstate)
+                wspair.first->close();
+
+        {
+            std::lock_guard<std::recursive_mutex> l2(client_list_mtx);
+            //delete_client(client, save, deleteobj);
+            DeleteClient(connection_state->client_handle, save, deleteobj);
+            client->connection_state.reset();
+        }
+    }
+    else
+    {
+        client_list.erase(client);
+    }
+    // else // already closed?
 }

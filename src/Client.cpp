@@ -12,8 +12,8 @@ CClient::CClient()
     int i;
 
     socknum = 0;
-    disconnecttime = steady_clock::now();
-    lastpackettime = steady_clock::now();
+    disconnecttime = now();
+    lastpackettime = now();
 
 	ZeroMemory(m_cProfile, sizeof(m_cProfile));
 	strcpy(m_cProfile, "__________");
@@ -30,12 +30,12 @@ CClient::CClient()
 
 	m_bIsInitComplete = FALSE;
 
-	//m_cLU_Str = m_cLU_Int = m_cLU_Vit = m_cLU_Dex = m_cLU_Mag = m_cLU_Char = 0;
+	// m_cLU_Str = m_cLU_Int = m_cLU_Vit = m_cLU_Dex = m_cLU_Mag = m_cLU_Char = 0;
 	m_iLU_Pool = 0;
 	m_cAura = 0;
 
-	//m_iHitRatio_ItemEffect_SM = 0;
-	//m_iHitRatio_ItemEffect_L  = 0;
+	// m_iHitRatio_ItemEffect_SM = 0;
+	// m_iHitRatio_ItemEffect_L  = 0;
 	m_cVar = 0;
 	m_iEnemyKillCount = 0;
 	m_iPKCount = 0;
@@ -331,15 +331,16 @@ BOOL CClient::bCreateNewParty()
 	return TRUE;
 }
 
-void CClient::set_disconnected(bool s)
+void CClient::set_connected(bool s)
 {
-    disconnected = s;
+    connected = s;
     auto conn = get_connection_state();
-    if (conn) conn->disconnected = s;
-    if (s) set_disconnect_time(now());
+    if (conn) conn->connected = s;
+    if (s) set_connect_time(now()); 
+    else set_disconnect_time(now());
 }
 
-void CClient::set_connect_time(time_point<steady_clock> t)
+void CClient::set_connect_time(time_point<system_clock> t)
 {
     connecttime = t;
     auto conn = get_connection_state();
@@ -347,7 +348,7 @@ void CClient::set_connect_time(time_point<steady_clock> t)
     connect_counter++;
 }
 
-void CClient::set_disconnect_time(time_point<steady_clock> t)
+void CClient::set_disconnect_time(time_point<system_clock> t)
 {
     disconnecttime = t;
     auto conn = get_connection_state();
@@ -355,7 +356,7 @@ void CClient::set_disconnect_time(time_point<steady_clock> t)
     disconnect_counter++;
 }
 
-void CClient::set_last_packet_time(time_point<steady_clock> t)
+void CClient::set_last_packet_time(time_point<system_clock> t)
 {
     lastpackettime = t;
     auto conn = get_connection_state();
@@ -363,14 +364,14 @@ void CClient::set_last_packet_time(time_point<steady_clock> t)
     packet_counter++;
 }
 
-void CClient::set_last_check_time(time_point<steady_clock> t)
+void CClient::set_last_check_time(time_point<system_clock> t)
 {
     lastchecktime = t;
     auto conn = get_connection_state();
     if (conn) conn->lastchecktime = t;
 }
 
-void CClient::set_login_time(time_point<steady_clock> t)
+void CClient::set_login_time(time_point<system_clock> t)
 {
     logintime = t;
     auto conn = get_connection_state();
@@ -378,16 +379,16 @@ void CClient::set_login_time(time_point<steady_clock> t)
     login_counter++;
 }
 
-bool CClient::get_disconnected()
+bool CClient::get_connected()
 {
     auto conn = get_connection_state();
-    if (!conn) return disconnected;
-    if (conn->disconnected || disconnected)
+    if (!conn) return connected;
+    if (conn->connected || connected)
         return true;
     return false;
 }
 
-time_point<steady_clock> CClient::get_connect_time()
+time_point<system_clock> CClient::get_connect_time()
 {
     auto conn = get_connection_state();
     if (!conn) return connecttime;
@@ -396,7 +397,7 @@ time_point<steady_clock> CClient::get_connect_time()
     return connecttime;
 }
 
-time_point<steady_clock> CClient::get_disconnect_time()
+time_point<system_clock> CClient::get_disconnect_time()
 {
     auto conn = get_connection_state();
     if (!conn) return disconnecttime;
@@ -405,7 +406,7 @@ time_point<steady_clock> CClient::get_disconnect_time()
     return connecttime;
 }
 
-time_point<steady_clock> CClient::get_last_packet_time()
+time_point<system_clock> CClient::get_last_packet_time()
 {
     auto conn = get_connection_state();
     if (!conn) return lastpackettime;
@@ -414,7 +415,7 @@ time_point<steady_clock> CClient::get_last_packet_time()
     return lastpackettime;
 }
 
-time_point<steady_clock> CClient::get_last_check_time()
+time_point<system_clock> CClient::get_last_check_time()
 {
     auto conn = get_connection_state();
     if (!conn) return lastchecktime;
@@ -423,7 +424,7 @@ time_point<steady_clock> CClient::get_last_check_time()
     return lastchecktime;
 }
 
-time_point<steady_clock> CClient::get_login_time()
+time_point<system_clock> CClient::get_login_time()
 {
     auto conn = get_connection_state();
     if (!conn) return logintime;
@@ -435,14 +436,10 @@ time_point<steady_clock> CClient::get_login_time()
 // todo - improve this heavily
 std::size_t CClient::write(stream_write & sw)
 {
-    if (connection_state.expired() == true)
-        return 0;
-
-    auto connection = connection_state.lock();
-    if (connection == nullptr)
+    if (connection_state == nullptr)
         return 0;
     //outgoingqueue.push_back(new StreamWrite(sw));
-    connection_state_hb * conn_state = reinterpret_cast<connection_state_hb *>(connection.get());
+    connection_state_hb * conn_state = reinterpret_cast<connection_state_hb *>(connection_state.get());
     ix::IXWebSocketSendData data{ sw.data, sw.position };
     auto ws = conn_state->websocket.lock();
     if (ws) return ws->sendBinary(data).payloadSize;

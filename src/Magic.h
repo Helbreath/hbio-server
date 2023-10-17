@@ -23,7 +23,7 @@
 #define DEF_MAGICTYPE_INVISIBILITY				13
 #define DEF_MAGICTYPE_CREATE_DYNAMIC			14
 #define DEF_MAGICTYPE_POSSESSION				15
-#define DEF_MAGICTYPE_CONFUSE					16 // Mass-Illusion, Illusion, Illusion-Movement, Mass-Illusion-Movement
+#define DEF_MAGICTYPE_CONFUSE					16 // Illusion, Mass-Illusion, Illusion-Movement, Mass-Illusion-Movement
 #define DEF_MAGICTYPE_POISON					17
 #define DEF_MAGICTYPE_BERSERK					18
 #define DEF_MAGICTYPE_DAMAGE_LINEAR				19
@@ -36,9 +36,9 @@
 #define DEF_MAGICTYPE_DAMAGE_AREA_ARMOR_BREAK   28
 #define DEF_MAGICTYPE_CANCELLATION				29
 #define DEF_MAGICTYPE_DAMAGE_LINEAR_SPDOWN		30 // Earth-Shock-Wave
-#define DEF_MAGICTYPE_INHIBITION				31 // Inhibition-Casting	
-#define DEF_MAGICTYPE_RESURRECTION				32 // Resurrection
-#define DEF_MAGICTYPE_SCAN						33 // Scan
+#define DEF_MAGICTYPE_INHIBITION				31
+#define DEF_MAGICTYPE_RESURRECTION				32
+#define DEF_MAGICTYPE_SCAN						33
 
 #define DEF_MAXMAGICEFFECTS			100
 

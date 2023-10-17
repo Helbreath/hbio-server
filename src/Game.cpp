@@ -23,98 +23,6 @@ using json = nlohmann::json;
 using namespace std::chrono;
 using namespace std::chrono_literals;
 
-void CGame::run()
-{
-    if (!state_valid)
-    {
-        std::cout << "Server state invalid. Errors occurred on creation. Exiting core::run()\n";
-        return;
-    }
-
-    try
-    {
-        std::unique_lock<std::shared_mutex> l(game_sql_mtx, std::defer_lock);
-        std::unique_lock<std::shared_mutex> l2(login_sql_mtx, std::defer_lock);
-        std::lock(l, l2);
-        pq_login = std::make_unique<pqxx::connection>(fmt::format("postgresql://{}:{}@{}:{}/{}", login_sqluser, login_sqlpass, login_sqlhost, login_sqlport, login_sqldb));
-        pq_game = std::make_unique<pqxx::connection>(fmt::format("postgresql://{}:{}@{}:{}/{}", game_sqluser, game_sqlpass, game_sqlhost, game_sqlport, game_sqldb));
-    }
-    catch (pqxx::broken_connection & ex)
-    {
-        throw std::runtime_error(fmt::format("Unable to connect to SQL - {}", ex.what()));
-    }
-
-    prepare_login_statements();
-    prepare_game_statements();
-
-    log->info("Connected to SQL");
-
-    set_server_state(server_status::running);
-
-    // todo - make a way to change these externally - maybe by admin client?
-    set_login_server_state(login_server_status::running);
-    set_game_server_state(game_server_status::running);
-
-    server = std::make_unique<ix::WebSocketServer>(bindport, bindip);
-
-    auto res = server->listen();
-    if (!res.first)
-        throw std::runtime_error(res.second);
-
-    log->info(fmt::format("Listening on {}:{}", bindip, bindport));
-
-    server->setConnectionStateFactory([&]()
-        {
-            return std::make_shared<connection_state_hb>();
-        });
-
-    server->setOnClientMessageCallback(
-        [&](std::shared_ptr<ix::ConnectionState> connection_state, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message)
-        {
-            on_message(connection_state, websocket, message);
-        }
-    );
-
-    if (bInit() == FALSE)
-    {
-        log->critical("Server failed to start");
-        return;
-    }
-
-    load_configs();
-
-    server->start();
-
-    log->info("Server started");
-
-    OnStartGameSignal();
-
-    time_point current_time = steady_clock::now();
-    time_point player_timeout_timer = steady_clock::now();
-    time_point player_count_report_timer = steady_clock::now();
-    time_point game_timer = steady_clock::now();
-
-    while (get_server_state() == server_status::running)
-    {
-        // todo - better handle timers
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(1ms);
-        current_time = steady_clock::now();
-
-        if (duration_cast<milliseconds>(current_time - game_timer).count() > 300)
-        {
-            OnTimer();
-            game_timer = steady_clock::now();
-        }
-
-//         if (duration_cast<seconds>(current_time - player_count_report_timer).count() > 5)
-//         {
-//             log->info(std::format("Online - players: {} - sockets: {}", client_list.size(), websocket_clients.size()));
-//             player_count_report_timer = steady_clock::now();
-//         }
-    }
-    Quit();
-}
 
 CGame::CGame()
 {
@@ -196,7 +104,7 @@ CGame::CGame()
     for (i = 0; i < DEF_MAXPORTIONTYPES; i++)
         m_pPortionConfigList[i] = NULL;
 
-    //	/for (i = 0; i < DEF_MAXTELEPORTTYPE; i++)
+    //	for (i = 0; i < DEF_MAXTELEPORTTYPE; i++)
     //		m_pTeleportConfigList[i] = NULL;
 
     for (i = 0; i < DEF_MAXBUILDITEMS; i++)
@@ -637,6 +545,8 @@ void CGame::DeleteClient(int iClientH, BOOL bSave, BOOL bNotify, BOOL bCountLogo
     WORD * wp;
 
     if (m_pClientList[iClientH] == NULL) return;
+    std::lock_guard<std::recursive_mutex> l(client_list_mtx);
+    client_list.erase(m_pClientList[iClientH]->shared_from_this());
     if (m_pClientList[iClientH]->m_bIsInitComplete == TRUE)
     {
         if (memcmp(m_pClientList[iClientH]->m_cMapName, "fight", 5) == 0)
@@ -842,6 +752,10 @@ void CGame::DeleteClient(int iClientH, BOOL bSave, BOOL bNotify, BOOL bCountLogo
 
                 //SendMsgToGateServer(MSGID_PARTYOPERATION, iClientH, cData);
             }
+            if (!save_player_data(m_pClientList[iClientH]->shared_from_this()))
+            {
+                log->error("Save player data error for [{}]", m_pClientList[iClientH]->m_cCharName);
+            }
             //if (bSendMsgToLS(MSGID_REQUEST_SAVEPLAYERDATALOGOUT, iClientH, bCountLogout) == FALSE) LocalSavePlayerData(iClientH);
         }
         //else bSendMsgToLS(MSGID_REQUEST_NOSAVELOGOUT, iClientH, bCountLogout);
@@ -937,7 +851,9 @@ void CGame::DeleteClient(int iClientH, BOOL bSave, BOOL bNotify, BOOL bCountLogo
 
     m_iTotalClients--;
 
-    delete m_pClientList[iClientH];
+    //client_list.erase(m_pClientList[iClientH]->shared_from_this());
+
+    //delete m_pClientList[iClientH];
     m_pClientList[iClientH] = NULL;
 
     RemoveClientShortCut(iClientH);
@@ -1429,7 +1345,6 @@ void CGame::SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, DWORD dw
 
 void CGame::CheckClientResponseTime()
 {
-    return;
     int i, iPlusTime, iMaxSuperAttack, iValue;
     short sTemp;
     DWORD dwTime;
@@ -1492,11 +1407,11 @@ void CGame::CheckClientResponseTime()
                     }
                 }
 
-                if (_bCheckCharacterData(i) == FALSE)
-                {
-                    DeleteClient(i, TRUE, TRUE);
-                    break;
-                }
+//                 if (_bCheckCharacterData(i) == FALSE)
+//                 {
+//                     DeleteClient(i, TRUE, TRUE);
+//                     break;
+//                 }
 
                 if ((m_pClientList[i]->m_iHungerStatus <= 30) && (m_pClientList[i]->m_iHungerStatus >= 0))
                     iPlusTime = (30 - m_pClientList[i]->m_iHungerStatus) * 1000;
@@ -1531,6 +1446,10 @@ void CGame::CheckClientResponseTime()
                 if ((m_pMapList[m_pClientList[i]->m_cMapIndex]->m_bIsFightZone == FALSE) &&
                     ((dwTime - m_pClientList[i]->m_dwAutoSaveTime) > (DWORD)DEF_AUTOSAVETIME))
                 {
+                    if (!save_player_data(m_pClientList[i]->shared_from_this()))
+                    {
+                        log->error("Save player data error for [{}]", m_pClientList[i]->m_cCharName);
+                    }
                     //bSendMsgToLS(MSGID_REQUEST_SAVEPLAYERDATA, i);
                     m_pClientList[i]->m_dwAutoSaveTime = dwTime;
                 }
@@ -1800,533 +1719,6 @@ void CGame::CheckClientResponseTime()
     }
 }
 
-// BOOL CGame::bSendMsgToLS(DWORD dwMsg, int iClientH, BOOL bFlag, char* pData)
-// {
-//  DWORD * dwp;
-//  WORD  * wp;
-//  int     iRet, i, iSize;
-//  char    cCharName[11], cAccountName[11], cAccountPassword[11], cAddress[16], cGuildName[21], cTxt[120], * cp;
-//  char    cGuildLoc[11], cTemp[120];
-//  int   * ip, iSendSize;
-//  
-// 
-// 	/*
-// 	m_iCurSubLogSockIndex++;
-// 	if (m_iCurSubLogSockIndex >= DEF_MAXSUBLOGSOCK) m_iCurSubLogSockIndex = 0;
-// 
-// 
-// 	iCnt = 0;
-// 	bLoopFlag = FALSE;
-// 	while (bLoopFlag == FALSE) {
-// 		if (m_pSubLogSock[m_iCurSubLogSockIndex] != NULL) 
-// 			 bLoopFlag = TRUE;
-// 		else m_iCurSubLogSockIndex++;
-// 
-// 		iCnt++;
-// 		if (iCnt >= DEF_MAXSUBLOGSOCK) {
-// 			if (m_bOnExitProcess == FALSE) {
-// 				m_cShutDownCode      = 3;
-// 				m_bOnExitProcess     = TRUE;
-// 				m_dwExitProcessTime  = timeGetTime();
-// 				log->info("(!) GAME SERVER SHUTDOWN PROCESS STARTED(by Log-server connection Lost)!!!");
-// 			}
-// 			return FALSE;
-// 		}
-// 	}
-// 	*/
-// 	
-// 
-// 	// v1.41
-// 	ZeroMemory(G_cData50000, sizeof(G_cData50000));
-// 	ZeroMemory(cCharName, sizeof(cCharName));
-// 	ZeroMemory(cAccountName, sizeof(cAccountName));
-// 	ZeroMemory(cAccountPassword, sizeof(cAccountPassword));
-// 	ZeroMemory(cAddress,   sizeof(cAddress));
-// 	ZeroMemory(cGuildName, sizeof(cGuildName));
-// 	ZeroMemory(cGuildLoc,  sizeof(cGuildLoc));
-// 
-// 	switch (dwMsg) {
-// 	case MSGID_GAMEMASTERLOG:
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 		if (pData == NULL) return FALSE ;
-// 
-// 
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_GAMEMASTERLOG;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		iSize =  strlen(pData) ;
-// 		memcpy((char *)cp, pData, iSize);
-// 
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 6 + iSize);
-// 		iSendSize = 6 + iSize;
-// 		break;
-// 		// v2.15 
-// 
-// 	case MSGID_GAMEITEMLOG:
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 
-// 		//		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 		if (pData == NULL) return FALSE ;
-// 
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_GAMEITEMLOG;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		iSize =  strlen(pData) ;
-// 		memcpy((char *)cp, pData, iSize);
-// 
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 6 + iSize);
-// 		iSendSize = 6 + iSize;
-// 		break;
-// 
-// 	case MSGID_SENDSERVERSHUTDOWNMSG:
-// 		if (m_pMainLogSock == NULL) return FALSE;
-// 
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_SENDSERVERSHUTDOWNMSG;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 		
-// 		iRet = m_pMainLogSock->iSendMsg(G_cData50000, 6);
-// 		break;
-// 	
-// 	case MSGID_GAMESERVERSHUTDOWNED:
-// 		if (m_pMainLogSock == NULL) return FALSE;
-// 
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_GAMESERVERSHUTDOWNED;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 		
-// 		iRet = m_pMainLogSock->iSendMsg(G_cData50000, 6);
-// 		return TRUE;
-// 
-// 	case MSGID_REQUEST_SETACCOUNTWAITSTATUS:
-// 	case MSGID_REQUEST_SETACCOUNTINITSTATUS:
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = dwMsg;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 		
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		memcpy(cp, m_pClientList[iClientH]->m_cAccountName, 10);
-// 		cp += 10;
-// 
-// 		ip = (int *)cp;
-// 		*ip = m_pClientList[iClientH]->m_iLevel;
-// 		cp += 4;
-// 	
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 20);
-// 		iSendSize = 16;
-// 		break;
-// 
-// 	case MSGID_ENTERGAMECONFIRM:
-// 		
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_ENTERGAMECONFIRM;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 		
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		memcpy(cp, m_pClientList[iClientH]->m_cAccountName, 10);
-// 		cp += 10;
-// 
-// 		memcpy(cp, m_pClientList[iClientH]->m_cAccountPassword, 10);
-// 		cp += 10;
-// 
-// 		memcpy(cp, m_cServerName, 10);
-// 		cp += 10;
-// 
-// 		ZeroMemory(cTxt, sizeof(cTxt));
-// 		m_pClientList[iClientH]->iGetPeerAddress(cTxt);
-// 		memcpy(cp, cTxt, 16);
-// 		cp += 16;
-// 
-// 		ip = (int *)cp;
-// 		*ip = m_pClientList[iClientH]->m_iLevel;
-// 		cp += 4;
-// 
-// 		//testcode
-// 		wsprintf(G_cTxt, "Confirmed. Account: (%s) Name: (%s) Level: (%d)", m_pClientList[iClientH]->m_cAccountName, m_pClientList[iClientH]->m_cCharName, m_pClientList[iClientH]->m_iLevel);
-// 		log->info(G_cTxt);
-// 
-// 
-// 
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 56);
-// 		iSendSize = 56;
-// 		if ((m_bIsCrusadeMode == FALSE) && (m_pClientList[iClientH]->m_dwCrusadeGUID == m_dwCrusadeGUID)) {
-// 		break;
-// 		}
-// 		else
-// 		m_pClientList[iClientH]->m_dwCrusadeGUID = m_dwCrusadeGUID;
-// 
-// 
-// 		break;
-// 	
-// 	case MSGID_REQUEST_REGISTERGAMESERVER:
-// 		if (m_pMainLogSock == NULL) return FALSE;
-// 				
-// 		wsprintf(cTxt, "(!) Try to register game server(%s)", m_cServerName);
-// 		log->info(cTxt);
-// 		
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_REQUEST_REGISTERGAMESERVER;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 		
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		memcpy(cAccountName, m_cServerName, 10);
-// 		if (m_iGameServerMode == 1)
-// 		{
-// 			memcpy(cAddress, m_cGameServerAddrExternal, strlen(m_cGameServerAddrExternal));
-// 		}
-// 		if (m_iGameServerMode == 2)
-// 		{
-// 			memcpy(cAddress, m_cGameServerAddr, strlen(m_cGameServerAddr));
-// 		}
-// 		memcpy(cp, cAccountName, 10);
-// 		cp += 10;
-// 
-// 		memcpy(cp, cAddress, 16);
-// 		cp += 16;
-// 
-// 		wp  = (WORD *)cp;
-// 		*wp = m_iGameServerPort;
-// 		cp += 2;
-// 
-// 		*cp = m_iTotalMaps;
-// 		cp++;
-// 
-// 		for (i = 0; i < m_iTotalMaps; i++) {
-// 			memcpy(cp, m_pMapList[i]->m_cName, 11);
-// 			cp += 11;
-// 		}
-// 
-// 		iRet = m_pMainLogSock->iSendMsg(G_cData50000, 35 + m_iTotalMaps*11); 
-// 
-// 		return TRUE;
-// 
-// 	case MSGID_REQUEST_PLAYERDATA:
-// 		
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_REQUEST_PLAYERDATA;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		//testcode
-// 		if (strlen(m_pClientList[iClientH]->m_cCharName) == 0) log->info("(X) CharName NULL!");
-// 
-// 		memcpy(cCharName, m_pClientList[iClientH]->m_cCharName, 10);
-// 		memcpy(cAccountName, m_pClientList[iClientH]->m_cAccountName, 10);
-// 		memcpy(cAccountPassword, m_pClientList[iClientH]->m_cAccountPassword, 10);
-// 
-// 		memcpy((char *)cp, cCharName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountPassword, 10);
-// 		cp += 10;
-// 
-// 		ZeroMemory(cTemp, sizeof(cTemp));
-// 		iRet = m_pClientList[iClientH]->iGetPeerAddress(cTemp);
-// 		memcpy((char *)cp, cTemp, 15);
-// 		cp += 15;
-// 		
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 52);
-// 		iSendSize = 52;
-// 		break;
-// 
-// 	case MSGID_REQUEST_SAVEPLAYERDATA_REPLY:
-// 	case MSGID_REQUEST_SAVEPLAYERDATA:
-// 	case MSGID_REQUEST_SAVEPLAYERDATALOGOUT:
-// 
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 		
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = dwMsg;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		memcpy(cCharName, m_pClientList[iClientH]->m_cCharName, 10);
-// 		memcpy(cAccountName, m_pClientList[iClientH]->m_cAccountName, 10);
-// 		memcpy(cAccountPassword, m_pClientList[iClientH]->m_cAccountPassword, 10);
-// 
-// 		memcpy((char *)cp, cCharName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountPassword, 10);
-// 		cp += 10;
-// 
-// 		*cp = (char)bFlag;
-// 		cp++;
-// 		
-// 		iSize = _iComposePlayerDataFileContents(iClientH, cp);
-// 		
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 37 + iSize);
-// 		iSendSize = 37 + iSize;
-// 		break;
-// 
-// 	case MSGID_REQUEST_NOSAVELOGOUT:
-// 
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 		
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_REQUEST_NOSAVELOGOUT;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		memcpy(cCharName, m_pClientList[iClientH]->m_cCharName, 10);
-// 		memcpy(cAccountName, m_pClientList[iClientH]->m_cAccountName, 10);
-// 		memcpy(cAccountPassword, m_pClientList[iClientH]->m_cAccountPassword, 10);
-// 
-// 		memcpy((char *)cp, cCharName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountPassword, 10);
-// 		cp += 10;
-// 		
-// 		*cp = (char)bFlag;
-// 		cp++;
-// 		
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 37);
-// 		iSendSize = 37;
-// 		break;
-// 	
-// 	case MSGID_REQUEST_CREATENEWGUILD:
-// 
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 		
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_REQUEST_CREATENEWGUILD;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		memcpy(cCharName, m_pClientList[iClientH]->m_cCharName, 10);
-// 		memcpy(cAccountName, m_pClientList[iClientH]->m_cAccountName, 10);
-// 		memcpy(cAccountPassword, m_pClientList[iClientH]->m_cAccountPassword, 10);
-// 		memcpy(cGuildName, m_pClientList[iClientH]->m_cGuildName, 20);
-// 		memcpy(cGuildLoc, m_pClientList[iClientH]->m_cLocation, 10);
-// 
-// 		memcpy((char *)cp, cCharName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountPassword, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cGuildName, 20);
-// 		cp += 20;
-// 		memcpy((char *)cp, cGuildLoc, 10);
-// 		cp += 10;
-// 
-// 		ip = (int *)cp;
-// 		*ip = m_pClientList[iClientH]->m_iGuildGUID;
-// 		cp += 4;
-// 
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 75);
-// 		iSendSize = 75;
-// 		break;
-// 
-// 	case MSGID_REQUEST_DISBANDGUILD:
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 		
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_REQUEST_DISBANDGUILD;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		memcpy(cCharName, m_pClientList[iClientH]->m_cCharName, 10);
-// 		memcpy(cAccountName, m_pClientList[iClientH]->m_cAccountName, 10);
-// 		memcpy(cAccountPassword, m_pClientList[iClientH]->m_cAccountPassword, 10);
-// 		memcpy(cGuildName, m_pClientList[iClientH]->m_cGuildName, 20);
-// 
-// 		memcpy((char *)cp, cCharName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cAccountPassword, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cGuildName, 20);
-// 		cp += 20;
-// 		
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 56);
-// 		iSendSize = 56;
-// 		break;
-// 
-// 	case MSGID_REQUEST_HELDENIAN_WINNER:
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_REQUEST_HELDENIAN_WINNER;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		if (m_cHeldenianVictoryType == 1)
-// 			memcpy(cp, "aresden", 7);
-// 		else if (m_cHeldenianVictoryType == 2)
-// 			memcpy(cp, "elvine", 6);
-// 		else 
-// 			memcpy(cp, "draw", 4);
-// 
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 21);
-// 		iSendSize = 21;
-// 		break;
-// 	
-// 	case MSGID_REQUEST_UPDATEGUILDINFO_NEWGUILDSMAN:
-// 
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 		
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_REQUEST_UPDATEGUILDINFO_NEWGUILDSMAN;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		memcpy(cCharName, m_pClientList[iClientH]->m_cCharName, 10);
-// 		memcpy(cGuildName, m_pClientList[iClientH]->m_cGuildName, 20);
-// 
-// 		memcpy((char *)cp, cCharName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cGuildName, 20);
-// 		cp += 20;
-// 
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 36);
-// 		iSendSize = 36;
-// 		break;
-// 
-// 	case MSGID_REQUEST_UPDATEGUILDINFO_DELGUILDSMAN:
-// 
-// 		// Sub-log-socket
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		
-// 		if (m_pClientList[iClientH] == NULL) return FALSE;
-// 
-// 		dwp  = (DWORD *)(G_cData50000 + DEF_INDEX4_MSGID);
-// 		*dwp = MSGID_REQUEST_UPDATEGUILDINFO_DELGUILDSMAN;
-// 		wp   = (WORD *)(G_cData50000 + DEF_INDEX2_MSGTYPE);
-// 		*wp  = DEF_MSGTYPE_CONFIRM;
-// 
-// 		cp = (char *)(G_cData50000 + DEF_INDEX2_MSGTYPE + 2);
-// 
-// 		memcpy(cCharName, m_pClientList[iClientH]->m_cCharName, 10);
-// 		memcpy(cGuildName, m_pClientList[iClientH]->m_cGuildName, 20);
-// 
-// 		memcpy((char *)cp, cCharName, 10);
-// 		cp += 10;
-// 
-// 		memcpy((char *)cp, cGuildName, 20);
-// 		cp += 20;
-// 
-// 		iRet = m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, 36);
-// 		iSendSize = 36;
-// 		break;
-// 	}
-// 
-// 	switch (iRet) {
-// 	case DEF_XSOCKEVENT_QUENEFULL:
-// 	case DEF_XSOCKEVENT_SOCKETERROR:
-// 	case DEF_XSOCKEVENT_CRITICALERROR:
-// 	case DEF_XSOCKEVENT_SOCKETCLOSED:
-// 		// Sub-log-socket
-// 		wsprintf(G_cTxt, "(!!!) Sub-log-socket(%d) send error!", m_iCurSubLogSockIndex);
-// 		log->info(G_cTxt);
-// 		log->info(G_cTxt);
-// 
-// 		delete m_pSubLogSock[m_iCurSubLogSockIndex];
-// 		m_pSubLogSock[m_iCurSubLogSockIndex] = NULL;
-// 		m_bIsSubLogSockAvailable[m_iCurSubLogSockIndex] = FALSE;
-// 		m_iSubLogSockActiveCount--;
-// 				
-// 		m_pSubLogSock[m_iCurSubLogSockIndex] = new XSocket(m_hWnd, DEF_SERVERSOCKETBLOCKLIMIT);
-// 		m_pSubLogSock[m_iCurSubLogSockIndex]->bConnect(m_cLogServerAddr, m_iLogServerPort, (WM_ONLOGSOCKETEVENT + m_iCurSubLogSockIndex + 1));
-// 		m_pSubLogSock[m_iCurSubLogSockIndex]->bInitBufferSize(DEF_MSGBUFFERSIZE);
-// 
-// 		wsprintf(G_cTxt, "(!) Try to reconnect sub-log-socket(%d)... Addr:%s  Port:%d", m_iCurSubLogSockIndex, m_cLogServerAddr, m_iLogServerPort);
-// 		log->info(G_cTxt);
-// 		
-// 		// v1.41 sub-log-socket
-// 		m_iSubLogSockFailCount++;
-// 
-// 		// v1.41
-// 		if (_bCheckSubLogSocketIndex() == FALSE) return FALSE;
-// 		m_pSubLogSock[m_iCurSubLogSockIndex]->iSendMsg(G_cData50000, iSendSize);
-// 
-// 		return FALSE;
-// 	}
-// 
-// 	return TRUE;
-// }
-
 void CGame::GameProcess()
 {
     NpcProcess();
@@ -2339,7 +1731,7 @@ int CGame::_iComposePlayerDataFileContents(int iClientH, char * pData)
 {
     SYSTEMTIME SysTime;
     char  cTxt[120], cTmp[30];
-    POINT TempItemPosList[DEF_MAXITEMS];
+    POINT TempItemPosList[DEF_MAXITEMS]{};
     int   i, iPos;
 
     if (m_pClientList[iClientH] == NULL) return 0;
@@ -2417,7 +1809,7 @@ int CGame::_iComposePlayerDataFileContents(int iClientH, char * pData)
     strcat(pData, cTxt);
     strcat(pData, "\n");
 
-    if (m_pClientList[iClientH]->m_iSP < 0) m_pClientList[iClientH]->m_iSP = 0; // v1.1
+    if (m_pClientList[iClientH]->m_iSP < 0) m_pClientList[iClientH]->m_iSP = 0;
     wsprintf(cTxt, "character-SP       = %d", m_pClientList[iClientH]->m_iSP);
     strcat(pData, cTxt);
     strcat(pData, "\n");
@@ -3488,6 +2880,8 @@ BOOL CGame::bGetEmptyPosition(short * pX, short * pY, char cMapIndex)
     int i;
     short sX, sY;
 
+    if (cMapIndex == -1) return FALSE;
+
     for (i = 0; i < 25; i++)
         if ((m_pMapList[cMapIndex]->bGetMoveable(*pX + _tmp_cEmptyPosX[i], *pY + _tmp_cEmptyPosY[i]) == TRUE) &&
             (m_pMapList[cMapIndex]->bGetIsTeleport(*pX + _tmp_cEmptyPosX[i], *pY + _tmp_cEmptyPosY[i]) == FALSE))
@@ -3509,10 +2903,10 @@ BOOL CGame::bGetEmptyPosition(short * pX, short * pY, char cMapIndex)
 
 void CGame::TargetSearch(int iNpcH, short * pTarget, char * pTargetType)
 {
-    int ix, iy, iPKCount;
-    short sX, sY, rX, rY, dX, dY;
-    short sOwner, sTargetOwner, sDistance, sTempDistance;
-    char  cOwnerType, cTargetType, cTargetSide;
+    int ix{}, iy{}, iPKCount{};
+    short sX{}, sY{}, rX{}, rY{}, dX{}, dY{};
+    short sOwner{}, sTargetOwner{}, sDistance{}, sTempDistance{};
+    char  cOwnerType{}, cTargetType{}, cTargetSide{};
     int   iInv;
 
     sTargetOwner = NULL;
@@ -3711,7 +3105,7 @@ void CGame::MsgProcess()
     char * pData, cFrom{}, cKey{};
     DWORD    dwMsgSize{}, * dwpMsgID;
     WORD * wpMsgType{}, * wp{};
-    int      i, iClientH{};
+    int      i;
     char   m_msgBuff[1000];
 
     if ((m_bF5pressed == TRUE) && (m_bF1pressed == TRUE))
@@ -3720,6 +3114,10 @@ void CGame::MsgProcess()
         for (i = 1; i < DEF_MAXCLIENTS; i++)
             if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
             {
+                if (!save_player_data(m_pClientList[i]->shared_from_this()))
+                {
+                    log->error("Save player data error for [{}]", m_pClientList[i]->m_cCharName);
+                }
                 //bSendMsgToLS(MSGID_REQUEST_SAVEPLAYERDATA, i);
             }
         bInit();
@@ -3761,14 +3159,31 @@ void CGame::MsgProcess()
         packet_queue.pop_front();
         l.unlock();
 
+        pData = sr.data;
+        dwMsgSize = sr.size;
+
         dwpMsgID = (DWORD *)(sr.data + DEF_INDEX4_MSGID);
 
-        if (!m_pClientList[iClientH]->logged_in)
+        if (client == nullptr || client->currentstatus == client_status::login_screen)
         {
             handle_login_server_message(sm);
-            break;
+            continue;
         }
 
+        if (m_pClientList[iClientH] == nullptr)
+        {
+            log->error(std::format("ClientList is null - Game Packet [{:X}]", *dwpMsgID));
+            continue;
+        }
+
+        if (client->currentstatus != client_status::in_game)
+        {
+            log->error(std::format("Client's status is not in game - Game Packet [{:X}]", *dwpMsgID));
+            continue;
+        }
+
+        log->info(std::format("Game Packet [{:X}]", *dwpMsgID));
+        m_pClientList[iClientH]->m_dwTime = timeGetTime();
         switch (*dwpMsgID)
         {
 
@@ -3796,14 +3211,6 @@ void CGame::MsgProcess()
                 RequestNoticementHandler(iClientH, pData);
                 break;
 
-            case MSGID_BWM_COMMAND_SHUTUP:
-                _BWM_Command_Shutup(pData);
-                break;
-
-            case MSGID_BWM_INIT:
-                _BWM_Init(iClientH, pData);
-                break;
-
             case MSGID_REQUEST_SETITEMPOS:
                 _SetItemPos(iClientH, pData);
                 break;
@@ -3826,10 +3233,6 @@ void CGame::MsgProcess()
 
             case MSGID_REQUEST_TELEPORT:
                 RequestTeleportHandler(iClientH, pData);
-                break;
-
-            case MSGID_REQUEST_INITPLAYER:
-                RequestInitPlayerHandler(iClientH, pData, cKey);
                 break;
 
             case MSGID_REQUEST_INITDATA:
@@ -5589,17 +4992,14 @@ BOOL CGame::_bInitNpcAttr(CNpc * pNpc, char * pNpcName, short sClass, char cSA)
         {
             if (memcmp(cTmpName, m_pNpcConfigList[i]->m_cNpcName, 20) == 0)
             {
-                // Â°Â°Ã€Âº Ã€ÃŒÂ¸Â§Ã€Â» Â°Â¡ÃÃ¸ NPC Â¼Â³ÃÂ¤Ã€Â» ÃƒÂ£Â¾Ã’Â´Ã™. Â¼Â³ÃÂ¤Â°ÂªÃ€Â¸Â·ÃŽ ÃƒÃŠÂ±Ã¢ÃˆÂ­Ã‡Ã‘Â´Ã™.
                 ZeroMemory(pNpc->m_cNpcName, sizeof(pNpc->m_cNpcName));
                 memcpy(pNpc->m_cNpcName, m_pNpcConfigList[i]->m_cNpcName, 20);
 
                 pNpc->m_sType = m_pNpcConfigList[i]->m_sType;
 
-                // HitDiceÂ¿Â¡ ÂµÃ»Â¶Ã³ Â°Ã¸Â½Ã„Ã€ÃŒ Â´Ã™Â¸Â£Â´Ã™. Â¸Ã·Â°Â£Ã€Ã‡ Ã‚Ã·ÂºÂ°Ã€Â» ÂµÃŽÂ±Ã¢ Ã€Â§Ã‡Ã”.
                 if (m_pNpcConfigList[i]->m_iHitDice <= 5)
                     pNpc->m_iHP = abs(iDice(m_pNpcConfigList[i]->m_iHitDice, 4) + m_pNpcConfigList[i]->m_iHitDice);
                 else pNpc->m_iHP = abs((m_pNpcConfigList[i]->m_iHitDice * 4) + m_pNpcConfigList[i]->m_iHitDice + iDice(1, m_pNpcConfigList[i]->m_iHitDice));
-                // v1.4 ÃˆÂ®Ã€ÃŽÃ„ÃšÂµÃ¥
                 if (pNpc->m_iHP == 0) pNpc->m_iHP = 1;
 
                 pNpc->m_iExpDiceMin = m_pNpcConfigList[i]->m_iExpDiceMin;
@@ -5621,7 +5021,7 @@ BOOL CGame::_bInitNpcAttr(CNpc * pNpc, char * pNpcName, short sClass, char cSA)
                 pNpc->m_dwRegenTime = m_pNpcConfigList[i]->m_dwRegenTime;
                 pNpc->m_cResistMagic = m_pNpcConfigList[i]->m_cResistMagic;
                 pNpc->m_cMagicLevel = m_pNpcConfigList[i]->m_cMagicLevel;
-                pNpc->m_iMaxMana = m_pNpcConfigList[i]->m_iMaxMana; // v1.4
+                pNpc->m_iMaxMana = m_pNpcConfigList[i]->m_iMaxMana;
                 pNpc->m_iMana = m_pNpcConfigList[i]->m_iMaxMana;
                 pNpc->m_cChatMsgPresence = m_pNpcConfigList[i]->m_cChatMsgPresence;
                 pNpc->m_cDayOfWeekLimit = m_pNpcConfigList[i]->m_cDayOfWeekLimit;
@@ -5633,7 +5033,7 @@ BOOL CGame::_bInitNpcAttr(CNpc * pNpc, char * pNpcName, short sClass, char cSA)
                 case 44:
                 case 45:
                 case 46:
-                case 47: // Ã€Ã¼Ã€Ã¯Â¿Ã« Ã€Â¯Â´Ã–Ã€Ã‡ Â°Ã¦Â¿Ã¬ Â¹Â«ÃÂ¶Â°Ã‡ Â°Ã¸Â°ÃÂ¸Â¸ Ã‡ÃÂ´Ã‚ Ã€Ã¼Â·Â«Ã€Â» Â±Â¸Â»Ã§.
+                case 47:
                     pNpc->m_iAttackStrategy = DEF_ATTACKAI_NORMAL;
                     break;
 
@@ -5649,7 +5049,6 @@ BOOL CGame::_bInitNpcAttr(CNpc * pNpc, char * pNpcName, short sClass, char cSA)
                 pNpc->m_cSpecialAbility = cSA;
                 pNpc->m_iBuildCount = m_pNpcConfigList[i]->m_iMinBravery;
 
-                // v1.411 NPCÃ€Ã‡ Ã†Â¯Â¼Ã¶ ÃˆÂ¿Â°Ãº Â°Ã¨Â»Ãª. Â°Ã¦Ã‡Ã¨Ã„Â¡ Â°Â¡ÃÃŸ 
                 switch (pNpc->m_cSpecialAbility)
                 {
                 case 1:
@@ -5669,7 +5068,6 @@ BOOL CGame::_bInitNpcAttr(CNpc * pNpc, char * pNpcName, short sClass, char cSA)
                 case 3: // Absorbing Physical Damage
                     if (pNpc->m_iAbsDamage > 0)
                     {
-                        // Â±Ã¢ÂºÂ»Ã€Ã»Ã€Â¸Â·ÃŽ Â¸Â¶Â¹Ã½ Â´Ã«Â¹ÃŒÃÃ¶ Ã€Ã½Â°Â¨ Â´Ã‰Â·Ã‚Ã€ÃŒ Ã€Ã–Â´Ã‚ Â°Ã¦Â¿Ã¬ Â¹Â°Â¸Â® Â´Ã«Â¹ÃŒÃÃ¶ Ã€Ã½Â°Â¨Ã€Âº Ã€Ã»Â¿Ã«ÂµÃ‡ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™. 
                         pNpc->m_cSpecialAbility = NULL;
                         cSA = NULL;
                     }
@@ -5689,7 +5087,6 @@ BOOL CGame::_bInitNpcAttr(CNpc * pNpc, char * pNpcName, short sClass, char cSA)
                 case 4: // Absorbing Magical Damage
                     if (pNpc->m_iAbsDamage < 0)
                     {
-                        // Â±Ã¢ÂºÂ»Ã€Ã»Ã€Â¸Â·ÃŽ Â¹Â°Â¸Â® Â´Ã«Â¹ÃŒÃÃ¶ Ã€Ã½Â°Â¨ Â´Ã‰Â·Ã‚Ã€ÃŒ Ã€Ã–Â´Ã‚ Â°Ã¦Â¿Ã¬ Â¸Â¶Â¹Ã½ Â´Ã«Â¹ÃŒÃÃ¶ Ã€Ã½Â°Â¨Ã€Âº Ã€Ã»Â¿Ã«ÂµÃ‡ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™. 
                         pNpc->m_cSpecialAbility = NULL;
                         cSA = NULL;
                     }
@@ -5729,16 +5126,13 @@ BOOL CGame::_bInitNpcAttr(CNpc * pNpc, char * pNpcName, short sClass, char cSA)
                     break;
                 }
 
-                // v1.411 Ã€Â§Ã„Â¡ Â¿Ã…Â±Ã¨ 
                 pNpc->m_iNoDieRemainExp = (pNpc->m_iExp) - (pNpc->m_iExp / 3);
 
-                // v1.411 NPCÃ€Ã‡ Ã†Â¯Â¼Ã¶ Â´Ã‰Â·Ã‚ Â»Ã°Ã€Ã” 
                 pNpc->m_iStatus = pNpc->m_iStatus & 0xFFFFF0FF;
                 sTemp = cSA;
                 sTemp = sTemp << 8;
                 pNpc->m_iStatus = pNpc->m_iStatus | sTemp;
 
-                // v1.41 NPCÃ€Ã‡ ClassÂ»Ã°Ã€Ã”.
                 pNpc->m_iStatus = pNpc->m_iStatus & 0xFFFFFFF0;
                 pNpc->m_iStatus = pNpc->m_iStatus | (sClass);
 
@@ -5746,7 +5140,6 @@ BOOL CGame::_bInitNpcAttr(CNpc * pNpc, char * pNpcName, short sClass, char cSA)
             }
         }
 
-    // NPCÂ¸Â®Â½ÂºÃ†Â®Â¸Â¦ Â¸Ã°ÂµÃŽ Â°Ã‹Â»Ã¶Ã‡ÃŸÃ€Â½Â¿Â¡ÂµÂµ Â¹ÃŸÂ°ÃŸÂµÃ‡ÃÃ¶ Â¾ÃŠÂ¾Ã’Â´Ã™. 
     return FALSE;
 }
 
@@ -5769,7 +5162,7 @@ void CGame::CalculateGuildEffect(int iVictimH, char cVictimType, short sAttacker
     short sOwnerH;
     char cOwnerType;
 
-    // ### ERROR POINT! Ã€Ã“Â½ÃƒÂ·ÃŽ Â¸Â·Â¾Ã† Â³Ã­Â´Ã™.
+    // ### ERROR POINT!
     return;
 
     if (m_pClientList[sAttackerH] == NULL) return;
@@ -5790,8 +5183,6 @@ void CGame::CalculateGuildEffect(int iVictimH, char cVictimType, short sAttacker
                     (memcmp(m_pClientList[sAttackerH]->m_cGuildName, m_pClientList[sOwnerH]->m_cGuildName, 20) == 0) &&
                     (m_pClientList[sAttackerH]->m_iLevel >= m_pClientList[sOwnerH]->m_iLevel))
                 {
-                    // Â±Ã¦ÂµÃ¥Â¿Ã¸Â°ÃºÃ€Ã‡ Ã‡Ã¹ÂµÂ¿Ã€Ã¼Ã…ÃµÂ¿Â¡Â¼Â­ Â°Ã¦Ã‡Ã¨Ã„Â¡Â¸Â¦ Â¾Ã²Â±Ã¢ Ã€Â§Ã‡Ã˜Â¼Â­Â´Ã‚ Â¸Ã³Â½ÂºÃ…ÃÂ¸Â¦ ÃÃ—Ã€ÃŽ Â±Ã¦ÂµÃ¥Â¿Ã¸Ã€Ã‡ Â·Â¹ÂºÂ§ÂºÂ¸Â´Ã™ Â³Â·Ã€Âº Â±Ã¦ÂµÃ¥Â¿Ã¸Ã€ÃŒÂ¾Ã®Â¾ÃŸ Ã‡Ã‘Â´Ã™.
-                    // 1D3Ã€Ã‡ Â°ÂªÃ€ÃŒ 2Ã€ÃÂ¶Â§ Â¸Ã³Â½ÂºÃ…Ã Â°Ã¦Ã‡Ã¨Ã„Â¡Ã€Ã‡ 3ÂºÃÃ€Ã‡ 1Ã€Â» Â¾Ã²Â´Ã‚Â´Ã™. 
                     if (iDice(1, 3) == 2)
                     {
                         iExp = (m_pNpcList[iVictimH]->m_iExp / 3);
@@ -5803,10 +5194,8 @@ void CGame::CalculateGuildEffect(int iVictimH, char cVictimType, short sAttacker
                             m_pClientList[sOwnerH]->m_iExp += iExp;
                             if (bCheckLimitedUser(sOwnerH) == FALSE)
                             {
-                                // ÃƒÂ¼Ã‡Ã¨Ã†Ã‡ Â»Ã§Â¿Ã«Ã€Ãš ÃÂ¦Ã‡Ã‘Â¿Â¡ Â°Ã‰Â¸Â®ÃÃ¶ Â¾ÃŠÂ¾Ã’Â´Ã™. Â°Ã¦Ã‡Ã¨Ã„Â¡Â°Â¡ Â¿ÃƒÂ¶ÃºÂ´Ã™Â´Ã‚ Ã…Ã«ÂºÂ¸Â¸Â¦ Ã‡Ã‘Â´Ã™.
                                 SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_EXP, NULL, NULL, NULL, NULL);
                             }
-                            // Â·Â¹ÂºÂ§Ã€ÃŒ Â¿ÃƒÂ¶ÃºÂ´Ã‚ÃÃ¶Â¸Â¦ Â°Ã‹Â»Ã§Ã‡Ã‘Â´Ã™.
                             bCheckLevelUp(sOwnerH);
                         }
                     }
@@ -5827,7 +5216,7 @@ void CGame::TimeManaPointsUp(int iClientH)
     if (m_pClientList[iClientH]->m_iHungerStatus <= 0) return;
     if (m_pClientList[iClientH]->m_bSkillUsingStatus[19] == TRUE) return;
 
-    iMaxMP = (2 * m_pClientList[iClientH]->m_iMag) + (2 * m_pClientList[iClientH]->m_iLevel) + (m_pClientList[iClientH]->m_iInt / 2); // v1.4
+    iMaxMP = (2 * m_pClientList[iClientH]->m_iMag) + (2 * m_pClientList[iClientH]->m_iLevel) + (m_pClientList[iClientH]->m_iInt / 2);
     if (m_pClientList[iClientH]->m_iMP < iMaxMP)
     {
         iTotal = iDice(1, (m_pClientList[iClientH]->m_iMag));
@@ -5857,13 +5246,13 @@ void CGame::TimeStaminarPointsUp(int iClientH)
     if (m_pClientList[iClientH]->m_bIsKilled == TRUE) return;
     if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return;
     if (m_pClientList[iClientH]->m_iHungerStatus <= 0) return;
-    if (m_pClientList[iClientH]->m_bSkillUsingStatus[19] == TRUE) return; // v1.4 ÃƒÂÃƒâ€”Ãƒâ‚¬Ã‚ÂºÃƒÆ’Ã‚Â´Ãƒâ€¡ÃƒÂÃ‚Â±ÃƒÂ¢ Ã‚Â±ÃƒÂ¢Ã‚Â¼ÃƒÂº Ã‚Â»ÃƒÂ§Ã‚Â¿ÃƒÂ«ÃƒÂÃƒÅ¸Ã‚Â¿Ã‚Â¡Ã‚Â´Ãƒâ€š Ã‚Â½Ã‚ÂºÃƒâ€¦Ãƒâ€”Ã‚Â¹ÃƒÅ’Ã‚Â³ÃƒÅ  Ã‚Â¿Ãƒâ‚¬Ã‚Â¸Ã‚Â£ÃƒÂÃƒÂ¶ Ã‚Â¾ÃƒÅ Ãƒâ‚¬Ã‚Â½.
+    if (m_pClientList[iClientH]->m_bSkillUsingStatus[19] == TRUE) return;
 
     iMaxSP = (2 * m_pClientList[iClientH]->m_iStr) + (2 * m_pClientList[iClientH]->m_iLevel);
     if (m_pClientList[iClientH]->m_iSP < iMaxSP)
     {
 
-        iTotal = iDice(1, (m_pClientList[iClientH]->m_iVit / 3)); // Staminar PointÂ´Ã‚ 10ÃƒÃŠÂ¸Â¶Â´Ã™ 1D(Vit/3)Â¾Â¿ Â¿ÃƒÂ¶Ã³Â°Â£Â´Ã™.
+        iTotal = iDice(1, (m_pClientList[iClientH]->m_iVit / 3));
         if (m_pClientList[iClientH]->m_iAddSP != 0)
         {
             dV2 = (double)iTotal;
@@ -5872,7 +5261,6 @@ void CGame::TimeStaminarPointsUp(int iClientH)
             iTotal += (int)dV1;
         }
 
-        // v2.03 Â·Â¹ÂºÂ§ 60 Ã€ÃŒÃ‡ÃÂ´Ã‚ ÃÂ¤Â±Ã¢Ã€Ã»Ã€Â¸Â·ÃŽ Â½ÂºÃ…Ã—Â¹ÃŒÂ³ÂªÂ°Â¡ Â¸Â¹Ã€ÃŒ Ã‚Ã¹Â´Ã™.
         if (m_pClientList[iClientH]->m_iLevel <= 20)
         {
             iTotal += 15;
@@ -5907,7 +5295,6 @@ void CGame::SendGuildMsg(int iClientH, WORD wNotifyMsgType, short sV1, short sV2
     char * cp;
     int i, iRet;
 
-    // Â°Â°Ã€Âº Â±Ã¦ÂµÃ¥Â¿Ã¸ÂµÃ©Â¿Â¡Â°Ã”Â¸Â¸ ÂºÂ¸Â³Â»Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶ÂµÃ©
     if (m_pClientList[iClientH] == NULL) return;
     if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return;
 
@@ -5915,8 +5302,6 @@ void CGame::SendGuildMsg(int iClientH, WORD wNotifyMsgType, short sV1, short sV2
         if ((m_pClientList[i] != NULL) &&
             (memcmp(m_pClientList[i]->m_cGuildName, m_pClientList[iClientH]->m_cGuildName, 20) == 0))
         {
-
-            // ### BUG POINT Ã€Â§Ã„Â¡Â°Â¡ Ã€ÃŸÂ¸Ã¸ÂµÃ‡Â¾Ã® Ã†Ã·Ã€ÃŽÃ…Ã Â¿Â¬Â»ÃªÃ€ÃŒ Ã€ÃŸÂ¸Ã¸ÂµÃ‡Â¾ÃºÂ´Ã™. 
             ZeroMemory(cData, sizeof(cData));
 
             dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
@@ -5926,17 +5311,14 @@ void CGame::SendGuildMsg(int iClientH, WORD wNotifyMsgType, short sV1, short sV2
 
             cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
 
-            // Â°Â°Ã€Âº Â±Ã¦ÂµÃ¥ Ã€ÃŒÂ¸Â§Ã€Â» Â°Â®Â°Ã­ Ã€Ã–Â´Ã‚ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¸Â¦ ÃƒÂ£Â¾Ã’Â´Ã™.
             switch (wNotifyMsgType)
             {
             case DEF_NOTIFY_GUILDDISBANDED:
-                if (i == iClientH) break; // <-- Â±Ã¦ÂµÃ¥ Â¸Â¶Â½ÂºÃ…Ã Ã€ÃšÂ½Ã…Â¿Â¡Â°Ã”Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ ÂºÂ¸Â³Â»ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
-                // Â±Ã¦ÂµÃ¥ Ã‡Ã˜Â»Ãª Ã…Ã«ÂºÂ¸Â¿Â¡ Ã‡Ã˜Â´Ã§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Ã€Ã‡ Â±Ã¦ÂµÃ¥ Â·Â©Ã…Â©Â¸Â¦ Ã…Â¬Â¸Â®Â¾Ã®Ã‡Ã‘Â´Ã™. 
+                if (i == iClientH) break;
                 memcpy(cp, m_pClientList[iClientH]->m_cGuildName, 20);
                 cp += 20;
 
                 iRet = m_pClientList[i]->iSendMsg(cData, 26);
-                // Ã‡Ã˜Â´Ã§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Ã€Ã‡ Â±Ã¦ÂµÃ¥Â³Â»Â¿Ã«Ã€Â» Ã…Â¬Â¸Â®Â¾Ã®Ã‡Ã‘Â´Ã™. @@@@@@@
                 ZeroMemory(m_pClientList[i]->m_cGuildName, sizeof(m_pClientList[i]->m_cGuildName));
                 strcpy(m_pClientList[i]->m_cGuildName, "NONE");
                 m_pClientList[i]->m_iGuildRank = -1;
@@ -5944,7 +5326,6 @@ void CGame::SendGuildMsg(int iClientH, WORD wNotifyMsgType, short sV1, short sV2
                 break;
 
             case DEF_NOTIFY_EVENTMSGSTRING:
-                // Â±Ã¦ÂµÃ¥Â¿Ã¸ÂµÃ©Â¿Â¡Â°Ã” Ã€Ã¼Â´ÃžÂµÃ‡Â´Ã‚ Ã€ÃŒÂºÂ¥Ã†Â® Â¸ÃžÂ½ÃƒÃÃ¶ Â½ÂºÃ†Â®Â¸Âµ 
                 strcpy(cp, pString);
                 cp += strlen(pString);
 
@@ -5972,7 +5353,6 @@ void CGame::SendGuildMsg(int iClientH, WORD wNotifyMsgType, short sV1, short sV2
             case DEF_XSOCKEVENT_SOCKETERROR:
             case DEF_XSOCKEVENT_CRITICALERROR:
             case DEF_XSOCKEVENT_SOCKETCLOSED:
-                // Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ ÂºÂ¸Â³Â¾Â¶Â§ Â¿Â¡Â·Â¯Â°Â¡ Â¹ÃŸÂ»Ã½Ã‡ÃŸÂ´Ã™Â¸Ã© ÃÂ¦Â°Ã…Ã‡Ã‘Â´Ã™.
                 DeleteClient(i, TRUE, TRUE);
                 return;
             }
@@ -6010,7 +5390,6 @@ int CGame::_iGetMagicNumber(char * pMagicName, int * pReqInt, int * pCost)
         {
             if (memcmp(cTmpName, m_pMagicConfigList[i]->m_cName, 30) == 0)
             {
-                // Â°Â°Ã€Âº Ã€ÃŒÂ¸Â§Ã€Â» Â°Â¡ÃÃ¸ Â¸Â¶Â¹Ã½ Â¼Â³ÃÂ¤Ã€Â» ÃƒÂ£Â¾Ã’Â´Ã™. Â¸Â¶Â¹Ã½ Â¹Ã¸ÃˆÂ£Â¸Â¦ Â¹ÃÃˆÂ¯Ã‡Ã‘Â´Ã™.
                 *pReqInt = (int)m_pMagicConfigList[i]->m_sIntLimit;
                 *pCost = (int)m_pMagicConfigList[i]->m_iGoldCost;
 
@@ -6023,7 +5402,7 @@ int CGame::_iGetMagicNumber(char * pMagicName, int * pReqInt, int * pCost)
 
 void CGame::TrainSkillResponse(BOOL bSuccess, int iClientH, int iSkillNum, int iSkillLevel)
 {
-    char * cp, cData[100];
+    char * cp, cData[100]{};
     DWORD * dwp;
     WORD * wp;
     int   iRet;
@@ -6035,14 +5414,11 @@ void CGame::TrainSkillResponse(BOOL bSuccess, int iClientH, int iSkillNum, int i
 
     if (bSuccess == TRUE)
     {
-        // ÀÌ¹Ì ±â¼úÀ» ÀÍÈù »óÅÂ¶ó¸é ¼Ò¿ëÀÌ ¾ø´Ù.
         if (m_pClientList[iClientH]->m_cSkillMastery[iSkillNum] != 0) return;
 
         m_pClientList[iClientH]->m_cSkillMastery[iSkillNum] = iSkillLevel;
-        // ±â¼ú ÃÑ ÇÕÀ» Àç °è»êÇÑ´Ù.
         bCheckTotalSkillMasteryPoints(iClientH, iSkillNum);
 
-        // ±â¼úÀ» ¹è¿ü´Ù´Â ¸Þ½ÃÁö¸¦ Àü¼ÛÇÑ´Ù.
         dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
         *dwp = MSGID_NOTIFY;
         wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
@@ -6050,21 +5426,18 @@ void CGame::TrainSkillResponse(BOOL bSuccess, int iClientH, int iSkillNum, int i
 
         cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
 
-        // ±â¼ú¹øÈ£
         *cp = iSkillNum;
         cp++;
 
-        // ±â¼ú ·¹º§ .
         *cp = iSkillLevel;
         cp++;
 
-        //wsprintf(G_cTxt, "Skill Improve: (%s) increased (%s) at %s (%d,%d).", m_pClientList[iClientH]->m_cCharName, m_pSkillConfigList[iSkillNum]->m_cName, m_pClientList[iClientH]->m_cMapName, m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY);
-        //log->info(G_cTxt);
+        wsprintf(G_cTxt, "Skill Improve: (%s) increased (%s) at %s (%d,%d).", m_pClientList[iClientH]->m_cCharName, m_pSkillConfigList[iSkillNum]->m_cName, m_pClientList[iClientH]->m_cMapName, m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY);
+        log->info(G_cTxt);
 
         if (m_pSkillConfigList[iSkillNum]->m_cName != NULL)
             _bItemLog(DEF_ITEMLOG_SKILLLEARN, iClientH, m_pSkillConfigList[iSkillNum]->m_cName, NULL);
 
-        // Á¤º¸ Àü¼Û 
         iRet = m_pClientList[iClientH]->iSendMsg(cData, 8);
         switch (iRet)
         {
@@ -6072,7 +5445,6 @@ void CGame::TrainSkillResponse(BOOL bSuccess, int iClientH, int iSkillNum, int i
         case DEF_XSOCKEVENT_SOCKETERROR:
         case DEF_XSOCKEVENT_CRITICALERROR:
         case DEF_XSOCKEVENT_SOCKETCLOSED:
-            // ¸Þ½ÃÁö¸¦ º¸³¾¶§ ¿¡·¯°¡ ¹ß»ýÇß´Ù¸é Á¦°ÅÇÑ´Ù.
             DeleteClient(iClientH, TRUE, TRUE);
             return;
         }
@@ -6098,7 +5470,6 @@ int CGame::_iGetSkillNumber(char * pSkillName)
         {
             if (memcmp(cTmpName, m_pSkillConfigList[i]->m_cName, 20) == 0)
             {
-                // Â°Â°Ã€Âº Ã€ÃŒÂ¸Â§Ã€Â» Â°Â¡ÃÃ¸ Â±Ã¢Â¼Ãº Â¼Â³ÃÂ¤Ã€Â» ÃƒÂ£Â¾Ã’Â´Ã™. Â±Ã¢Â¼Ãº Â¹Ã¸ÃˆÂ£Â¸Â¦ Â¹ÃÃˆÂ¯Ã‡Ã‘Â´Ã™.
                 return i;
             }
         }
@@ -6118,22 +5489,16 @@ BOOL CGame::bPlayerItemToBank(int iClientH, short sItemIndex)
             iIndex = i;
             goto NEXT_STEP_PLTB;
         }
-    // Â´ÃµÃ€ÃŒÂ»Ã³ Ã€ÃºÃ€Ã¥Ã‡Ã’ Â°Ã¸Â°Â£Ã€ÃŒ Â¾Ã¸Â´Ã™. 
     return FALSE;
 
     NEXT_STEP_PLTB:;
 
-    // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Ã€ÃºÃ€Ã¥Ã‡Ã’ Â°Ã¸Â°Â£Ã€ÃŒ Â³Â²Â¾Ã†Ã€Ã–Â´Ã™. 
-    // Â¸Ã•Ã€Ãº Ã€Ã¥Ã‚Ã¸ÂµÃ‡Â¾Ã® Ã€Ã–Â´Ã™Â¸Ã© Ã‡Ã˜ÃÂ¦Â½ÃƒÃ…Â²Â´Ã™.
     ReleaseItemHandler(iClientH, sItemIndex, TRUE);
 
-    // Â¾Ã†Ã€ÃŒÃ…Ã› Ã…Â¬Â·Â¡Â½ÂºÃ€Ã‡ ÃÃ–Â¼Ã’Â¸Â¦ Â¹Ã™Â²Ã›Â´Ã™. 
     m_pClientList[iClientH]->m_pItemInBankList[iIndex] = m_pClientList[iClientH]->m_pItemList[sItemIndex];
-    // Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã® Â¾Ã†Ã€ÃŒÃ…Ã› Â¸Â®Â½ÂºÃ†Â®Â¸Â¦ Ã…Â¬Â¸Â®Â¾Ã®Ã‡ÃÂ°Ã­ 
     m_pClientList[iClientH]->m_pItemList[sItemIndex] = NULL;
     m_pClientList[iClientH]->m_bIsItemEquipped[sItemIndex] = FALSE;
 
-    // Â¾Ã†Ã€ÃŒÃ…Ã› Â¸Â®Â½ÂºÃ†Â®Ã€Ã‡ ÂºÃ³ Â°Ã¸Â°Â£Ã€Â» Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™.
     for (i = 1; i < DEF_MAXITEMS; i++)
         if ((m_pClientList[iClientH]->m_pItemList[i - 1] == NULL) && (m_pClientList[iClientH]->m_pItemList[i] != NULL))
         {
@@ -6160,2097 +5525,15 @@ BOOL CGame::bBankItemToPlayer(int iClientH, short sItemIndex)
             iIndex = i;
             goto NEXT_STEP_PLTB;
         }
-    // Â´ÃµÃ€ÃŒÂ»Ã³ Â°Â®Â°Ã­Ã€Ã–Ã€Â» Â°Ã¸Â°Â£Ã€ÃŒ Â¾Ã¸Â´Ã™. 
     return FALSE;
 
     NEXT_STEP_PLTB:;
 
-    // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Â¼Ã’ÃÃ¶Ã‡Ã’ Â°Ã¸Â°Â£Ã€ÃŒ Â³Â²Â¾Ã†Ã€Ã–Â´Ã™. 
-
-    // Â¾Ã†Ã€ÃŒÃ…Ã› Ã…Â¬Â·Â¡Â½ÂºÃ€Ã‡ ÃÃ–Â¼Ã’Â¸Â¦ Â¹Ã™Â²Ã›Â´Ã™. 
     m_pClientList[iClientH]->m_pItemList[iIndex] = m_pClientList[iClientH]->m_pItemInBankList[sItemIndex];
 
     m_pClientList[iClientH]->m_pItemInBankList[sItemIndex] = NULL;
 
     return TRUE;
-}
-
-BOOL CGame::__bReadMapInfo(int iMapIndex)
-{
-    char * pContents, * token, * pTile, cTxt[250], cFn[255];
-    char seps[] = "= \t\n";
-    char cReadModeA = 0;
-    char cReadModeB = 0;
-    int  iTeleportLocIndex = 0;
-    int  iWayPointCfgIndex = 0;
-    int  iTotalNpcSetting = 0;
-    int  iMGARCfgIndex = 0;
-    int  iSMGRCfgIndex = 0;
-    int  iNMRCfgIndex = 0;
-    int  iFishPointIndex = 0;
-    int  iMineralPointIndex = 0;
-    int  iStrategicPointIndex = 0;
-    int  iIndex = 0;
-
-    int  iNamingValue;
-    CStrTok * pStrTok;
-    HANDLE hFile;
-    DWORD  dwFileSize, dwReadSize;
-    FILE * pFile;
-
-    char cName[6], cNpcName[30], cNpcMoveType, cNpcWaypointIndex[10]{}, cNamePrefix;
-    short sIPindex, dX, dY;
-
-    // Â»Ã§Ã…ÃµÃ€Ã¥Ã€ÃŽÃÃ¶Â¸Â¦ Ã†Ã‡Â´Ãœ.
-    if (memcmp(m_pMapList[iMapIndex]->m_cName, "fightzone", 9) == 0)
-        m_pMapList[iMapIndex]->m_bIsFightZone = TRUE;
-
-    if (memcmp(m_pMapList[iMapIndex]->m_cName, "icebound", 8) == 0)
-        m_pMapList[iMapIndex]->m_bIsSnowEnabled = TRUE;
-
-    ZeroMemory(cFn, sizeof(cFn));
-    strcat(cFn, "mapdata\\");
-    strcat(cFn, m_pMapList[iMapIndex]->m_cName);
-    strcat(cFn, ".txt");
-
-    hFile = CreateFile(cFn, GENERIC_READ, NULL, NULL, OPEN_EXISTING, NULL, NULL);
-    if (hFile == INVALID_HANDLE_VALUE) return FALSE;
-    dwFileSize = GetFileSize(hFile, NULL);
-    CloseHandle(hFile);
-
-
-    pContents = new char[dwFileSize + 1];
-    ZeroMemory(pContents, dwFileSize + 1);
-
-    pFile = fopen(cFn, "rt");
-    if (pFile == NULL)
-    {
-        // Â¸ÃŠ ÃÂ¤ÂºÂ¸Ã†Ã„Ã€ÃÃ€Â»  Ã€ÃÃ€Â» Â¼Ã¶ Â¾Ã¸Â´Ã™.
-        wsprintf(cTxt, "(!) Cannot open file : %s", cFn);
-        log->info(cTxt);
-        return FALSE;
-    }
-    else
-    {
-        wsprintf(cTxt, "(!) Reading Map info file : %s", cFn);
-        log->info(cTxt);
-        dwReadSize = fread(pContents, dwFileSize, 1, pFile);
-        fclose(pFile);
-    }
-
-    pStrTok = new CStrTok(pContents, seps);
-    token = pStrTok->pGet();
-    //token = strtok(pContents, seps);
-    while (token != NULL)
-    {
-        if (cReadModeA != 0)
-        {
-            switch (cReadModeA)
-            {
-            case 1:
-                switch (cReadModeB)
-                {
-                case 1:
-                    // Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® Â¼Ã’Â½Âº ÃÃ‚Ã‡Â¥ X  
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 1 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_sSrcX = atoi(token);
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    // Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® Â¼Ã’Â½Âº ÃÃ‚Ã‡Â¥ Y 
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 2 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_sSrcY = atoi(token);
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    // Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® Â¸Ã±Ã€Ã»ÃÃ¶ Â¸ÃŠ Ã€ÃŒÂ¸Â§ 
-                    ZeroMemory(m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_cDestMapName,
-                        sizeof(m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_cDestMapName));
-                    strcpy(m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_cDestMapName, token);
-                    cReadModeB = 4;
-                    break;
-
-                case 4:
-                    // Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® Â¸Ã±Ã€Ã»ÃÃ¶ Ã€Â§Ã„Â¡ X 
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 3 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_sDestX = atoi(token);
-                    cReadModeB = 5;
-                    break;
-
-                case 5:
-                    // Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® Â¸Ã±Ã€Ã»ÃÃ¶ Ã€Â§Ã„Â¡ Y 
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 4 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_sDestY = atoi(token);
-                    cReadModeB = 6;
-                    break;
-
-                case 6:
-                    // Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® ÃˆÃ„ Â¹Ã¦Ã‡Ã¢  
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 5 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex]->m_cDir = atoi(token);
-                    iTeleportLocIndex++;
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 2:
-                switch (cReadModeB)
-                {
-                case 1:
-                    // waypoint Â¹Ã¸ÃˆÂ£   
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 6 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iWayPointCfgIndex = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_WaypointList[iWayPointCfgIndex].x != -1)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚ Waypoint Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 7 - Duplicated waypoint");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    // waypoint ÃÃ½Ã‡Ã• ÃÂ¤Ã€Ã‡ X  
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 8 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_WaypointList[iWayPointCfgIndex].x = atoi(token);
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    // waypoint ÃÃ½Ã‡Ã• ÃÂ¤Ã€Ã‡ Y  
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 9 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_WaypointList[iWayPointCfgIndex].y = atoi(token);
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 3:
-                // NpcÂ¸Â¦ Ã†Â¯ÃÂ¤Ã€Â§Ã„Â¡Â¿Â¡ Ã€Â§Ã„Â¡Â½ÃƒÃ…Â²Â´Ã™.
-                switch (cReadModeB)
-                {
-                case 1:
-                    // NPCÃ€Ã‡ Ã€ÃŒÂ¸Â§. 
-                    ZeroMemory(cNpcName, sizeof(cNpcName));
-                    strcpy(cNpcName, token);
-                    cReadModeB = 2;
-                    break;
-                case 2:
-                    // NpcMoveType
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 10 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    cNpcMoveType = atoi(token);
-                    cReadModeB = 3;
-                    break;
-                default:
-                    // WayPoint0~waypoint9
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 11 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    cNpcWaypointIndex[cReadModeB - 3] = atoi(token);
-                    cReadModeB++;
-                    break;
-                case 13:
-                    // cNamePrefix
-                    cNamePrefix = token[0];
-                    // Ã€ÃŒÃÂ¦ Ã€ÃŒÂ°Ã·Â¿Â¡Â¼Â­ NPCÂ¸Â¦ Â»Ã½Â¼ÂºÃ‡Ã‘Â´Ã™. 
-
-                    iNamingValue = m_pMapList[iMapIndex]->iGetEmptyNamingValue();
-                    if (iNamingValue == -1)
-                    {
-                        // Â´ÃµÃ€ÃŒÂ»Ã³ Ã€ÃŒ Â¸ÃŠÂ¿Â¡ NPCÂ¸Â¦ Â¸Â¸ÂµÃ©Â¼Ã¶ Â¾Ã¸Â´Ã™. Ã€ÃŒÂ¸Â§Ã€Â» Ã‡Ã’Â´Ã§Ã‡Ã’ Â¼Ã¶ Â¾Ã¸Â±Ã¢ Â¶Â§Â¹Â®.
-                    }
-                    else
-                    {
-                        // NPCÂ¸Â¦ Â»Ã½Â¼ÂºÃ‡Ã‘Â´Ã™.
-                        ZeroMemory(cName, sizeof(cName));
-                        wsprintf(cName, "XX%d", iNamingValue);
-                        cName[0] = cNamePrefix;
-                        cName[1] = iMapIndex + 65;
-
-                        if (bCreateNewNpc(cNpcName, cName, m_pMapList[iMapIndex]->m_cName, 0, 0, cNpcMoveType, NULL, NULL, cNpcWaypointIndex, NULL, NULL, -1, FALSE) == FALSE)
-                        {
-                            // Â½Ã‡Ã†ÃÃ‡ÃŸÃ€Â¸Â¹Ã‡Â·ÃŽ Â¿Â¹Â¾Ã ÂµÃˆ NameValueÂ¸Â¦ Ã‡Ã˜ÃÂ¦Â½ÃƒÃ…Â²Â´Ã™.
-                            m_pMapList[iMapIndex]->SetNamingValueEmpty(iNamingValue);
-                        }
-                    }
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    iTotalNpcSetting++;
-                    break;
-                }
-                break;
-
-            case 4:
-                switch (cReadModeB)
-                {
-                case 1:
-                    // Random-Mob-Generator Â»Ã§Â¿Ã« Â¿Â©ÂºÃŽ 
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 12 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_bRandomMobGenerator = (BOOL)atoi(token);
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    // Mob- Level
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 13 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_cRandomMobGeneratorLevel = atoi(token);
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 5:
-                // Maximum object
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error 14 - Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-
-                m_pMapList[iMapIndex]->m_iMaximumObject = atoi(token);
-                cReadModeA = 0;
-                cReadModeB = 0;
-                break;
-
-            case 6:
-                // Ã„Â³Â¸Â¯Ã…Ã Â·Â£Â´Ã½ Â»Ã½Â¼Âº Â±ÃÃÃ¶ Â±Â¸Â¿Âª : Â¸Â¶Ã€Â» ÃÃŸÂ½Ã‰ÂºÃŽ Â°Â°Ã€ÂºÂµÂ¥Â¼Â­ Â¸Ã·Ã€ÃŒ Â¹ÃŸÂ»Ã½ÂµÃ‡Â¸Ã© Â°Ã¯Â¶ÃµÃ‡ÃÂ¹Ã‡Â·ÃŽ 
-                switch (cReadModeB)
-                {
-                case 1:
-                    // Rect Â¹Ã¸ÃˆÂ£ 
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 15 - Wrong Data format(MGAR num).");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iMGARCfgIndex = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].left != -1)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚ Waypoint Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 16 - Duplicated Mob Gen Rect Number!");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    // left
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 17 - Wrong Data format(MGAR num).");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].left = atoi(token);
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    // top
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 18 - Wrong Data format(MGAR num).");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].top = atoi(token);
-                    cReadModeB = 4;
-                    break;
-
-                case 4:
-                    // right
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 19 - Wrong Data format(MGAR num).");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].right = atoi(token);
-                    cReadModeB = 5;
-                    break;
-
-                case 5:
-                    // bottom
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 20 - Wrong Data format(MGAR num).");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[iMGARCfgIndex].bottom = atoi(token);
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 7:
-                // Ã†Â¯ÃÂ¤ÃÃ¶Â¿Âª Â¸Ã· Â»Ã½Â¼Âº 
-                switch (cReadModeB)
-                {
-                case 1:
-                    // Rect Â¹Ã¸ÃˆÂ£ m_stSpotMobGenerator[]
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 21 - Wrong Data format(MGAR num).");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iSMGRCfgIndex = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].bDefined == TRUE)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚ Â¸Ã· ÃÂ¦Â³ÃŠÂ·Â¹Ã€ÃŒÃ…Ã Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error - ");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    cReadModeB = 2;
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].bDefined = TRUE;
-                    break;
-
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 22 - Wrong Data format(SMGAR num).");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].cType = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].cType == 1)
-                        cReadModeB = 3;
-                    else if (m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].cType == 2)
-                        cReadModeB = 9;  // RECTÂ°Â¡ Â¾Ã†Â´ÃÂ¶Ã³ WaypointÃÃ½Ã‡Ã•Ã€Â» Ã€ÃÂ¾Ã®Â¾ÃŸ Ã‡Ã‘Â´Ã™.
-                    break;
-
-                case 3:
-                    // left
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 23 - Wrong Data format(SMGAR num).");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].rcRect.left = atoi(token);
-                    cReadModeB = 4;
-                    break;
-
-                case 4:
-                    // top
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 24 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].rcRect.top = atoi(token);
-                    cReadModeB = 5;
-                    break;
-
-                case 5:
-                    // right
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 25 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].rcRect.right = atoi(token);
-                    cReadModeB = 6;
-                    break;
-
-                case 6:
-                    // bottom
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 26 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].rcRect.bottom = atoi(token);
-                    cReadModeB = 7;
-                    break;
-
-                case 7:
-                    // spot mob type
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 27 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iMobType = atoi(token);
-                    cReadModeB = 8;
-                    break;
-
-                case 8:
-                    // Max Mobs
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 28 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iMaxMobs = atoi(token);
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iCurMobs = 0;
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-
-                default:
-                    // WayPoint0~waypoint9
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 29 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].cWaypoint[cReadModeB - 9] = atoi(token);
-                    cReadModeB++;
-                    break;
-
-                case 19:
-                    // spot mob type
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 30 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iMobType = atoi(token);
-                    cReadModeB = 20;
-                    break;
-
-                case 20:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 31 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iMaxMobs = atoi(token);
-                    m_pMapList[iMapIndex]->m_stSpotMobGenerator[iSMGRCfgIndex].iCurMobs = 0;
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 8:
-                // Â¸ÃŠÃ€ÃŒ Â¼Ã“Ã‡Ã‘ Ã€Ã¥Â¼Ã’ Ã€ÃŒÂ¸Â§ 
-                ZeroMemory(m_pMapList[iMapIndex]->m_cLocationName, sizeof(m_pMapList[iMapIndex]->m_cLocationName));
-                memcpy(m_pMapList[iMapIndex]->m_cLocationName, token, 10);
-                cReadModeA = 0;
-                cReadModeB = 0;
-                break;
-
-            case 9:
-                switch (cReadModeB)
-                {
-                case 1:
-                    // Initial-Point Index
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 32:1 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    sIPindex = atoi(token);
-                    if (m_pMapList[iMapIndex]->m_pInitialPoint[sIPindex].x != -1)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Duplicate Initial Point Index!");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    // Initial-Point X
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 32 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_pInitialPoint[sIPindex].x = atoi(token);
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    // Initial-Point Y
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 33 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_pInitialPoint[sIPindex].y = atoi(token);
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 10:
-                // Â°Ã¸Â°Ã Â¹Â«ÃˆÂ¿ÃˆÂ­ Â¿ÂµÂ¿Âª RECT
-                switch (cReadModeB)
-                {
-                case 1:
-                    // 
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 34 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iNMRCfgIndex = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].top != -1)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚ No-Magic-Rect Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 35 - Duplicate No-Magic-Rect number");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 36 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].left = atoi(token);
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 37 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].top = atoi(token);
-                    cReadModeB = 4;
-                    break;
-
-                case 4:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 38 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].right = atoi(token);
-                    cReadModeB = 5;
-                    break;
-
-                case 5:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 39 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_rcNoAttackRect[iNMRCfgIndex].bottom = atoi(token);
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 11:
-                m_pMapList[iMapIndex]->m_bIsFixedDayMode = (BOOL)atoi(token);
-                if (m_pMapList[iMapIndex]->m_bIsFixedDayMode == TRUE)
-                    m_pMapList[iMapIndex]->m_bIsSnowEnabled = FALSE;
-                cReadModeA = 0;
-                break;
-
-            case 12:
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 40 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iFishPointIndex = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_FishPointList[iFishPointIndex].x != -1)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚ Fish Point Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 41 - Duplicate FishPoint number");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_iTotalFishPoint++;
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 42 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_FishPointList[iFishPointIndex].x = atoi(token);
-
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 43 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_FishPointList[iFishPointIndex].y = atoi(token);
-
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 13:
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error 44 - Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_iMaxFish = atoi(token);
-
-                cReadModeA = 0;
-                break;
-
-            case 14:
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error 45 - Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_cType = atoi(token);
-
-                cReadModeA = 0;
-                break;
-
-            case 15:
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error 46 - Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_iLevelLimit = atoi(token);
-
-                cReadModeA = 0;
-                break;
-
-            case 16:
-                // Â±Â¤Â¹Â° ÃÂ¦Â³Ã—Â·Â¹Ã€ÃŒÃ…ÃÃ€Ã‡ ÃÂ¸Ã€Ã§Ã€Â¯Â¹Â«Â¿Ã ÂµÃ®Â±Ãž 
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 47 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_bMineralGenerator = (BOOL)atoi(token);
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 48 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_cMineralGeneratorLevel = atoi(token);
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 17:
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 49 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iMineralPointIndex = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_MineralPointList[iMineralPointIndex].x != -1)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚ Mineral Point Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 50 - Duplicate MineralPoint number");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_iTotalMineralPoint++;
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 51 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_MineralPointList[iMineralPointIndex].x = atoi(token);
-
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 52 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_MineralPointList[iMineralPointIndex].y = atoi(token);
-
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 18:
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error 53 - Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_iMaxMineral = atoi(token);
-
-                cReadModeA = 0;
-                break;
-
-            case 19:
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error 54 - Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_iUpperLevelLimit = atoi(token);
-
-                cReadModeA = 0;
-                break;
-
-            case 20:
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 55 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iStrategicPointIndex = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex] != NULL)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚ Strategic Point Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 56 - Duplicate Strategic Point number");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex] = new CStrategicPoint;
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 57 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex]->m_iSide = atoi(token);
-
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 58 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex]->m_iValue = atoi(token);
-
-                    cReadModeB = 4;
-                    break;
-
-                case 4:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 59 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex]->m_iX = atoi(token);
-
-                    cReadModeB = 5;
-                    break;
-
-                case 5:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 60 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_pStrategicPointList[iStrategicPointIndex]->m_iY = atoi(token);
-
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 21:
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 61 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iIndex = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_stEnergySphereCreationList[iIndex].cType != NULL)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚ Energy-Sphere-Creation Point Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 62 - Duplicate EnergySphereCreation number");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_iTotalEnergySphereCreationPoint++;
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 63 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stEnergySphereCreationList[iIndex].cType = atoi(token);
-
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 64 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stEnergySphereCreationList[iIndex].sX = atoi(token);
-
-                    cReadModeB = 4;
-                    break;
-
-                case 4:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 65 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stEnergySphereCreationList[iIndex].sY = atoi(token);
-
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 22:
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 66 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iIndex = atoi(token);
-
-                    if (m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].cResult != NULL)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚ Energy-Sphere-Goal Point Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        wsprintf(G_cTxt, "(!!!) CRITICAL ERROR! Map Info file error 67 - Duplicate EnergySphereGoal number(%d:%d)", iIndex, m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].cResult);
-                        log->info(G_cTxt);
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_iTotalEnergySphereGoalPoint++;
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 68 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].cResult = atoi(token);
-
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 69 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].aresdenX = atoi(token);
-
-                    cReadModeB = 4;
-                    break;
-
-                case 4:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 70 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].aresdenY = atoi(token);
-
-                    cReadModeB = 5;
-                    break;
-
-                case 5:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 71 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].elvineX = atoi(token);
-
-                    cReadModeB = 6;
-                    break;
-
-                case 6:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 72 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stEnergySphereGoalList[iIndex].elvineY = atoi(token);
-
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 23:
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 73 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iIndex = atoi(token);
-
-                    if (strlen(m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].cRelatedMapName) != NULL)
-                    {
-                        // Ã€ÃŒÂ¹ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã®Ã€Ã–Â´Ã‚  Point Â¹Ã¸ÃˆÂ£Ã€ÃŒÂ´Ã™.
-                        wsprintf(G_cTxt, "(!!!) CRITICAL ERROR! Map Info file error 74 - Duplicate Strike Point number(%d)", iIndex);
-                        log->info(G_cTxt);
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 75 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].dX = atoi(token);
-
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 76 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].dY = atoi(token);
-
-                    cReadModeB = 4;
-                    break;
-
-                case 4:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iHP = atoi(token);
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iInitHP = atoi(token);
-                    cReadModeB = 5;
-                    break;
-
-
-                case 5:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[0] = atoi(token);
-
-                    cReadModeB = 6;
-                    break;
-
-                case 6:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[0] = atoi(token);
-
-                    cReadModeB = 7;
-                    break;
-
-                case 7:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[1] = atoi(token);
-
-                    cReadModeB = 8;
-                    break;
-
-                case 8:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[1] = atoi(token);
-
-                    cReadModeB = 9;
-                    break;
-
-                case 9:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[2] = atoi(token);
-
-                    cReadModeB = 10;
-                    break;
-
-                case 10:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[2] = atoi(token);
-
-                    cReadModeB = 11;
-                    break;
-
-                case 11:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[3] = atoi(token);
-
-                    cReadModeB = 12;
-                    break;
-
-                case 12:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[3] = atoi(token);
-
-                    cReadModeB = 13;
-                    break;
-
-                case 13:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectX[4] = atoi(token);
-
-                    cReadModeB = 14;
-                    break;
-
-                case 14:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 77 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].iEffectY[4] = atoi(token);
-
-                    cReadModeB = 15;
-                    break;
-
-                case 15:
-                    ZeroMemory(m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].cRelatedMapName, sizeof(m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].cRelatedMapName));
-                    strcpy(m_pMapList[iMapIndex]->m_stStrikePoint[iIndex].cRelatedMapName, token);
-
-                    m_pMapList[iMapIndex]->m_iTotalStrikePoints++;
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-
-                }
-                break; // end 23
-
-            case 24:
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 78 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iIndex = atoi(token);
-
-                    if (strlen(m_pMapList[iMapIndex]->m_stItemEventList[iIndex].cItemName) != NULL)
-                    {
-                        // ÀÌ¹Ì ÇÒ´çµÇ¾îÀÖ´Â Item-Event ¹øÈ£ÀÌ´Ù.
-                        wsprintf(G_cTxt, "(!!!) CRITICAL ERROR! Map Info file error 79 - Duplicate Item-Event number(%d:%s)", iIndex, m_pMapList[iMapIndex]->m_stItemEventList[iIndex].cItemName);
-                        log->info(G_cTxt);
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-
-                    m_pMapList[iMapIndex]->m_iTotalItemEvents++;
-                    cReadModeB = 2;
-                    break;
-
-                case 2:
-                    strcpy(m_pMapList[iMapIndex]->m_stItemEventList[iIndex].cItemName, token);
-                    cReadModeB = 3;
-                    break;
-
-                case 3:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 81 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stItemEventList[iIndex].iAmount = atoi(token);
-
-                    cReadModeB = 4;
-                    break;
-
-                case 4:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 82 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stItemEventList[iIndex].iTotalNum = atoi(token);
-
-                    cReadModeB = 5;
-                    break;
-
-                case 5:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 83 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stItemEventList[iIndex].iMonth = atoi(token);
-
-                    cReadModeB = 6;
-                    break;
-
-                case 6:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 83 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stItemEventList[iIndex].iDay = atoi(token);
-
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 25: //mobevent-amount
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error 78 - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->sMobEventAmount = atoi(token);
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 26: //ApocalypseMobGenType
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseMobGenType - Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_iApocalypseMobGenType = atoi(token);
-                cReadModeA = 0;
-                cReadModeB = 0;
-                break;
-
-            case 27: // ApocalypseBossMob
-                switch (cReadModeB)
-                {
-                case 1: // 3CB6Ch m_pMapList[]->m_ApocalypseBossMobNpcID
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_iApocalypseBossMobNpcID = atoi(token);
-                    cReadModeB = 2;
-                    break;
-                case 2: // 3CB70h m_pMapList[]->ApocalypseBossMobRectX1
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sApocalypseBossMobRectX1 = atoi(token);
-                    cReadModeB = 3;
-                    break;
-                case 3: // 3CB74h m_pMapList[]->ApocalypseBossMobRectY1
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sApocalypseBossMobRectY1 = atoi(token);
-                    cReadModeB = 4;
-                    break;
-                case 4: // 3CB78h m_pMapList[]->ApocalypseBossMobRectX2
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sApocalypseBossMobRectX2 = atoi(token);
-                    cReadModeB = 5;
-                    break;
-                case 5: // 3CB7Ch m_pMapList[]->ApocalypseBossMobRectY2
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sApocalypseBossMobRectY2 = atoi(token);
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 28: //DynamicGateType // 28
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error DynamicGateType - Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_cDynamicGateType = atoi(token);
-                cReadModeA = 0;
-                cReadModeB = 0;
-                break;
-
-            case 29: //DynamicGateCoord // 29
-                // DynamicGateCoord	= 59 196 60 197        abaddon	   -1  -1
-                switch (cReadModeB)
-                {
-                case 1: // 3CA20h
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sDynamicGateCoordRectX1 = atoi(token);
-                    cReadModeB = 2;
-                    break;
-
-                case 2: // 3CA24h
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sDynamicGateCoordRectY1 = atoi(token);
-                    cReadModeB = 3;
-                    break;
-
-                case 3: // 3CA28h
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sDynamicGateCoordRectX2 = atoi(token);
-                    cReadModeB = 4;
-                    break;
-
-                case 4: // 3CA2Ch
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sDynamicGateCoordRectY2 = atoi(token);
-                    cReadModeB = 5;
-                    break;
-
-                case 5: // 3CA30h
-                    memcpy(m_pMapList[iMapIndex]->m_cDynamicGateCoordDestMap, token, strlen(token));
-                    cReadModeB = 6;
-                    break;
-
-                case 6: // 3CA3Ch
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sDynamicGateCoordTgtX = atoi(token);
-                    cReadModeB = 7;
-                    break;
-
-                case 7: // (ty = 3CB60h) unknown (3CA3Eh)
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseBossMob - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_sDynamicGateCoordTgtY = atoi(token);
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 30: // RecallImpossible // 30
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error RecallImpossible -  Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_bIsRecallImpossible = atoi(token);
-                cReadModeA = 0;
-                cReadModeB = 0;
-                break;
-
-            case 31: // ApocalypseMap // 31
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error ApocalypseMap -  Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_bIsApocalypseMap = atoi(token);
-                cReadModeA = 0;
-                cReadModeB = 0;
-                break;
-
-            case 32: // CitizenLimit // 32
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error CitizenLimit -  Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_bIsCitizenLimit = atoi(token);
-                cReadModeA = 0;
-                cReadModeB = 0;
-                break;
-
-            case 33: // HeldenianMap
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error CitizenLimit -  Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_bIsHeldenianMap = atoi(token);
-                cReadModeA = 0;
-                cReadModeB = 0;
-                break;
-
-            case 34: // HeldenianTower
-                switch (cReadModeB)
-                {
-                case 1: // NpcID
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian tower type id - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stHeldenianTower[iIndex].sTypeID = atoi(token);
-                    cReadModeB = 2;
-                    break;
-                case 2: // side 
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Tower Side - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stHeldenianTower[iIndex].cSide = atoi(token);
-                    cReadModeB = 3;
-                    break;
-                case 3: // sX
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Tower X pos - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stHeldenianTower[iIndex].dX = atoi(token);
-                    cReadModeB = 4;
-                    break;
-                case 4: // sY
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Tower Y pos - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    iIndex++;
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 35: // HeldenianModeMap
-                if (_bGetIsStringIsNumber(token) == FALSE)
-                {
-                    log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Map Mode - Wrong Data format.");
-                    delete pContents;
-                    delete pStrTok;
-                    return FALSE;
-                }
-                m_pMapList[iMapIndex]->m_cHeldenianModeMap = atoi(token);
-                cReadModeA = 0;
-                cReadModeB = 0;
-                break;
-
-            case 36: // HeldenianWinningZone
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Map Mode - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    dX = atoi(token);
-                    cReadModeB = 2;
-                    break;
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error Hedenian Map Mode - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    dY = atoi(token);
-                    pTile = 0;
-                    pTile = (char *)(m_pMapList[iMapIndex]->m_pTile + dX + dY * m_pMapList[iMapIndex]->m_sSizeY);
-                    if (pTile == 0)
-                    {
-                        wsprintf(cTxt, "(!!!) CRITICAL ERROR! Map Info file error HeldenianWinningZone - pTile is Null dx(%d), dy(%d).", dX, dY);
-                        log->info(cTxt);
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    //pTile->m_iAttribute = 1;
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            case 37: // HeldenianGateDoor // 37
-                switch (cReadModeB)
-                {
-                case 1:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error Heldenian Door Direction - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stHeldenianGateDoor[iIndex].cDir = atoi(token);
-                    cReadModeB = 2;
-                    break;
-                case 2:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error Heldenian Door X pos - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stHeldenianGateDoor[iIndex].dX = atoi(token);
-                    cReadModeB = 3;
-                    break;
-                case 3:
-                    if (_bGetIsStringIsNumber(token) == FALSE)
-                    {
-                        log->info("(!!!) CRITICAL ERROR! Map Info file error Heldenian Door Y pos - Wrong Data format.");
-                        delete pContents;
-                        delete pStrTok;
-                        return FALSE;
-                    }
-                    m_pMapList[iMapIndex]->m_stHeldenianGateDoor[iIndex].dY = atoi(token);
-                    iIndex++;
-                    cReadModeA = 0;
-                    cReadModeB = 0;
-                    break;
-                }
-                break;
-
-            default:
-                break;
-            }
-        }
-        else
-        {
-            if (memcmp(token, "teleport-loc", 12) == 0)
-            {
-                m_pMapList[iMapIndex]->m_pTeleportLoc[iTeleportLocIndex] = new CTeleportLoc;
-                cReadModeA = 1;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "waypoint", 8) == 0)
-            {
-                cReadModeA = 2;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "npc", 3) == 0)
-            {
-                cReadModeA = 3;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "random-mob-generator", 20) == 0)
-            {
-                cReadModeA = 4;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "maximum-object", 14) == 0)
-                cReadModeA = 5;
-
-            if (memcmp(token, "npc-avoidrect", 13) == 0)
-            {
-                cReadModeA = 6;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "spot-mob-generator", 18) == 0)
-            {
-                cReadModeA = 7;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "map-location", 12) == 0)
-                cReadModeA = 8;
-
-            if (memcmp(token, "initial-point", 13) == 0)
-            {
-                cReadModeA = 9;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "no-attack-area", 14) == 0)
-            {
-                cReadModeA = 10;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "fixed-dayornight-mode", 21) == 0) cReadModeA = 11;
-
-            if (memcmp(token, "fish-point", 10) == 0)
-            {
-                cReadModeA = 12;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "max-fish", 8) == 0)		cReadModeA = 13;
-            if (memcmp(token, "type", 4) == 0)			cReadModeA = 14;
-            if (memcmp(token, "level-limit", 11) == 0)	cReadModeA = 15;
-
-            if (memcmp(token, "mineral-generator", 17) == 0)
-            {
-                cReadModeA = 16;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "mineral-point", 13) == 0)
-            {
-                cReadModeA = 17;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "max-mineral", 11) == 0)			cReadModeA = 18;
-            if (memcmp(token, "upper-level-limit", 17) == 0)	cReadModeA = 19;	// v1.4
-            if (memcmp(token, "strategic-point", 15) == 0)
-            {	// v1.41
-                cReadModeA = 20;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "energy-sphere-creation-point", 28) == 0)
-            {
-                cReadModeA = 21;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "energy-sphere-goal-point", 24) == 0)
-            {
-                cReadModeA = 22;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "strike-point", 12) == 0)
-            {
-                cReadModeA = 23;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "item-event", 10) == 0)
-            {
-                cReadModeA = 24;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "energy-sphere-auto-creation", 27) == 0)
-            {
-                cReadModeA = 0;
-                cReadModeB = 0;
-                m_pMapList[iMapIndex]->m_bIsEnergySphereAutoCreation = TRUE;
-            }
-
-            if (memcmp(token, "mobevent-amount", 15) == 0)
-            {
-                cReadModeA = 25;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "ApocalypseMobGenType", 20) == 0)
-            {
-                cReadModeA = 26;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "ApocalypseBossMob", 17) == 0)
-            {
-                cReadModeA = 27;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "DynamicGateType", 15) == 0)
-            {
-                cReadModeA = 28;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "DynamicGateCoord", 16) == 0)
-            {
-                cReadModeA = 29;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "RecallImpossible", 16) == 0)
-            {
-                cReadModeA = 30;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "ApocalypseMap", 13) == 0)
-            {
-                cReadModeA = 31;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "CitizenLimit", 12) == 0)
-            {
-                cReadModeA = 32;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "HeldenianMap", 12) == 0)
-            {
-                cReadModeA = 33;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "HeldenianTower", 14) == 0)
-            {
-                cReadModeA = 34;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "HeldenianModeMap", 16) == 0)
-            {
-                cReadModeA = 35;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "HeldenianWinningZone", 20) == 0)
-            {
-                cReadModeA = 36;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "HeldenianGateDoor", 17) == 0)
-            {
-                cReadModeA = 37;
-                cReadModeB = 1;
-            }
-
-            if (memcmp(token, "[END-MAP-INFO]", 14) == 0)
-            {
-                cReadModeA = 0;
-                cReadModeB = 0;
-                goto RMI_SKIPDECODING;
-            }
-        }
-        token = pStrTok->pGet();
-    }
-
-    RMI_SKIPDECODING:;
-
-    delete pStrTok;
-    delete pContents;
-
-    if ((cReadModeA != 0) || (cReadModeB != 0))
-    {
-        log->info("(!!!) CRITICAL ERROR! map info file contents error!");
-        return FALSE;
-    }
-
-    wsprintf(cTxt, "(!) Map info file decoding(%s) - success! TL(%d) WP(%d) LNPC(%d) MXO(%d) RMG(%d / %d)", cFn, iTeleportLocIndex, iWayPointCfgIndex, iTotalNpcSetting, m_pMapList[iMapIndex]->m_iMaximumObject, m_pMapList[iMapIndex]->m_bRandomMobGenerator, m_pMapList[iMapIndex]->m_cRandomMobGeneratorLevel);
-    log->info(cTxt);
-
-    // Crusade Â°Ã¸Â°Ã ÂºÃ’Â°Â¡Â´Ã‰ Â¿ÂµÂ¿ÂªÃ€Â» Ã…Â¸Ã€ÃÂ¿Â¡ Ã‡Â¥Â½ÃƒÃ‡Ã‘Â´Ã™.
-    m_pMapList[iMapIndex]->_SetupNoAttackArea();
-
-    return TRUE;
-
 }
 
 void CGame::Quit()
@@ -8420,8 +5703,8 @@ BOOL CGame::bChangeState(char cStateChange, char * cStr, char * cVit, char * cDe
     else if (cStateChange == DEF_VIT)
     {
         *cInt += 1;
-        //		if(m_pClientList[iClientH]->m_iStr - cVit < 10 || m_pClientList[iClientH]->cVit - cVit < DEF_CHARPOINTLIMIT )
-        //			return 0;
+		// if(m_pClientList[iClientH]->m_iStr - cVit < 10 || m_pClientList[iClientH]->cVit - cVit < DEF_CHARPOINTLIMIT )
+		// 	return 0;
     }
     else if (cStateChange == DEF_DEX)
     {
@@ -8441,8 +5724,6 @@ BOOL CGame::bChangeState(char cStateChange, char * cStr, char * cVit, char * cDe
     }
     else
     {
-        //Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â°Â¡ Ã€ÃŸÂ¸Ã¸ÂµÃˆ Â°ÂªÃ€Â» ÂºÂ¸Â³Â» Â¿Ã”Â´Ã™..
-//		::MessageBox(NULL, "Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â® Â¹Ã¶Â±Ã—? - í´ë¼ì´ì–¸íŠ¸ ë²„ê·¸?","debug", MB_ICONEXCLAMATION | MB_YESNO) ;
         return 0;
     }
 
@@ -8456,8 +5737,6 @@ BOOL CGame::bCheckLimitedUser(int iClientH)
     if ((memcmp(m_pClientList[iClientH]->m_cLocation, "NONE", 4) == 0) &&
         (m_pClientList[iClientH]->m_iExp >= m_iLevelExp20))
     {
-        // Â¿Â©Ã‡Ã Ã€ÃšÂ°Â¡ Â·Â¹ÂºÂ§ 20 Â°Ã¦Ã‡Ã¨Ã„Â¡Â¸Â¦ Â¾Ã²Â¾ÃºÂ´Ã™Â¸Ã© 19Â¼Ã¶ÃÃ˜Ã€Â¸Â·ÃŽ ÃˆÂ¯Â¿Ã¸. 
-
         m_pClientList[iClientH]->m_iExp = m_iLevelExp20 - 1;
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_TRAVELERLIMITEDLEVEL, NULL, NULL, NULL, NULL);
         return TRUE;
@@ -8477,24 +5756,18 @@ BOOL CGame::bSetItemToBankItem(int iClientH, short sItemIndex)
     char cData[100]{};
     CItem * pItem;
 
-    // Â¼Ã’ÃÃ¶Ã‡ÃÂ°Ã­ Ã€Ã–Â´Ã‚ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» ÂºÂ¸Â°Ã¼Ã‡Ã‘Â´Ã™.
     if (m_pClientList[iClientH] == NULL) return FALSE;
     if ((sItemIndex < 0) || (sItemIndex >= DEF_MAXITEMS)) return FALSE;
     if (m_pClientList[iClientH]->m_pItemList[sItemIndex] == NULL) return FALSE;
-    //wh remove
-    //if (m_pClientList[iClientH]->m_bIsInsideWarehouse == FALSE) return FALSE;
+    if (m_pClientList[iClientH]->m_bIsInsideWarehouse == FALSE) return FALSE;
 
     for (i = 0; i < DEF_MAXBANKITEMS; i++)
         if (m_pClientList[iClientH]->m_pItemInBankList[i] == NULL)
         {
-            // ÂºÃ±Â¾Ã®Ã€Ã–Â´Ã‚ Ã€Â§Ã„Â¡Â¸Â¦ ÃƒÂ£Â¾Ã’Â´Ã™.
-
             m_pClientList[iClientH]->m_pItemInBankList[i] = m_pClientList[iClientH]->m_pItemList[sItemIndex];
             pItem = m_pClientList[iClientH]->m_pItemInBankList[i];
-            // !!! Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Ã‡ Ã†Ã·Ã€ÃŽÃ…ÃÂ¸Â¦ Ã€ÃŒÂµÂ¿Ã‡ÃŸÃ€Â¸Â´Ã Â±Ã¢ÃÂ¸Ã€Ã‡ Ã†Ã·Ã€ÃŽÃ…ÃÂ´Ã‚ NULLÂ°ÂªÃ€Â¸Â·ÃŽ Ã‡Ã’Â´Ã§. 
             m_pClientList[iClientH]->m_pItemList[sItemIndex] = NULL;
 
-            // Â¼Ã’ÃÃ¶Ã‡Â° ÃƒÃ‘ ÃÃŸÂ·Â® Ã€Ã§ Â°Ã¨Â»Ãª 
             iCalcTotalWeight(iClientH);
 
             dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
@@ -8504,10 +5777,9 @@ BOOL CGame::bSetItemToBankItem(int iClientH, short sItemIndex)
 
             cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
 
-            *cp = i; // Ã€Â§Ã„Â¡ Ã€ÃºÃ€Ã¥ 
+            *cp = i;
             cp++;
 
-            // 1Â°Â³.
             *cp = 1;
             cp++;
 
@@ -8553,17 +5825,14 @@ BOOL CGame::bSetItemToBankItem(int iClientH, short sItemIndex)
             *cp = pItem->m_cItemColor;
             cp++;
 
-            // v1.432
             sp = (short *)cp;
             *sp = pItem->m_sItemEffectValue2;
             cp += 2;
 
-            // v1.42
             dwp = (DWORD *)cp;
             *dwp = pItem->m_dwAttribute;
             cp += 4;
 
-            // Â¾Ã†Ã€ÃŒÃ…Ã› ÃÂ¤ÂºÂ¸ Ã€Ã¼Â¼Ã› 
             iRet = m_pClientList[iClientH]->iSendMsg(cData, 55);
             switch (iRet)
             {
@@ -8571,15 +5840,13 @@ BOOL CGame::bSetItemToBankItem(int iClientH, short sItemIndex)
             case DEF_XSOCKEVENT_SOCKETERROR:
             case DEF_XSOCKEVENT_CRITICALERROR:
             case DEF_XSOCKEVENT_SOCKETCLOSED:
-                // Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ ÂºÂ¸Â³Â¾Â¶Â§ Â¿Â¡Â·Â¯Â°Â¡ Â¹ÃŸÂ»Ã½Ã‡ÃŸÂ´Ã™Â¸Ã© ÃÂ¦Â°Ã…Ã‡Ã‘Â´Ã™. v1.41 ÃÂ¦Â°Ã…Ã‡ÃÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
                 // DeleteClient(iClientH, TRUE, TRUE);
-                return TRUE; // v1.41 FALSEÂ¸Â¦ Â¹ÃÃˆÂ¯Ã‡ÃÂ¸Ã© Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¹Ã™Â´ÃšÂ¿Â¡ ÂºÂ¹Â»Ã§ÂµÃˆÂ´Ã™.
+                return TRUE;
             }
 
             return TRUE;
         }
 
-    // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» ÂºÂ¸Â°Ã¼Ã‡Ã’ Â¿Â©Ã€Â¯Â°Ã¸Â°Â£Ã€ÃŒ Â¾Ã¸Â´Ã™.
     return FALSE;
 }
 
@@ -8589,20 +5856,16 @@ void CGame::ApplyPKpenalty(short sAttackerH, short sVictumH)
 
     if (m_pClientList[sAttackerH] == NULL) return;
     if (m_pClientList[sVictumH] == NULL) return;
-    // Â¾ÃˆÃ€Ã¼ Â°Ã¸Â°Ã Â¸Ã°ÂµÃ¥Â°Â¡ Ã„Ã‘ÃÃ¸ Â»Ã³Ã…Ã‚Â¿Â¡Â¼Â­ Â°Ã¸Â°ÃÃ€Â¸Â·ÃŽ Ã€ÃŽÃ‡Ã˜ Â°Â°Ã€Âº Ã†Ã­Ã€ÃŒ ÃÃ—Ã€Â»Â¼Ã¶Â´Ã‚ Â¾Ã¸ÃÃ¶Â¸Â¸ Â¸Â¸Â¾Ã  Ã€Ã–Ã€Â»Â°Ã¦Â¿Ã¬ Â¹Â«Â½Ãƒ 
-    // Â´Ãœ Â°Ã¸Â°ÃÃ€ÃšÂ°Â¡ Â¹Ã¼ÃÃ‹Ã€ÃšÂ°Â¡ Â¾Ã†Â´ÃÂ¾Ã®Â¾ÃŸÂ¸Â¸ Ã‡Ã˜Â´Ã§ÂµÃˆÂ´Ã™.
     if ((m_pClientList[sAttackerH]->m_bIsSafeAttackMode == TRUE) && (m_pClientList[sAttackerH]->m_iPKCount == 0)) return;
     if ((strcmp(m_pClientList[sVictumH]->m_cLocation, "aresden") != 0) && (strcmp(m_pClientList[sVictumH]->m_cLocation, "elvine") != 0) && (strcmp(m_pClientList[sVictumH]->m_cLocation, "elvhunter") != 0) && (strcmp(m_pClientList[sVictumH]->m_cLocation, "arehunter") != 0))
     {
         return;
     }
 
-    // PK Count ÃÃµÂ°Â¡  
     m_pClientList[sAttackerH]->m_iPKCount++;
 
     _bPKLog(DEF_PKLOG_BYPK, sAttackerH, sVictumH, NULL);
 
-    // Â°Ã¦Ã‡Ã¨Ã„Â¡ Â°Â¨Â¼Ã’ 
     iV1 = iDice((m_pClientList[sVictumH]->m_iLevel / 2) + 1, 50);
     iV2 = iDice((m_pClientList[sAttackerH]->m_iLevel / 2) + 1, 50);
 
@@ -8610,20 +5873,15 @@ void CGame::ApplyPKpenalty(short sAttackerH, short sVictumH)
     m_pClientList[sAttackerH]->m_iExp -= iV2;
     if (m_pClientList[sAttackerH]->m_iExp < 0) m_pClientList[sAttackerH]->m_iExp = 0;
 
-    // Ã†Ã¤Â³ÃŽÃ†Â¼Â¸Â¦ Â¸Ã”Â¾ÃºÃ€Â½Ã€Â» Â¾Ã‹Â·ÃÃÃ˜Â´Ã™.
     SendNotifyMsg(NULL, sAttackerH, DEF_NOTIFY_PKPENALTY, NULL, NULL, NULL, NULL);
 
-    // Ã†Â¯Â¼ÂºÃ€ÃŒ Â¹Ã™Â²Ã®Â¹Ã‡Â·ÃŽ Â¿ÃœÂ¾Ã§Ã€Â» Â»ÃµÂ·ÃŽ ÂºÂ¸Â³Â½Â´Ã™. 
     SendEventToNearClient_TypeA(sAttackerH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
 
-    // v1.4 Â·ÃŽÂ±Ã— Ã†Ã„Ã€ÃÂ¿Â¡ Â±Ã¢Â·Ã 
-    //wsprintf(G_cTxt, "(!) PK-penalty: Â°Ã¸Â°ÃÃ€Ãš(%s) Â¼Ã•Â½Ã‡ Â°Ã¦Ã‡Ã¨Ã„Â¡(%d) Â°Ã¦Ã‡Ã¨Ã„Â¡(%d) ", m_pClientList[sAttackerH]->m_cCharName, iV1+iV2, m_pClientList[sAttackerH]->m_iExp);
-    //log->info(G_cTxt);
+    wsprintf(G_cTxt, "(!) PK-penalty: Attacker(%s) Exp Lost(%d) Remaining Exp(%d) ", m_pClientList[sAttackerH]->m_cCharName, iV1+iV2, m_pClientList[sAttackerH]->m_iExp);
+    log->info(G_cTxt);
 
-    // v1.4 Ã…Â©Â¶Ã³Ã€Ã“ ÃˆÂ½Â¼Ã¶ ÃÃµÂ°Â¡ 
     m_stCityStatus[m_pClientList[sAttackerH]->m_cSide].iCrimes++;
 
-    // v1.41 Rating Ã‡ÃÂ¶Ã´ 
     m_pClientList[sAttackerH]->m_iRating -= 10;
     if (m_pClientList[sAttackerH]->m_iRating > 10000)  m_pClientList[sAttackerH]->m_iRating = 10000;
     if (m_pClientList[sAttackerH]->m_iRating < -10000) m_pClientList[sAttackerH]->m_iRating = -10000;
@@ -8640,9 +5898,6 @@ void CGame::ApplyPKpenalty(short sAttackerH, short sVictumH)
             (strcmp(m_pMapList[m_pClientList[sAttackerH]->m_cMapIndex]->m_cName, "areuni") == 0) ||
             (strcmp(m_pMapList[m_pClientList[sAttackerH]->m_cMapIndex]->m_cName, "arefarm") == 0))
         {
-
-            // Â¾Ã†Â·Â¹Â½ÂºÂµÂ§ Â±Ã™Â±Â³Â¿Â¡Â¼Â­ PKÂ¸Â¦ Ã‡ÃŸÂ´Ã™. ÂºÃ­Â¸Â®ÂµÃ¹ Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® 5ÂºÃ
-            // v2.16 Â¼ÂºÃˆÃ„Â´Ã Â¼Ã¶ÃÂ¤
             ZeroMemory(m_pClientList[sAttackerH]->m_cLockedMapName, sizeof(m_pClientList[sAttackerH]->m_cLockedMapName));
             strcpy(m_pClientList[sAttackerH]->m_cLockedMapName, "arejail");
             m_pClientList[sAttackerH]->m_iLockedMapTime = 60 * 3;
@@ -8662,8 +5917,6 @@ void CGame::ApplyPKpenalty(short sAttackerH, short sVictumH)
             (strcmp(m_pMapList[m_pClientList[sAttackerH]->m_cMapIndex]->m_cName, "elvuni") == 0) ||
             (strcmp(m_pMapList[m_pClientList[sAttackerH]->m_cMapIndex]->m_cName, "elvfarm") == 0))
         {
-
-            // Â¿Â¤Â¹Ã™Ã€ÃŽ Â±Ã™Â±Â³Â¿Â¡Â¼Â­ PKÂ¸Â¦ Ã‡ÃŸÂ´Ã™. ÂºÃ­Â¸Â®ÂµÃ¹ Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® 5ÂºÃ
             ZeroMemory(m_pClientList[sAttackerH]->m_cLockedMapName, sizeof(m_pClientList[sAttackerH]->m_cLockedMapName));
             strcpy(m_pClientList[sAttackerH]->m_cLockedMapName, "elvjail");
             m_pClientList[sAttackerH]->m_iLockedMapTime = 60 * 3;
@@ -8680,16 +5933,12 @@ void CGame::ApplyCombatKilledPenalty(int iClientH, int cPenaltyLevel, BOOL bIsSA
     if (m_pClientList[iClientH] == NULL) return;
     if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return;
 
-    // Crusade
     if (m_bIsCrusadeMode == TRUE)
     {
-        // Ã…Â©Â·Ã§Â¼Â¼Ã€ÃŒÂµÃ¥ Â¸Ã°ÂµÃ¥Ã€ÃŽ Â°Ã¦Â¿Ã¬ Ã€Ã¼Ã€Ã¯ÃÃŸÂ¿Â¡ ÃÃ—Â¾Ã®ÂµÂµ Â¾Ã†Â¹Â«Â·Â± Ã†Ã¤Â³ÃŽÃ†Â¼Â°Â¡ Â¾Ã¸Â´Ã™.
-        // PKcountÂ¸Â¸ Â°Â¨Â¼Ã’ 
         if (m_pClientList[iClientH]->m_iPKCount > 0)
         {
             m_pClientList[iClientH]->m_iPKCount--;
             SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PKPENALTY, NULL, NULL, NULL, NULL);
-            // v2.15 
             _bPKLog(DEF_PKLOG_REDUCECRIMINAL, NULL, iClientH, NULL);
 
         }
@@ -8697,22 +5946,17 @@ void CGame::ApplyCombatKilledPenalty(int iClientH, int cPenaltyLevel, BOOL bIsSA
     }
     else
     {
-        // PKcount Â°Â¨Â¼Ã’ 
         if (m_pClientList[iClientH]->m_iPKCount > 0)
         {
             m_pClientList[iClientH]->m_iPKCount--;
             SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PKPENALTY, NULL, NULL, NULL, NULL);
-            // v2.15
             _bPKLog(DEF_PKLOG_REDUCECRIMINAL, NULL, iClientH, NULL);
         }
 
-        // Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Â·ÃŽÂºÃŽÃ…ÃÃ€Ã‡ Â°Ã¸Â°ÃÃ€Â» Â¹ÃžÂ°Ã­ Ã€Ã¼Ã€Ã¯ÃÃŸ Â»Ã§Â¸ÃÃ‡ÃŸÂ´Ã™.
         iExp = iDice(1, (5 * cPenaltyLevel * m_pClientList[iClientH]->m_iLevel));
 
-        // ÃÃŸÂ¸Â³Ã€ÃŽ Â°Ã¦Â¿Ã¬ ÃÃ—Â¾ÃºÃ€Â» Â¶Â§ Â¶Â³Â¾Ã®ÃÃ¶Â´Ã‚ Â°Ã¦Ã‡Ã¨Ã„Â¡Â´Ã‚ 1/3
         if (m_pClientList[iClientH]->m_bIsNeutral == TRUE) iExp = iExp / 3;
 
-        // v2.17 2002-7-31 ÃƒÃ–Â°Ã­Â·Â¾Ã€Âº ÃÃ—Â¾ÃºÃ€Â»Â¶Â§ Â°Ã¦Ã„Â¡Â°Â¡ Â¶Â³Â¾Ã®ÃÃ¶ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™. Â¼Ã¶ÃÂ¤ 
         // if (m_pClientList[iClientH]->m_iLevel == DEF_PLAYERMAXLEVEL) iExp = 0;
 
         m_pClientList[iClientH]->m_iExp -= iExp;
@@ -8720,13 +5964,10 @@ void CGame::ApplyCombatKilledPenalty(int iClientH, int cPenaltyLevel, BOOL bIsSA
 
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_EXP, NULL, NULL, NULL, NULL);
 
-        // v1.41 ÃÃŸÂ¸Â³Ã€Âº Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¶Â³Â¾Ã®ÃÃ¶ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
         if (m_pClientList[iClientH]->m_bIsNeutral != TRUE)
         {
             if (m_pClientList[iClientH]->m_iLevel < 80)
             {
-                // Â·Â¹ÂºÂ§ 80 Â¹ÃŒÂ¸Â¸Ã€Âº Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Ã‡ÃÂ³Âª Ã€Ã»Â°Ã” Â¶Â³Â¾Ã®ÃÃ¸Â´Ã™.
-                // v2.03 60 -> 80
                 cPenaltyLevel--;
                 if (cPenaltyLevel <= 0) cPenaltyLevel = 1;
                 _PenaltyItemDrop(iClientH, cPenaltyLevel, bIsSAattacked);
@@ -8746,11 +5987,8 @@ void CGame::_PenaltyItemDrop(int iClientH, int iTotal, BOOL bIsSAattacked)
 
     if ((m_pClientList[iClientH]->m_iAlterItemDropIndex != -1) && (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_iAlterItemDropIndex] != NULL))
     {
-        // Testcode
         if (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_iAlterItemDropIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_ALTERITEMDROP)
         {
-            // v2.04 Â½ÂºÃ…Ã¦ Â¿Ã€ÂºÃª Â»ÃµÃ…Â©Â¸Â®Ã†Ã„Ã€ÃŒÂ½ÂºÂ°Â¡ Â¸Ã‚Â´Ã‚ÃÃ¶ ÃˆÂ®Ã€ÃŽ
-            // Â´Ã«ÃƒÂ¼Ã€Ã»Ã€Â¸Â·ÃŽ Â¶Â³Â¾Ã®ÃÃ¶Â´Ã‚ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Ã€Ã–Â´Ã™Â¸Ã© Â´Ã™Â¸Â¥ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¶Â³Â¾Ã®ÃÃ¶ÃÃ¶ Â¾ÃŠÂ°Ã­ Ã€ÃŒ Â¾Ã†Ã€ÃŒÃ…Ã›Â¸Â¸ Â¶Â³Â¾Ã®ÃÃ¸Â´Ã™. 
             if (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_iAlterItemDropIndex]->m_wCurLifeSpan > 0)
                 m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_iAlterItemDropIndex]->m_wCurLifeSpan--;
 
@@ -8760,9 +5998,7 @@ void CGame::_PenaltyItemDrop(int iClientH, int iTotal, BOOL bIsSAattacked)
         }
         else
         {
-            // v2.04 testcode
             log->info("Alter Drop Item Index Error1");
-            // Â´Ã™Â½Ãƒ Â°Ã‹Â»Ã¶ 
             for (i = 0; i < DEF_MAXITEMS; i++)
                 if ((m_pClientList[iClientH]->m_pItemList[i] != NULL) && (m_pClientList[iClientH]->m_pItemList[i]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_ALTERITEMDROP))
                 {
@@ -8775,7 +6011,6 @@ void CGame::_PenaltyItemDrop(int iClientH, int iTotal, BOOL bIsSAattacked)
                     return;
                 }
 
-            // Â¿Ã€Â·Ã¹Â¹ÃŸÂ»Ã½! ÃˆÃ±Â»Ã½Â¼Â®Ã€ÃŒ Â¾Ã¸Â´Ã™. 
             goto PID_DROP;
         }
         return;
@@ -8804,7 +6039,6 @@ void CGame::_PenaltyItemDrop(int iClientH, int iTotal, BOOL bIsSAattacked)
             (m_pClientList[iClientH]->m_pItemList[cItemIndex]->m_sTouchEffectValue2 == m_pClientList[iClientH]->m_sCharIDnum2) &&
             (m_pClientList[iClientH]->m_pItemList[cItemIndex]->m_sTouchEffectValue3 == m_pClientList[iClientH]->m_sCharIDnum3))
         {
-            // Â°Â³Ã€ÃŽÂ¿Â¡Â°Ã” Â¼Ã“Ã‡Ã‘ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â¸Â·ÃŽ Â¶Â³Â¾Ã®ÃÃ¶ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™. Â¸ÃÃ…Ã¤Â°Â°Ã€Âº Â°Â³Ã€ÃŽÂ¿Ã« Â¾Ã†Ã€ÃŒÃ…Ã› 
         }
 
         else if (
@@ -8818,12 +6052,10 @@ void CGame::_PenaltyItemDrop(int iClientH, int iTotal, BOOL bIsSAattacked)
             (m_pClientList[iClientH]->m_pItemList[cItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_DEFENSE_SPECABLTY)) &&
             (bIsSAattacked == FALSE))
         {
-            // Ã†Â¯Â¼Ã¶ Â´Ã‰Â·Ã‚Ã€Â» Â°Â¡ÃÃ¸ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Ã†Â¯Â¼Ã¶ Â°Ã¸Â°ÃÃ€Â» Â¹ÃžÃ€ÂºÂ°Ã” Â¾Ã†Â´ÃÂ¶Ã³Â¸Ã© Â¶Â³Â¾Ã®ÃÃ¶ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
         }
 
         else if ((m_pClientList[iClientH]->m_bIsLuckyEffect == TRUE) && (iDice(1, 10) == 5))
         {
-            // Ã„Â³Â¸Â¯Ã…ÃÂ¿Â¡Â°Ã” Ã‡Ã Â¿Ã®ÃˆÂ¿Â°ÃºÂ°Â¡ Ã€Ã–Ã€Â¸Â¸Ã© 10% ÃˆÂ®Â·Ã¼Â·ÃŽ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¶Â³Â¾Ã®ÃÃ¶ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
         }
 
         else DropItemHandler(iClientH, cItemIndex, -1, m_pClientList[iClientH]->m_pItemList[cItemIndex]->m_cName);
@@ -8905,7 +6137,6 @@ void CGame::CheckDynamicObjectList()
     DWORD dwTime = timeGetTime(), dwRegisterTime;
     short sType;
 
-    // Â³Â¯Â¾Â¾ ÃˆÂ¿Â°ÃºÂ¿Â¡ ÂµÃ»Â¸Â¥ ÂµÂ¿Ã€Ã» Â°Â´ÃƒÂ¼Ã€Ã‡ ÃÃ¶Â¼Ã“Â½ÃƒÂ°Â£ Â´ÃœÃƒÃ Ã€Â» Â°Ã¨Â»ÃªÃ‡Ã‘Â´Ã™. 
     for (i = 1; i < DEF_MAXDYNAMICOBJECTS; i++)
     {
         if ((m_pDynamicObjectList[i] != NULL) && (m_pDynamicObjectList[i]->m_dwLastTime != NULL))
@@ -8915,14 +6146,12 @@ void CGame::CheckDynamicObjectList()
             {
             case DEF_DYNAMICOBJECT_FIRE3:
             case DEF_DYNAMICOBJECT_FIRE:
-                // ÂºÃ’Ã€Ã‡ Â°Ã¦Â¿Ã¬ ÂºÃ±Â°Â¡ Â¿ÃˆÃ€Â¸Â·ÃŽ Ã€ÃŽÃ‡Ã˜ Â¼Ã¶Â¸Ã­Ã€ÃŒ Â±ÃžÂ°ÃÃˆÃ· Â´ÃœÃƒÃ ÂµÃˆÂ´Ã™.
                 switch (m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->m_cWhetherStatus)
                 {
                 case 0: break;
                 case 1:
                 case 2:
                 case 3:
-                    // (Â³Â²Ã€Âº Â½ÃƒÂ°Â£/10)*ÂºÃ±Â¿Ã€Â´Ã‚ Â»Ã³Ã…Ã‚ Â¸Â¸Ã…Â­ Â½ÃƒÂ°Â£Ã€Â» Â»Â«Â´Ã™.
                     m_pDynamicObjectList[i]->m_dwLastTime = m_pDynamicObjectList[i]->m_dwLastTime -
                         (m_pDynamicObjectList[i]->m_dwLastTime / 10) * m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->m_cWhetherStatus;
                     break;
@@ -8932,21 +6161,17 @@ void CGame::CheckDynamicObjectList()
         }
     }
 
-    // Â½ÃƒÂ°Â£Ã€ÃŒ Â¸Â¸Â·Ã¡ÂµÃˆ Â°Â´ÃƒÂ¼Â¸Â¦ ÃÂ¾Â·Ã¡Â½ÃƒÃ…Â²Â´Ã™. ÃÃ¶Â¼Ã“Â½ÃƒÂ°Â£Ã€ÃŒ NULLÃ€ÃŒÂ¸Ã© Â¿ÂµÂ¿Ã¸ÃˆÃ· Â³Â²Â¾Ã†Ã€Ã–Â´Ã‚ ÂµÂ¿Ã€Ã» Â°Â´ÃƒÂ¼Ã€ÃŒÂ´Ã™.
     for (i = 1; i < DEF_MAXDYNAMICOBJECTS; i++)
     {
         if ((m_pDynamicObjectList[i] != NULL) && (m_pDynamicObjectList[i]->m_dwLastTime != NULL) &&
             ((dwTime - m_pDynamicObjectList[i]->m_dwRegisterTime) >= m_pDynamicObjectList[i]->m_dwLastTime))
         {
 
-            // ÃÃ¶Â¼Ã“Â½ÃƒÂ°Â£Ã€ÃŒ Â°Ã¦Â°ÃºÃ‡Ã‘ ÂµÂ¿Ã€Ã» Â°Â´ÃƒÂ¼Â¸Â¦ ÃƒÂ£Â¾Ã’Â´Ã™.
             m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->bGetDynamicObject(m_pDynamicObjectList[i]->m_sX, m_pDynamicObjectList[i]->m_sY, &sType, &dwRegisterTime);
-            // ÂµÃ®Â·ÃÂ½ÃƒÂ°Â£Ã€ÃŒ Ã€ÃÃ„Â¡Ã‡Ã‘Â´Ã™Â¸Ã© Â°Â´ÃƒÂ¼Â°Â¡ Â»Ã§Â¶Ã³ÃÃ¸Â´Ã™Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ ÂºÂ¸Â³Â»ÃÃ Â¾ÃŸ Ã‡Ã‘Â´Ã™.
 
             if (dwRegisterTime == m_pDynamicObjectList[i]->m_dwRegisterTime)
             {
                 SendEventToNearClient_TypeB(MSGID_DYNAMICOBJECT, DEF_MSGTYPE_REJECT, m_pDynamicObjectList[i]->m_cMapIndex, m_pDynamicObjectList[i]->m_sX, m_pDynamicObjectList[i]->m_sY, m_pDynamicObjectList[i]->m_sType, i, NULL);
-                // Â¸ÃŠÂ¿Â¡Â¼Â­ Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™.
                 m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->SetDynamicObject(NULL, NULL, m_pDynamicObjectList[i]->m_sX, m_pDynamicObjectList[i]->m_sY, dwTime);
             }
 
@@ -8954,12 +6179,10 @@ void CGame::CheckDynamicObjectList()
             {
             case DEF_DYNAMICOBJECT_FISHOBJECT:
             case DEF_DYNAMICOBJECT_FISH:
-                // Â¹Â°Â°Ã­Â±Ã¢ Â¿Ã€ÂºÃªÃÂ§Ã†Â®Â°Â¡ Â»Ã§Â¶Ã³ÃÂ³Ã€Â¸Â¹Ã‡Â·ÃŽ ÃƒÂ³Â¸Â®Ã‡Ã‘Â´Ã™.
-                bDeleteFish(m_pDynamicObjectList[i]->m_sOwner, 2); // Â½ÃƒÂ°Â£Ã€ÃŒ ÃÃ¶Â³ÂªÂ¼Â­ Â¹Â°Â°Ã­Â±Ã¢Â°Â¡ Â»Ã§Â¶Ã³ÃÃ¸Â´Ã™.
+                bDeleteFish(m_pDynamicObjectList[i]->m_sOwner, 2);
                 break;
             }
 
-            // Â¸Â®Â½ÂºÃ†Â®Â¸Â¦ Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™.
             delete m_pDynamicObjectList[i];
             m_pDynamicObjectList[i] = NULL;
         }
@@ -9041,7 +6264,7 @@ void CGame::CalculateSSN_ItemIndex(int iClientH, short sWeaponIndex, int iValue)
 
         case 2:	 // Farming
         case 12: // Alchemy
-        case 15: // ÀÀ±ÞÃ³Ä¡
+        case 15: 
         case 19: // Pretend-Corpse
             if (m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] > (m_pClientList[iClientH]->m_iInt * 2))
             {
@@ -9065,28 +6288,22 @@ void CGame::CalculateSSN_ItemIndex(int iClientH, short sWeaponIndex, int iValue)
             break;
         }
 
-        // ¸¸¾à ¹«±â¿Í °ü·ÃÀÖ´Â ½ºÅ³ÀÌ ¿Ã¶ú°í ÇöÀç ±× ¹«±â¸¦ »ç¿ë ÁßÀÌ¶ó¸é ÇöÀç ¸íÁß·ü¿¡ 1À» ´õÇÑ´Ù. 
         if (m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] == 0)
         {
-            // Ä«¿îÆ®°¡ 0ÀÌ¸é ½ºÅ³ÀÌ Á¤»óÀûÀ¸·Î ¿Ã¶ú´Ù´Â ÀÇ¹Ì. 
             if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND] != -1)
             {
-                // ¾ç¼Õ¹«±â°¡ ÀåÂøµÇ¾î ÀÖ¾ú´Ù. 
                 iWeaponIndex = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND];
                 if (m_pClientList[iClientH]->m_pItemList[iWeaponIndex]->m_sRelatedSkill == sSkillIndex)
                 {
-                    // È°·ùÀÇ »ç¿ë¿¡ ÀÇÇÑ ½ºÅ³ÀÇ »ó½ÂÀÌ¾ú´Ù. ¸íÁß·üÀ» 1 ¿Ã¸°´Ù. 
                     m_pClientList[iClientH]->m_iHitRatio++;
                 }
             }
 
             if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND] != -1)
             {
-                // ¹«±â°¡ ÀåÂøµÇ¾î ÀÖ¾ú´Ù. 
                 iWeaponIndex = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND];
                 if (m_pClientList[iClientH]->m_pItemList[iWeaponIndex]->m_sRelatedSkill == sSkillIndex)
                 {
-                    // °ËÀÌ³ª Mace·ùÀÇ »ç¿ë¿¡ ÀÇÇÑ ½ºÅ³ÀÇ »ó½ÂÀÌ¾ú´Ù. ¸íÁß·üÀ» 1 ¿Ã¸°´Ù. 
                     m_pClientList[iClientH]->m_iHitRatio++;
                 }
             }
@@ -9094,9 +6311,7 @@ void CGame::CalculateSSN_ItemIndex(int iClientH, short sWeaponIndex, int iValue)
 
         if (m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] == 0)
         {
-            // SKillÀÇ ÃÑÇÕÀÌ 600À» ³ÑÀ¸¸é ´Ù¸¥ ½ºÅ³Áß ÇÏ³ª¸¦ 1 ³»¸°´Ù. 
             bCheckTotalSkillMasteryPoints(iClientH, sSkillIndex);
-            // SkillÀÌ ¿Ã¶ú´Ù´Â °ÍÀ» Å¬¶óÀÌ¾ðÆ®¿¡°Ô ¾Ë·ÁÁØ´Ù.
             SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SKILL, sSkillIndex, m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex], NULL, NULL);
         }
     }
@@ -9111,7 +6326,6 @@ void CGame::CalculateSSN_SkillIndex(int iClientH, short sSkillIndex, int iValue)
     if ((sSkillIndex < 0) || (sSkillIndex >= DEF_MAXSKILLTYPE)) return;
     if (m_pClientList[iClientH]->m_bIsKilled == TRUE) return;
 
-    // Â±Ã¢Â¼Ãº Â¼Ã¶ÃÃ˜Ã€ÃŒ 0Ã€ÃŒÂ¶Ã³Â¸Ã© Â½ÂºÃ…Â³Ã€Âº Â¿Ã€Â¸Â£ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
     if (m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] == 0) return;
 
 #ifdef DEF_TESTSERVER
@@ -9123,14 +6337,10 @@ void CGame::CalculateSSN_SkillIndex(int iClientH, short sSkillIndex, int iValue)
 
     iSSNpoint = m_iSkillSSNpoint[m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] + 1];
 
-    // Â¸Â¸Â¾Ã  SkillSSNÃ€ÃŒ ÃÂ¦Ã‡Ã‘Ã„Â¡Â¸Â¦ Â³Ã‘Â¾Ã®Â¼Â¹Â´Ã™Â¸Ã© SkillÂ°ÂªÃ€ÃŒ ÃÃµÂ°Â¡Ã‡Ã‘Â´Ã™. 
     if ((m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] < 100) &&
         (m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] > iSSNpoint))
     {
-
-        // Â½ÂºÃ…Â³Ã€ÃŒ Â¿ÃƒÂ¶ÃºÂ´Ã™.
         m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex]++;
-        // Ã†Â¯Â¼ÂºÃ„Â¡ ÃÂ¦Ã‡Ã‘Ã€ÃŒ Ã€Ã–Â´Ã‚ SkillÃ€Â» ÃƒÂ³Â¸Â®Ã‡Ã‘Â´Ã™.
         switch (sSkillIndex)
         {
         case 0:
@@ -9138,7 +6348,6 @@ void CGame::CalculateSSN_SkillIndex(int iClientH, short sSkillIndex, int iValue)
         case 13:
             if (m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] > (m_pClientList[iClientH]->m_iStr * 2))
             {
-                // ÃÂ¦Ã‡Ã‘Ã„Â¡ÂºÂ¸Â´Ã™ Ã„Â¿ÃÂ³Â´Ã™. Â¹Â«ÃˆÂ¿Ã€ÃŒÂ¹Ã‡Â·ÃŽ Ã€ÃŒÃ€Ã¼Â»Ã³Ã…Ã‚Â·ÃŽ ÂµÃ‡ÂµÂ¹Â¸Â°Â´Ã™.
                 m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex]--;
                 m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] = iOldSSN;
             }
@@ -9146,10 +6355,8 @@ void CGame::CalculateSSN_SkillIndex(int iClientH, short sSkillIndex, int iValue)
             break;
 
         case 3:
-            // Â¸Â¶Â¹Ã½ Ã€ÃºÃ‡Ã—Ã€Âº ÃƒÃ–Â´Ã« Level*2Â¸Â¸Ã…Â­ Â¿Ã€Â¸Â¥Â´Ã™.
             if (m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] > (m_pClientList[iClientH]->m_iLevel * 2))
             {
-                // ÃÂ¦Ã‡Ã‘Ã„Â¡ÂºÂ¸Â´Ã™ Ã„Â¿ÃÂ³Â´Ã™. Â¹Â«ÃˆÂ¿Ã€ÃŒÂ¹Ã‡Â·ÃŽ Ã€ÃŒÃ€Ã¼Â»Ã³Ã…Ã‚Â·ÃŽ ÂµÃ‡ÂµÂ¹Â¸Â°Â´Ã™.
                 m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex]--;
                 m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] = iOldSSN;
             }
@@ -9160,7 +6367,6 @@ void CGame::CalculateSSN_SkillIndex(int iClientH, short sSkillIndex, int iValue)
         case 21:
             if (m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] > (m_pClientList[iClientH]->m_iMag * 2))
             {
-                // ÃÂ¦Ã‡Ã‘Ã„Â¡ÂºÂ¸Â´Ã™ Ã„Â¿ÃÂ³Â´Ã™. Â¹Â«ÃˆÂ¿Ã€ÃŒÂ¹Ã‡Â·ÃŽ Ã€ÃŒÃ€Ã¼Â»Ã³Ã…Ã‚Â·ÃŽ ÂµÃ‡ÂµÂ¹Â¸Â°Â´Ã™.
                 m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex]--;
                 m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] = iOldSSN;
             }
@@ -9176,7 +6382,6 @@ void CGame::CalculateSSN_SkillIndex(int iClientH, short sSkillIndex, int iValue)
         case 11:
             if (m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] > (m_pClientList[iClientH]->m_iDex * 2))
             {
-                // ÃÂ¦Ã‡Ã‘Ã„Â¡ÂºÂ¸Â´Ã™ Ã„Â¿ÃÂ³Â´Ã™. Â¹Â«ÃˆÂ¿Ã€ÃŒÂ¹Ã‡Â·ÃŽ Ã€ÃŒÃ€Ã¼Â»Ã³Ã…Ã‚Â·ÃŽ ÂµÃ‡ÂµÂ¹Â¸Â°Â´Ã™.
                 m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex]--;
                 m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] = iOldSSN;
             }
@@ -9190,17 +6395,15 @@ void CGame::CalculateSSN_SkillIndex(int iClientH, short sSkillIndex, int iValue)
         case 19:
             if (m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] > (m_pClientList[iClientH]->m_iInt * 2))
             {
-                // ÃÂ¦Ã‡Ã‘Ã„Â¡ÂºÂ¸Â´Ã™ Ã„Â¿ÃÂ³Â´Ã™. Â¹Â«ÃˆÂ¿Ã€ÃŒÂ¹Ã‡Â·ÃŽ Ã€ÃŒÃ€Ã¼Â»Ã³Ã…Ã‚Â·ÃŽ ÂµÃ‡ÂµÂ¹Â¸Â°Â´Ã™.
                 m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex]--;
                 m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] = iOldSSN;
             }
             else m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] = 0;
             break;
 
-        case 23: // ÂµÂ¶Â¼Âº Ã€ÃºÃ‡Ã— 
+        case 23:
             if (m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex] > (m_pClientList[iClientH]->m_iVit * 2))
             {
-                // ÃÂ¦Ã‡Ã‘Ã„Â¡ÂºÂ¸Â´Ã™ Ã„Â¿ÃÂ³Â´Ã™. Â¹Â«ÃˆÂ¿Ã€ÃŒÂ¹Ã‡Â·ÃŽ Ã€ÃŒÃ€Ã¼Â»Ã³Ã…Ã‚Â·ÃŽ ÂµÃ‡ÂµÂ¹Â¸Â°Â´Ã™.
                 m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex]--;
                 m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] = iOldSSN;
             }
@@ -9212,28 +6415,22 @@ void CGame::CalculateSSN_SkillIndex(int iClientH, short sSkillIndex, int iValue)
             break;
         }
 
-        // Â¸Â¸Â¾Ã  Â¹Â«Â±Ã¢Â¿Ã Â°Ã¼Â·ÃƒÃ€Ã–Â´Ã‚ Â½ÂºÃ…Â³Ã€ÃŒ Â¿ÃƒÂ¶ÃºÂ°Ã­ Ã‡Ã¶Ã€Ã§ Â±Ã— Â¹Â«Â±Ã¢Â¸Â¦ Â»Ã§Â¿Ã« ÃÃŸÃ€ÃŒÂ¶Ã³Â¸Ã© Ã‡Ã¶Ã€Ã§ Â¸Ã­ÃÃŸÂ·Ã¼Â¿Â¡ 1Ã€Â» Â´ÃµÃ‡Ã‘Â´Ã™. 
         if (m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] == 0)
         {
-            // Ã„Â«Â¿Ã®Ã†Â®Â°Â¡ 0Ã€ÃŒÂ¸Ã© Â½ÂºÃ…Â³Ã€ÃŒ ÃÂ¤Â»Ã³Ã€Ã»Ã€Â¸Â·ÃŽ Â¿ÃƒÂ¶ÃºÂ´Ã™Â´Ã‚ Ã€Ã‡Â¹ÃŒ. 
             if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND] != -1)
             {
-                // Â¾Ã§Â¼Ã•Â¹Â«Â±Ã¢Â°Â¡ Ã€Ã¥Ã‚Ã¸ÂµÃ‡Â¾Ã® Ã€Ã–Â¾ÃºÂ´Ã™. 
                 iWeaponIndex = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND];
                 if (m_pClientList[iClientH]->m_pItemList[iWeaponIndex]->m_sRelatedSkill == sSkillIndex)
                 {
-                    // ÃˆÂ°Â·Ã¹Ã€Ã‡ Â»Ã§Â¿Ã«Â¿Â¡ Ã€Ã‡Ã‡Ã‘ Â½ÂºÃ…Â³Ã€Ã‡ Â»Ã³Â½Ã‚Ã€ÃŒÂ¾ÃºÂ´Ã™. Â¸Ã­ÃÃŸÂ·Ã¼Ã€Â» 1 Â¿ÃƒÂ¸Â°Â´Ã™. 
                     m_pClientList[iClientH]->m_iHitRatio++;
                 }
             }
 
             if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND] != -1)
             {
-                // Â¹Â«Â±Ã¢Â°Â¡ Ã€Ã¥Ã‚Ã¸ÂµÃ‡Â¾Ã® Ã€Ã–Â¾ÃºÂ´Ã™. 
                 iWeaponIndex = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND];
                 if (m_pClientList[iClientH]->m_pItemList[iWeaponIndex]->m_sRelatedSkill == sSkillIndex)
                 {
-                    // Â°Ã‹Ã€ÃŒÂ³Âª MaceÂ·Ã¹Ã€Ã‡ Â»Ã§Â¿Ã«Â¿Â¡ Ã€Ã‡Ã‡Ã‘ Â½ÂºÃ…Â³Ã€Ã‡ Â»Ã³Â½Ã‚Ã€ÃŒÂ¾ÃºÂ´Ã™. Â¸Ã­ÃÃŸÂ·Ã¼Ã€Â» 1 Â¿ÃƒÂ¸Â°Â´Ã™. 
                     m_pClientList[iClientH]->m_iHitRatio++;
                 }
             }
@@ -9241,10 +6438,8 @@ void CGame::CalculateSSN_SkillIndex(int iClientH, short sSkillIndex, int iValue)
 
         if (m_pClientList[iClientH]->m_iSkillSSN[sSkillIndex] == 0)
         {
-            // SKillÃ€Ã‡ ÃƒÃ‘Ã‡Ã•Ã€ÃŒ 700Ã€Â» Â³Ã‘Ã€Â¸Â¸Ã© Â´Ã™Â¸Â¥ Â½ÂºÃ…Â³ÃÃŸ Ã‡ÃÂ³ÂªÂ¸Â¦ 1 Â³Â»Â¸Â°Â´Ã™. 
             bCheckTotalSkillMasteryPoints(iClientH, sSkillIndex);
 
-            // SkillÃ€ÃŒ Â¿ÃƒÂ¶ÃºÂ´Ã™Â´Ã‚ Â°ÃÃ€Â» Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã‹Â·ÃÃÃ˜Â´Ã™.
             SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SKILL, sSkillIndex, m_pClientList[iClientH]->m_cSkillMastery[sSkillIndex], NULL, NULL);
         }
     }
@@ -9282,7 +6477,6 @@ void CGame::MobGenerator()
             iNamingValue = m_pMapList[i]->iGetEmptyNamingValue();
             if (iNamingValue != -1)
             {
-                // Master Mob????????.
                 ZeroMemory(cName_Master, sizeof(cName_Master));
                 wsprintf(cName_Master, "XX%d", iNamingValue);
                 cName_Master[0] = '_';
@@ -9332,7 +6526,7 @@ void CGame::MobGenerator()
                     iMapLevel = 1;
                     break;
 
-                case 3:     // v1.4334 ????????? ????
+                case 3:
                     if ((iResult >= 1) && (iResult < 20))
                     {
                         switch (iDice(1, 2))
@@ -9626,7 +6820,7 @@ void CGame::MobGenerator()
                         case 3: iResult = 15; break;
                         }
                     }
-                    // Demon?? Berserk ????? ??? ?????
+                    // Demon Berserk
                     if ((iDice(1, 3) == 1) && (iResult != 16)) bFirmBerserk = TRUE;
                     iMapLevel = 5;
                     break;
@@ -10008,7 +7202,6 @@ void CGame::MobGenerator()
                 pX = NULL;
                 pY = NULL;
 
-                //				bIsSpecialEvent = TRUE;
                 if ((m_bIsSpecialEventTime == TRUE) && (iDice(1, 10) == 3)) bIsSpecialEvent = TRUE;
 
                 if (bIsSpecialEvent == TRUE)
@@ -10077,68 +7270,68 @@ void CGame::MobGenerator()
                 //Random Monster Spawns
                 switch (iResult)
                 {
-                case 1:  strcpy(cNpcName, "Slime");				iNpcID = 10; iProbSA = 5;  iKindSA = 1; break;
-                case 2:  strcpy(cNpcName, "Giant-Ant");			iNpcID = 16; iProbSA = 10; iKindSA = 2; break;
-                case 3:  strcpy(cNpcName, "Orc");				iNpcID = 14; iProbSA = 15; iKindSA = 1; break;
-                case 4:  strcpy(cNpcName, "Zombie");			iNpcID = 18; iProbSA = 15; iKindSA = 3; break;
-                case 5:  strcpy(cNpcName, "Skeleton");			iNpcID = 11; iProbSA = 35; iKindSA = 8; break;
-                case 6:  strcpy(cNpcName, "Orc-Mage");			iNpcID = 14; iProbSA = 30; iKindSA = 7; break;
-                case 7:  strcpy(cNpcName, "Scorpion");			iNpcID = 17; iProbSA = 15; iKindSA = 3; break;
-                case 8:  strcpy(cNpcName, "Stone-Golem");		iNpcID = 12; iProbSA = 25; iKindSA = 5; break;
-                case 9:  strcpy(cNpcName, "Cyclops");			iNpcID = 13; iProbSA = 35; iKindSA = 8; break;
-                case 10: strcpy(cNpcName, "Amphis");			iNpcID = 22; iProbSA = 20; iKindSA = 3; break;
-                case 11: strcpy(cNpcName, "Clay-Golem");		iNpcID = 23; iProbSA = 20; iKindSA = 5; break;
-                case 12: strcpy(cNpcName, "Troll");				iNpcID = 28; iProbSA = 25; iKindSA = 3; break;
-                case 13: strcpy(cNpcName, "Orge");				iNpcID = 29; iProbSA = 25; iKindSA = 1; break;
-                case 14: strcpy(cNpcName, "Hellbound");			iNpcID = 27; iProbSA = 25; iKindSA = 8; break;
-                case 15: strcpy(cNpcName, "Liche");				iNpcID = 30; iProbSA = 30; iKindSA = 8; break;
-                case 16: strcpy(cNpcName, "Demon");				iNpcID = 31; iProbSA = 20; iKindSA = 8; break;
-                case 17: strcpy(cNpcName, "Unicorn");			iNpcID = 32; iProbSA = 35; iKindSA = 7; break;
-                case 18: strcpy(cNpcName, "WereWolf");			iNpcID = 33; iProbSA = 25; iKindSA = 1; break;
-                case 19: strcpy(cNpcName, "YB-Aresden");		iNpcID = -1;  iProbSA = 15; iKindSA = 1; break;
-                case 20: strcpy(cNpcName, "YB-Elvine");			iNpcID = -1;  iProbSA = 15; iKindSA = 1; break;
-                case 21: strcpy(cNpcName, "Gagoyle");			iNpcID = 52; iProbSA = 20; iKindSA = 8; break;
-                case 22: strcpy(cNpcName, "Beholder");			iNpcID = 53; iProbSA = 20; iKindSA = 5; break;
-                case 23: strcpy(cNpcName, "Dark-Elf");			iNpcID = 54; iProbSA = 20; iKindSA = 3; break;
-                case 24: strcpy(cNpcName, "Rabbit");			iNpcID = -1; iProbSA = 5;  iKindSA = 1; break;
-                case 25: strcpy(cNpcName, "Cat");				iNpcID = -1; iProbSA = 10; iKindSA = 2; break;
-                case 26: strcpy(cNpcName, "Giant-Frog");		iNpcID = 57; iProbSA = 10; iKindSA = 2; break;
-                case 27: strcpy(cNpcName, "Mountain-Giant");	iNpcID = 58; iProbSA = 25; iKindSA = 1; break;
-                case 28: strcpy(cNpcName, "Ettin");				iNpcID = 59; iProbSA = 20; iKindSA = 8; break;
-                case 29: strcpy(cNpcName, "Cannibal-Plant");	iNpcID = 60; iProbSA = 20; iKindSA = 5; break;
-                case 30: strcpy(cNpcName, "Rudolph");			iNpcID = -1; iProbSA = 20; iKindSA = 5; break;
-                case 31: strcpy(cNpcName, "Ice-Golem");			iNpcID = 65; iProbSA = 35; iKindSA = 8; break;
-                case 32: strcpy(cNpcName, "DireBoar");			iNpcID = 62; iProbSA = 20; iKindSA = 5; break;
-                case 33: strcpy(cNpcName, "Frost");				iNpcID = 63; iProbSA = 30; iKindSA = 8; break;
-                case 34: strcpy(cNpcName, "Stalker");           iNpcID = 48; iProbSA = 20; iKindSA = 1; break;
-                case 35: strcpy(cNpcName, "Hellclaw");			iNpcID = 49; iProbSA = 20; iKindSA = 1; break;
-                case 36: strcpy(cNpcName, "Wyvern");			iNpcID = 66; iProbSA = 20; iKindSA = 1; break;
-                case 37: strcpy(cNpcName, "Fire-Wyvern");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 38: strcpy(cNpcName, "Barlog");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 39: strcpy(cNpcName, "Tentocle");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 40: strcpy(cNpcName, "Centaurus");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 41: strcpy(cNpcName, "Giant-Lizard");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 42: strcpy(cNpcName, "Minotaurs");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 43: strcpy(cNpcName, "Tentocle");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 44: strcpy(cNpcName, "Claw-Turtle");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 45: strcpy(cNpcName, "Giant-Crayfish");	iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 46: strcpy(cNpcName, "Giant-Plant");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 47: strcpy(cNpcName, "MasterMage-Orc");	iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 48: strcpy(cNpcName, "Nizie");				iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 49: strcpy(cNpcName, "Tigerworm");			iNpcID = 50; iProbSA = 20; iKindSA = 1; break;
-                case 50: strcpy(cNpcName, "Giant-Plant");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 51: strcpy(cNpcName, "Abaddon");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
-                case 52: strcpy(cNpcName, "YW-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                case 53: strcpy(cNpcName, "YW-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                case 54: strcpy(cNpcName, "YY-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                case 55: strcpy(cNpcName, "YY-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                case 56: strcpy(cNpcName, "XB-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                case 57: strcpy(cNpcName, "XB-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                case 58: strcpy(cNpcName, "XW-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                case 59: strcpy(cNpcName, "XW-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                case 60: strcpy(cNpcName, "XY-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                case 61: strcpy(cNpcName, "XY-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
-                default: strcpy(cNpcName, "Orc");				iNpcID = 14; iProbSA = 15; iKindSA = 1; break;
+                    case 1:  strcpy(cNpcName, "Slime");				iNpcID = 10; iProbSA = 5;  iKindSA = 1; break;
+                    case 2:  strcpy(cNpcName, "Giant-Ant");			iNpcID = 16; iProbSA = 10; iKindSA = 2; break;
+                    case 3:  strcpy(cNpcName, "Orc");				iNpcID = 14; iProbSA = 15; iKindSA = 1; break;
+                    case 4:  strcpy(cNpcName, "Zombie");			iNpcID = 18; iProbSA = 15; iKindSA = 3; break;
+                    case 5:  strcpy(cNpcName, "Skeleton");			iNpcID = 11; iProbSA = 35; iKindSA = 8; break;
+                    case 6:  strcpy(cNpcName, "Orc-Mage");			iNpcID = 14; iProbSA = 30; iKindSA = 7; break;
+                    case 7:  strcpy(cNpcName, "Scorpion");			iNpcID = 17; iProbSA = 15; iKindSA = 3; break;
+                    case 8:  strcpy(cNpcName, "Stone-Golem");		iNpcID = 12; iProbSA = 25; iKindSA = 5; break;
+                    case 9:  strcpy(cNpcName, "Cyclops");			iNpcID = 13; iProbSA = 35; iKindSA = 8; break;
+                    case 10: strcpy(cNpcName, "Amphis");			iNpcID = 22; iProbSA = 20; iKindSA = 3; break;
+                    case 11: strcpy(cNpcName, "Clay-Golem");		iNpcID = 23; iProbSA = 20; iKindSA = 5; break;
+                    case 12: strcpy(cNpcName, "Troll");				iNpcID = 28; iProbSA = 25; iKindSA = 3; break;
+                    case 13: strcpy(cNpcName, "Orge");				iNpcID = 29; iProbSA = 25; iKindSA = 1; break;
+                    case 14: strcpy(cNpcName, "Hellbound");			iNpcID = 27; iProbSA = 25; iKindSA = 8; break;
+                    case 15: strcpy(cNpcName, "Liche");				iNpcID = 30; iProbSA = 30; iKindSA = 8; break;
+                    case 16: strcpy(cNpcName, "Demon");				iNpcID = 31; iProbSA = 20; iKindSA = 8; break;
+                    case 17: strcpy(cNpcName, "Unicorn");			iNpcID = 32; iProbSA = 35; iKindSA = 7; break;
+                    case 18: strcpy(cNpcName, "WereWolf");			iNpcID = 33; iProbSA = 25; iKindSA = 1; break;
+                    case 19: strcpy(cNpcName, "YB-Aresden");		iNpcID = -1;  iProbSA = 15; iKindSA = 1; break;
+                    case 20: strcpy(cNpcName, "YB-Elvine");			iNpcID = -1;  iProbSA = 15; iKindSA = 1; break;
+                    case 21: strcpy(cNpcName, "Gagoyle");			iNpcID = 52; iProbSA = 20; iKindSA = 8; break;
+                    case 22: strcpy(cNpcName, "Beholder");			iNpcID = 53; iProbSA = 20; iKindSA = 5; break;
+                    case 23: strcpy(cNpcName, "Dark-Elf");			iNpcID = 54; iProbSA = 20; iKindSA = 3; break;
+                    case 24: strcpy(cNpcName, "Rabbit");			iNpcID = -1; iProbSA = 5;  iKindSA = 1; break;
+                    case 25: strcpy(cNpcName, "Cat");				iNpcID = -1; iProbSA = 10; iKindSA = 2; break;
+                    case 26: strcpy(cNpcName, "Giant-Frog");		iNpcID = 57; iProbSA = 10; iKindSA = 2; break;
+                    case 27: strcpy(cNpcName, "Mountain-Giant");	iNpcID = 58; iProbSA = 25; iKindSA = 1; break;
+                    case 28: strcpy(cNpcName, "Ettin");				iNpcID = 59; iProbSA = 20; iKindSA = 8; break;
+                    case 29: strcpy(cNpcName, "Cannibal-Plant");	iNpcID = 60; iProbSA = 20; iKindSA = 5; break;
+                    case 30: strcpy(cNpcName, "Rudolph");			iNpcID = -1; iProbSA = 20; iKindSA = 5; break;
+                    case 31: strcpy(cNpcName, "Ice-Golem");			iNpcID = 65; iProbSA = 35; iKindSA = 8; break;
+                    case 32: strcpy(cNpcName, "DireBoar");			iNpcID = 62; iProbSA = 20; iKindSA = 5; break;
+                    case 33: strcpy(cNpcName, "Frost");				iNpcID = 63; iProbSA = 30; iKindSA = 8; break;
+                    case 34: strcpy(cNpcName, "Stalker");           iNpcID = 48; iProbSA = 20; iKindSA = 1; break;
+                    case 35: strcpy(cNpcName, "Hellclaw");			iNpcID = 49; iProbSA = 20; iKindSA = 1; break;
+                    case 36: strcpy(cNpcName, "Wyvern");			iNpcID = 66; iProbSA = 20; iKindSA = 1; break;
+                    case 37: strcpy(cNpcName, "Fire-Wyvern");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 38: strcpy(cNpcName, "Barlog");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 39: strcpy(cNpcName, "Tentocle");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 40: strcpy(cNpcName, "Centaurus");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 41: strcpy(cNpcName, "Giant-Lizard");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 42: strcpy(cNpcName, "Minotaurs");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 43: strcpy(cNpcName, "Tentocle");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 44: strcpy(cNpcName, "Claw-Turtle");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 45: strcpy(cNpcName, "Giant-Crayfish");	iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 46: strcpy(cNpcName, "Giant-Plant");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 47: strcpy(cNpcName, "MasterMage-Orc");	iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 48: strcpy(cNpcName, "Nizie");				iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 49: strcpy(cNpcName, "Tigerworm");			iNpcID = 50; iProbSA = 20; iKindSA = 1; break;
+                    case 50: strcpy(cNpcName, "Giant-Plant");		iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 51: strcpy(cNpcName, "Abaddon");			iNpcID = -1; iProbSA = 20; iKindSA = 1; break;
+                    case 52: strcpy(cNpcName, "YW-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    case 53: strcpy(cNpcName, "YW-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    case 54: strcpy(cNpcName, "YY-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    case 55: strcpy(cNpcName, "YY-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    case 56: strcpy(cNpcName, "XB-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    case 57: strcpy(cNpcName, "XB-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    case 58: strcpy(cNpcName, "XW-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    case 59: strcpy(cNpcName, "XW-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    case 60: strcpy(cNpcName, "XY-Aresden");		iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    case 61: strcpy(cNpcName, "XY-Elvine");			iNpcID = -1; iProbSA = 15; iKindSA = 1; break;
+                    default: strcpy(cNpcName, "Orc");				iNpcID = 14; iProbSA = 15; iKindSA = 1; break;
                 }
 
                 cSA = 0;
@@ -10252,7 +7445,7 @@ void CGame::MobGenerator()
                 case 30:
                 case 31:
                 case 32:
-                    if (iDice(1, 5) == 1) iTotalMob = 0;  // 75% ???????? ???.
+                    if (iDice(1, 5) == 1) iTotalMob = 0;  // 75%
                     break;
 
                 case 33:
@@ -10271,7 +7464,7 @@ void CGame::MobGenerator()
                 case 47:
                 case 48:
                 case 49:
-                    if (iDice(1, 5) != 1) iTotalMob = 0;  // 75% ???????????????
+                    if (iDice(1, 5) != 1) iTotalMob = 0;  // 75%
                     break;
                 }
             }
@@ -10310,7 +7503,7 @@ void CGame::MobGenerator()
                 {
                     ZeroMemory(cName_Slave, sizeof(cName_Slave));
                     wsprintf(cName_Slave, "XX%d", iNamingValue);
-                    cName_Slave[0] = 95; // original '_';
+                    cName_Slave[0] = 95;
                     cName_Slave[1] = i + 65;
 
                     cSA = 0;
@@ -10346,64 +7539,64 @@ void CGame::MobGenerator()
                         switch (m_pMapList[i]->m_stSpotMobGenerator[j].iMobType)
                         {
                             // spot-mob-generator
-                        case 10:  strcpy(cNpcName, "Slime");				iProbSA = 5;  iKindSA = 1;  break;
-                        case 16:  strcpy(cNpcName, "Giant-Ant");			iProbSA = 10; iKindSA = 2;  break;
-                        case 14:  strcpy(cNpcName, "Orc");				iProbSA = 15; iKindSA = 1;  break;
-                        case 18:  strcpy(cNpcName, "Zombie");			iProbSA = 15; iKindSA = 3;  break;
-                        case 11:  strcpy(cNpcName, "Skeleton");			iProbSA = 35; iKindSA = 8;  break;
-                        case 6:   strcpy(cNpcName, "Orc-Mage");			iProbSA = 30; iKindSA = 7;  break;
-                        case 17:  strcpy(cNpcName, "Scorpion");			iProbSA = 15; iKindSA = 3;  break;
-                        case 12:  strcpy(cNpcName, "Stone-Golem");		iProbSA = 25; iKindSA = 5;  break;
-                        case 13:  strcpy(cNpcName, "Cyclops");			iProbSA = 35; iKindSA = 8;  break;
-                        case 22:  strcpy(cNpcName, "Amphis");			iProbSA = 20; iKindSA = 3;  break;
-                        case 23:  strcpy(cNpcName, "Clay-Golem");		iProbSA = 20; iKindSA = 5;  break;
-                        case 24:  strcpy(cNpcName, "Guard-Aresden");		iProbSA = 20; iKindSA = 1;  break;
-                        case 25:  strcpy(cNpcName, "Guard-Elvine");		iProbSA = 20; iKindSA = 1;  break;
-                        case 26:  strcpy(cNpcName, "Guard-Neutral");		iProbSA = 20; iKindSA = 1;  break;
-                        case 27:  strcpy(cNpcName, "Hellbound");			iProbSA = 20; iKindSA = 1;  break;
-                        case 29:  strcpy(cNpcName, "Orge");              iProbSA = 20; iKindSA = 1;  break;
-                        case 30:  strcpy(cNpcName, "Liche");				iProbSA = 30; iKindSA = 8;  break;
-                        case 31:  strcpy(cNpcName, "Demon");				iProbSA = 20; iKindSA = 8;  break;
-                        case 32:  strcpy(cNpcName, "Unicorn");			iProbSA = 35; iKindSA = 7;  break;
-                        case 33:  strcpy(cNpcName, "WereWolf");			iProbSA = 25; iKindSA = 1;  break;
-                        case 34:  strcpy(cNpcName, "Dummy");				iProbSA = 5;  iKindSA = 1;  break;
-                        case 35:  strcpy(cNpcName, "Attack-Dummy");		iProbSA = 5;  iKindSA = 1;  break;
-                        case 48:  strcpy(cNpcName, "Stalker");			iProbSA = 20; iKindSA = 3;  break;
-                        case 49:  strcpy(cNpcName, "Hellclaw");			iProbSA = 20; iKindSA = 8;  break;
-                        case 50:  strcpy(cNpcName, "Tigerworm");			iProbSA = 20; iKindSA = 8;  break;
-                        case 54:  strcpy(cNpcName, "Dark-Elf");			iProbSA = 20; iKindSA = 8;  break;
-                        case 53:  strcpy(cNpcName, "Beholder");			iProbSA = 20; iKindSA = 8;  break;
-                        case 52:  strcpy(cNpcName, "Gagoyle");			iProbSA = 20; iKindSA = 8;  break;
-                        case 57:  strcpy(cNpcName, "Giant-Frog");		iProbSA = 10; iKindSA = 2;  break;
-                        case 58:  strcpy(cNpcName, "Mountain-Giant");	iProbSA = 25; iKindSA = 1;  break;
-                        case 59:  strcpy(cNpcName, "Ettin");				iProbSA = 20; iKindSA = 8;  break;
-                        case 60:  strcpy(cNpcName, "Cannibal-Plant");	iProbSA = 20; iKindSA = 5;  break;
-                        case 61:  strcpy(cNpcName, "Rudolph");			iProbSA = 20; iKindSA = 1;  break;
-                        case 62:  strcpy(cNpcName, "DireBoar");			iProbSA = 20; iKindSA = 1;  break;
-                        case 63:  strcpy(cNpcName, "Frost");				iProbSA = 20; iKindSA = 8;  break;
-                        case 65:  strcpy(cNpcName, "Ice-Golem");			iProbSA = 20; iKindSA = 8;  break;
-                        case 66:  strcpy(cNpcName, "Wyvern");			iProbSA = 20; iKindSA = 1;  break;
-                        case 55:  strcpy(cNpcName, "Rabbit");			iProbSA = 20; iKindSA = 1;  break;
-                        case 67:  strcpy(cNpcName, "McGaffin");			iProbSA = 20; iKindSA = 1;  break;
-                        case 68:  strcpy(cNpcName, "Perry");				iProbSA = 20; iKindSA = 1;  break;
-                        case 69:  strcpy(cNpcName, "Devlin");			iProbSA = 20; iKindSA = 1;  break;
-                        case 73:  strcpy(cNpcName, "Fire-Wyvern");		iProbSA = 20; iKindSA = 1;  break;
-                        case 70:  strcpy(cNpcName, "Barlog");			iProbSA = 20; iKindSA = 1;  break;
-                        case 80:  strcpy(cNpcName, "Tentocle");			iProbSA = 20; iKindSA = 1;  break;
-                        case 71:  strcpy(cNpcName, "Centaurus");			iProbSA = 20; iKindSA = 1;  break;
-                        case 75:  strcpy(cNpcName, "Giant-Lizard");		iProbSA = 20; iKindSA = 1;  break;
-                        case 78:  strcpy(cNpcName, "Minotaurs");			iProbSA = 20; iKindSA = 1;  break;
-                        case 81:  strcpy(cNpcName, "Abaddon");			iProbSA = 20; iKindSA = 1;  break;
-                        case 72:  strcpy(cNpcName, "Claw-Turtle");		iProbSA = 20; iKindSA = 1;  break;
-                        case 74:  strcpy(cNpcName, "Giant-Crayfish");	iProbSA = 20; iKindSA = 1;  break;
-                        case 76:  strcpy(cNpcName, "Giant-Plant");		iProbSA = 20; iKindSA = 1;  break;
-                        case 77:  strcpy(cNpcName, "MasterMage-Orc");	iProbSA = 20; iKindSA = 1;  break;
-                        case 79:  strcpy(cNpcName, "Nizie");				iProbSA = 20; iKindSA = 1; break;
-                        default:
-                            strcpy(cNpcName, "Orc");
-                            iProbSA = 15;
-                            iKindSA = 1;
-                            break;
+                            case 10:  strcpy(cNpcName, "Slime");				iProbSA = 5;  iKindSA = 1;  break;
+                            case 16:  strcpy(cNpcName, "Giant-Ant");			iProbSA = 10; iKindSA = 2;  break;
+                            case 14:  strcpy(cNpcName, "Orc");				iProbSA = 15; iKindSA = 1;  break;
+                            case 18:  strcpy(cNpcName, "Zombie");			iProbSA = 15; iKindSA = 3;  break;
+                            case 11:  strcpy(cNpcName, "Skeleton");			iProbSA = 35; iKindSA = 8;  break;
+                            case 6:   strcpy(cNpcName, "Orc-Mage");			iProbSA = 30; iKindSA = 7;  break;
+                            case 17:  strcpy(cNpcName, "Scorpion");			iProbSA = 15; iKindSA = 3;  break;
+                            case 12:  strcpy(cNpcName, "Stone-Golem");		iProbSA = 25; iKindSA = 5;  break;
+                            case 13:  strcpy(cNpcName, "Cyclops");			iProbSA = 35; iKindSA = 8;  break;
+                            case 22:  strcpy(cNpcName, "Amphis");			iProbSA = 20; iKindSA = 3;  break;
+                            case 23:  strcpy(cNpcName, "Clay-Golem");		iProbSA = 20; iKindSA = 5;  break;
+                            case 24:  strcpy(cNpcName, "Guard-Aresden");		iProbSA = 20; iKindSA = 1;  break;
+                            case 25:  strcpy(cNpcName, "Guard-Elvine");		iProbSA = 20; iKindSA = 1;  break;
+                            case 26:  strcpy(cNpcName, "Guard-Neutral");		iProbSA = 20; iKindSA = 1;  break;
+                            case 27:  strcpy(cNpcName, "Hellbound");			iProbSA = 20; iKindSA = 1;  break;
+                            case 29:  strcpy(cNpcName, "Orge");              iProbSA = 20; iKindSA = 1;  break;
+                            case 30:  strcpy(cNpcName, "Liche");				iProbSA = 30; iKindSA = 8;  break;
+                            case 31:  strcpy(cNpcName, "Demon");				iProbSA = 20; iKindSA = 8;  break;
+                            case 32:  strcpy(cNpcName, "Unicorn");			iProbSA = 35; iKindSA = 7;  break;
+                            case 33:  strcpy(cNpcName, "WereWolf");			iProbSA = 25; iKindSA = 1;  break;
+                            case 34:  strcpy(cNpcName, "Dummy");				iProbSA = 5;  iKindSA = 1;  break;
+                            case 35:  strcpy(cNpcName, "Attack-Dummy");		iProbSA = 5;  iKindSA = 1;  break;
+                            case 48:  strcpy(cNpcName, "Stalker");			iProbSA = 20; iKindSA = 3;  break;
+                            case 49:  strcpy(cNpcName, "Hellclaw");			iProbSA = 20; iKindSA = 8;  break;
+                            case 50:  strcpy(cNpcName, "Tigerworm");			iProbSA = 20; iKindSA = 8;  break;
+                            case 54:  strcpy(cNpcName, "Dark-Elf");			iProbSA = 20; iKindSA = 8;  break;
+                            case 53:  strcpy(cNpcName, "Beholder");			iProbSA = 20; iKindSA = 8;  break;
+                            case 52:  strcpy(cNpcName, "Gagoyle");			iProbSA = 20; iKindSA = 8;  break;
+                            case 57:  strcpy(cNpcName, "Giant-Frog");		iProbSA = 10; iKindSA = 2;  break;
+                            case 58:  strcpy(cNpcName, "Mountain-Giant");	iProbSA = 25; iKindSA = 1;  break;
+                            case 59:  strcpy(cNpcName, "Ettin");				iProbSA = 20; iKindSA = 8;  break;
+                            case 60:  strcpy(cNpcName, "Cannibal-Plant");	iProbSA = 20; iKindSA = 5;  break;
+                            case 61:  strcpy(cNpcName, "Rudolph");			iProbSA = 20; iKindSA = 1;  break;
+                            case 62:  strcpy(cNpcName, "DireBoar");			iProbSA = 20; iKindSA = 1;  break;
+                            case 63:  strcpy(cNpcName, "Frost");				iProbSA = 20; iKindSA = 8;  break;
+                            case 65:  strcpy(cNpcName, "Ice-Golem");			iProbSA = 20; iKindSA = 8;  break;
+                            case 66:  strcpy(cNpcName, "Wyvern");			iProbSA = 20; iKindSA = 1;  break;
+                            case 55:  strcpy(cNpcName, "Rabbit");			iProbSA = 20; iKindSA = 1;  break;
+                            case 67:  strcpy(cNpcName, "McGaffin");			iProbSA = 20; iKindSA = 1;  break;
+                            case 68:  strcpy(cNpcName, "Perry");				iProbSA = 20; iKindSA = 1;  break;
+                            case 69:  strcpy(cNpcName, "Devlin");			iProbSA = 20; iKindSA = 1;  break;
+                            case 73:  strcpy(cNpcName, "Fire-Wyvern");		iProbSA = 20; iKindSA = 1;  break;
+                            case 70:  strcpy(cNpcName, "Barlog");			iProbSA = 20; iKindSA = 1;  break;
+                            case 80:  strcpy(cNpcName, "Tentocle");			iProbSA = 20; iKindSA = 1;  break;
+                            case 71:  strcpy(cNpcName, "Centaurus");			iProbSA = 20; iKindSA = 1;  break;
+                            case 75:  strcpy(cNpcName, "Giant-Lizard");		iProbSA = 20; iKindSA = 1;  break;
+                            case 78:  strcpy(cNpcName, "Minotaurs");			iProbSA = 20; iKindSA = 1;  break;
+                            case 81:  strcpy(cNpcName, "Abaddon");			iProbSA = 20; iKindSA = 1;  break;
+                            case 72:  strcpy(cNpcName, "Claw-Turtle");		iProbSA = 20; iKindSA = 1;  break;
+                            case 74:  strcpy(cNpcName, "Giant-Crayfish");	iProbSA = 20; iKindSA = 1;  break;
+                            case 76:  strcpy(cNpcName, "Giant-Plant");		iProbSA = 20; iKindSA = 1;  break;
+                            case 77:  strcpy(cNpcName, "MasterMage-Orc");	iProbSA = 20; iKindSA = 1;  break;
+                            case 79:  strcpy(cNpcName, "Nizie");				iProbSA = 20; iKindSA = 1; break;
+                            default:
+                                strcpy(cNpcName, "Orc");
+                                iProbSA = 15;
+                                iKindSA = 1;
+                                break;
                         }
                         /* NPCs not spawning in pits:
                         case 56:  strcpy(cNpcName,"Cat");				iProbSA = 15; iKindSA = 6;  break;
@@ -10431,7 +7624,7 @@ void CGame::MobGenerator()
 
                         ZeroMemory(cName_Master, sizeof(cName_Master));
                         wsprintf(cName_Master, "XX%d", iNamingValue);
-                        cName_Master[0] = 95; // original '_';
+                        cName_Master[0] = 95;
                         cName_Master[1] = i + 65;
 
                         cSA = 0;
@@ -10479,7 +7672,6 @@ void CGame::CalcNextWayPointDestination(int iNpcH)
     switch (m_pNpcList[iNpcH]->m_cMoveType)
     {
     case DEF_MOVETYPE_GUARD:
-        // ÃÃ¶ÃÂ¤ÂµÃˆ Ã€Â§Ã„Â¡Â¸Â¦ Â¹Ã¾Â¾Ã®Â³ÂªÃÃ¶ Â¾ÃŠÃ€Â¸Â¸Ã§ ÃƒÃŸÂ°ÃÃ€ÃŒ Â³Â¡Â³Â­ ÃˆÃ„Â¿Â¡ ÂµÂ¹Â¾Ã†Â¿Ã‚Â´Ã™.
         break;
 
     case DEF_MOVETYPE_SEQWAYPOINT:
@@ -10507,14 +7699,12 @@ void CGame::CalcNextWayPointDestination(int iNpcH)
         break;
 
     case DEF_MOVETYPE_RANDOM:
-        // Â¿ÃÃ€Ã¼ Â·Â£Â´Ã½ 
         //m_pNpcList[iNpcH]->m_dX = (rand() % (m_pMapList[m_pNpcList[iNpcH]->m_cMapIndex]->m_sSizeX - 50)) + 15;
         //m_pNpcList[iNpcH]->m_dY = (rand() % (m_pMapList[m_pNpcList[iNpcH]->m_cMapIndex]->m_sSizeY - 50)) + 15;
         iMapIndex = m_pNpcList[iNpcH]->m_cMapIndex;
 
         for (i = 0; i <= 30; i++)
         {
-            // Â°Â¥ Â¼Ã¶ Ã€Ã–Â´Ã‚ ÃÃ‚Ã‡Â¥Â°Â¡ Â³ÂªÂ¿ÃƒÂ¶Â§ Â±Ã®ÃÃ¶ 30Â¹Ã¸ Â¹ÃÂºÂ¹ 
             sX = (rand() % (m_pMapList[iMapIndex]->m_sSizeX - 50)) + 15;
             sY = (rand() % (m_pMapList[iMapIndex]->m_sSizeY - 50)) + 15;
 
@@ -10522,13 +7712,12 @@ void CGame::CalcNextWayPointDestination(int iNpcH)
             for (j = 0; j < DEF_MAXMGAR; j++)
                 if (m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[j].left != -1)
                 {
-                    // Ã‡Ã‡Ã‡Ã˜Â¾ÃŸ Ã‡Ã’ ÃÃ‚Ã‡Â¥Â°Â¡ Ã€Ã–Â´Ã™. 
                     if ((sX >= m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[j].left) &&
                         (sX <= m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[j].right) &&
                         (sY >= m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[j].top) &&
                         (sY <= m_pMapList[iMapIndex]->m_rcMobGenAvoidRect[j].bottom))
                     {
-                        // Avoid RectÂ¾ÃˆÃ€ÃŒÂ¹Ã‡Â·ÃŽ Ã€ÃŒ Ã€Â§Ã„Â¡Â¿Â¡Â´Ã‚ Â»Ã½Â¼ÂºÂ½ÃƒÃ…Â³ Â¼Ã¶ Â¾Ã¸Â´Ã™.	
+                        // Avoid Rect
                         bFlag = FALSE;
                     }
                 }
@@ -10562,28 +7751,23 @@ void CGame::DeleteNpc(int iNpcH)
 
     //Init number of items to 1 unless its a multidrop;
     iNumItem = 0;
-    iItemID = 0; // No current item
+    iItemID = 0;
 
-    //Ã¬Â£Â½Ã¬â€“Â´Ã¬Å¾Ë†Ã«ÂËœ Ã¬Å“â€žÃ¬Â¹ËœÃ¬â€”ÂÃ¬â€žÅ“ Ã¬â€šÂ­Ã¬Â Å“ 
     SendEventToNearClient_TypeA(iNpcH, DEF_OWNERTYPE_NPC, MSGID_EVENT_LOG, DEF_MSGTYPE_REJECT, NULL, NULL, NULL);
     m_pMapList[m_pNpcList[iNpcH]->m_cMapIndex]->ClearOwner(11, iNpcH, DEF_OWNERTYPE_NPC, m_pNpcList[iNpcH]->m_sX, m_pNpcList[iNpcH]->m_sY);
 
     ZeroMemory(cTmp, sizeof(cTmp));
     strcpy(cTmp, (char *)(m_pNpcList[iNpcH]->m_cName + 2));
-    // NPCÃ¬ÂËœ NamigValueÃ«Â¥Â¼ Ã¬â€“Â»Ã¬â€“Â´Ã¬â„¢â‚¬ Ã¬â€šÂ¬Ã¬Å¡Â©Ã¬Â¤â€˜Ã¬ÂÂ¸ Ã­â€˜Å“Ã¬â€¹Å“Ã«Â¥Â¼ Ã­â€¢Â´Ã¬Â§â‚¬Ã­â€¢Å“Ã«â€¹Â¤.
     iNamingValue = atoi(cTmp);
 
-    // NamingValueÃ«Â¥Â¼ Ã«Â¹â€žÃ¬Å¡Â°ÃªÂ³Â  Ã«Ââ„¢Ã¬Å¾â€˜Ã¬Â¤â€˜Ã¬ÂÂ¸ ÃªÂ°Å“Ã¬Â²Â´ Ã¬Ë†ËœÃ«Â¥Â¼ ÃªÂ°ÂÃ¬â€ Å’Ã¬â€¹Å“Ã­â€šÂ¨Ã«â€¹Â¤.
     m_pMapList[m_pNpcList[iNpcH]->m_cMapIndex]->SetNamingValueEmpty(iNamingValue);
     m_pMapList[m_pNpcList[iNpcH]->m_cMapIndex]->m_iTotalActiveObject--;
 
-    // Spot-mob-generatorÃ¬Â â€¢Ã«Â³Â´ 
     if (m_pNpcList[iNpcH]->m_iSpotMobIndex != NULL)
         m_pMapList[m_pNpcList[iNpcH]->m_cMapIndex]->m_stSpotMobGenerator[m_pNpcList[iNpcH]->m_iSpotMobIndex].iCurMobs--;
 
     RemoveFromTarget(iNpcH, DEF_OWNERTYPE_NPC);
 
-    // Ã­ÂÂ¬Ã«Â£Â¨Ã¬â€žÂ¸Ã¬ÂÂ´Ã«â€œÅ“Ã¬Å¡Â© ÃªÂ±Â´Ã¬Â¶â€¢Ã«Â¬Â¼Ã¬ÂÂ´Ã«ÂÂ¼Ã«Â©Â´ Ã¬Â§â‚¬Ã­Å“ËœÃªÂ´â‚¬ Ã­â€ ÂµÃ«Â³Â´Ã¬Å¡Â© ÃªÂ±Â´Ã¬Â¶â€¢Ã«Â¬Â¼ Ã«Â¦Â¬Ã¬Å Â¤Ã­Å Â¸Ã«Â¥Â¼ Ã­â€¢Â´Ã¬Â Å“
     switch (m_pNpcList[iNpcH]->m_sType)
     {
     case 36:
@@ -10592,7 +7776,6 @@ void CGame::DeleteNpc(int iNpcH)
     case 39:
     case 42:
         m_pMapList[m_pNpcList[iNpcH]->m_cMapIndex]->bRemoveCrusadeStructureInfo(m_pNpcList[iNpcH]->m_sX, m_pNpcList[iNpcH]->m_sY);
-        // ÃªÂ¸Â¸Ã«â€œÅ“ ÃªÂ±Â´Ã¬Â¶â€¢Ã«Â¬Â¼ ÃªÂ°Å“Ã¬Ë†ËœÃ«Ââ€ž ÃªÂ°ÂÃ¬â€ Å’Ã¬â€¹Å“Ã­â€šÂ´ 
         for (i = 0; i < DEF_MAXGUILDS; i++)
             if (m_pGuildTeleportLoc[i].m_iV1 == m_pNpcList[iNpcH]->m_iGuildGUID)
             {
@@ -10606,11 +7789,9 @@ void CGame::DeleteNpc(int iNpcH)
 
     }
 
-    // DelayEventÃ«Â¥Â¼ Ã¬â€šÂ­Ã¬Â Å“ 
     bRemoveFromDelayEventList(iNpcH, DEF_OWNERTYPE_NPC, NULL);
     if ((m_pNpcList[iNpcH]->m_bIsSummoned == FALSE) && (m_pNpcList[iNpcH]->m_bIsUnsummoned == FALSE))
     {
-        // Ã¬â€ Å’Ã­â„¢ËœÃ«ÂªÂ¹Ã¬ÂÂ´ Ã¬â€¢â€žÃ«â€¹Ë†Ã«ÂÂ¼Ã«Â©Â´ Ã¬â€”Â°ÃªÂ¸Ë† Ã¬Å¾Â¬Ã«Â£Å’ÃªÂ°â‚¬ Ã«â€šËœÃ¬ËœÂ¨Ã«â€¹Â¤.
         pItem = new CItem;
         ZeroMemory(cItemName, sizeof(cItemName));
         switch (m_pNpcList[iNpcH]->m_sType)
@@ -10814,43 +7995,43 @@ void CGame::DeleteNpc(int iNpcH)
             break;
 
         case 66: // Wyvern
-            bGetMultipleItemNamesWhenDeleteNpc(m_pNpcList[iNpcH]->m_sType,	// NPC Type
-                50,				// ÃˆÂ®Â·Ã¼( ÃƒÃ–Â¼Ã’ ~ ÃƒÃ–Â´Ã« Â»Ã§Ã€ÃŒÃ€Ã‡ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â³ÂªÂ¿Ãƒ ÃˆÂ®Â·Ã¼ , 100 Ã€ÃŒÂ¸Ã© ÃƒÃ–Â´Ã« Â°Â¹Â¼Ã¶ Â¸Â¸Ã…Â­ Â³ÂªÂ¿Ã‚Â´Ã™.)
-                5,				// Â³ÂªÂ¿ÃÂ¾ÃŸ Ã‡ÃÂ´Ã‚ Item ÃƒÃ–Â¼Ã’ Â°Â³Â¼Ã¶
-                15,				// Â³ÂªÂ¿ÃƒÂ¼Ã¶ Ã€Ã–Â´Ã‚ Item ÃƒÃ–Â´Ã« Â°Â³Â¼Ã¶
-                m_pNpcList[iNpcH]->m_sX,	// Â±Ã¢ÃÃ˜ ÃÃ‚Ã‡Â¥ X
-                m_pNpcList[iNpcH]->m_sY,	// Â±Ã¢ÃÃ˜ ÃÃ‚Ã‡Â¥ Y
-                DEF_ITEMSPREAD_FIXED,		// Â¾Ã†Ã€ÃŒÃ…Ã› Â»Ã‘Â¸Â®Â´Ã‚ Â¹Ã¦Â¹Ã½ (RANDOM, FIXED)
-                4,				// Â¾Ã†Ã€ÃŒÃ…Ã› Â»Ã‘Â¸Â± Â¹Ã¼Ã€Â§, DEF_ITEMSPREAD_RANDOM Ã€ÃÂ¶Â§Â¸Â¸ Â»Ã§Â¿Ã«
-                iItemIDs,			// Â¹ÃžÂ¾Ã†Â¿Ãƒ Â¾Ã†Ã€ÃŒÃ…Ã› IdÂµÃ©
-                ItemPositions,			// Â¾Ã†Ã€ÃŒÃ…Ã›ÂµÃ©Ã€Ã‡ Ã€Â§Ã„Â¡
-                &iNumItem);			// Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Ã‡ ÃƒÃ‘ Â°Â¹Â¼Ã¶
+            bGetMultipleItemNamesWhenDeleteNpc(m_pNpcList[iNpcH]->m_sType,
+                50,
+                5,
+                15,
+                m_pNpcList[iNpcH]->m_sX,
+                m_pNpcList[iNpcH]->m_sY,
+                DEF_ITEMSPREAD_FIXED,
+                4,
+                iItemIDs,
+                ItemPositions,
+                &iNumItem);
             break;
 
         case 73: // Fire-Wyvern
-            bGetMultipleItemNamesWhenDeleteNpc(m_pNpcList[iNpcH]->m_sType,	// NPC Type
-                50,				// ÃˆÂ®Â·Ã¼( ÃƒÃ–Â¼Ã’ ~ ÃƒÃ–Â´Ã« Â»Ã§Ã€ÃŒÃ€Ã‡ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â³ÂªÂ¿Ãƒ ÃˆÂ®Â·Ã¼ , 100 Ã€ÃŒÂ¸Ã© ÃƒÃ–Â´Ã« Â°Â¹Â¼Ã¶ Â¸Â¸Ã…Â­ Â³ÂªÂ¿Ã‚Â´Ã™.)
-                5,				// Â³ÂªÂ¿ÃÂ¾ÃŸ Ã‡ÃÂ´Ã‚ Item ÃƒÃ–Â¼Ã’ Â°Â³Â¼Ã¶
-                15,				// Â³ÂªÂ¿ÃƒÂ¼Ã¶ Ã€Ã–Â´Ã‚ Item ÃƒÃ–Â´Ã« Â°Â³Â¼Ã¶
-                m_pNpcList[iNpcH]->m_sX,	// Â±Ã¢ÃÃ˜ ÃÃ‚Ã‡Â¥ X
-                m_pNpcList[iNpcH]->m_sY,	// Â±Ã¢ÃÃ˜ ÃÃ‚Ã‡Â¥ Y
-                2,				// Â¾Ã†Ã€ÃŒÃ…Ã› Â»Ã‘Â¸Â®Â´Ã‚ Â¹Ã¦Â¹Ã½ (RANDOM, FIXED)
-                4,				// Â¾Ã†Ã€ÃŒÃ…Ã› Â»Ã‘Â¸Â± Â¹Ã¼Ã€Â§, DEF_ITEMSPREAD_RANDOM Ã€ÃÂ¶Â§Â¸Â¸ Â»Ã§Â¿Ã«
-                iItemIDs,			// Â¹ÃžÂ¾Ã†Â¿Ãƒ Â¾Ã†Ã€ÃŒÃ…Ã› IdÂµÃ©
-                ItemPositions,			// Â¾Ã†Ã€ÃŒÃ…Ã›ÂµÃ©Ã€Ã‡ Ã€Â§Ã„Â¡
-                &iNumItem);			// Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Ã‡ ÃƒÃ‘ Â°Â¹Â¼Ã¶
+            bGetMultipleItemNamesWhenDeleteNpc(m_pNpcList[iNpcH]->m_sType,
+                50,
+                5,
+                15,
+                m_pNpcList[iNpcH]->m_sX,
+                m_pNpcList[iNpcH]->m_sY,
+                2,
+                4,
+                iItemIDs,
+                ItemPositions,
+                &iNumItem);
             break;
         case 81:
-            bGetMultipleItemNamesWhenDeleteNpc(m_pNpcList[iNpcH]->m_sType,	// NPC Type
-                50,				// ÃˆÂ®Â·Ã¼( ÃƒÃ–Â¼Ã’ ~ ÃƒÃ–Â´Ã« Â»Ã§Ã€ÃŒÃ€Ã‡ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â³ÂªÂ¿Ãƒ ÃˆÂ®Â·Ã¼ , 100 Ã€ÃŒÂ¸Ã© ÃƒÃ–Â´Ã« Â°Â¹Â¼Ã¶ Â¸Â¸Ã…Â­ Â³ÂªÂ¿Ã‚Â´Ã™.)
-                12,				// Â³ÂªÂ¿ÃÂ¾ÃŸ Ã‡ÃÂ´Ã‚ Item ÃƒÃ–Â¼Ã’ Â°Â³Â¼Ã¶
-                20,				// Â³ÂªÂ¿ÃƒÂ¼Ã¶ Ã€Ã–Â´Ã‚ Item ÃƒÃ–Â´Ã« Â°Â³Â¼Ã¶
-                m_pNpcList[iNpcH]->m_sX,	// Â±Ã¢ÃÃ˜ ÃÃ‚Ã‡Â¥ X
-                m_pNpcList[iNpcH]->m_sY,	// Â±Ã¢ÃÃ˜ ÃÃ‚Ã‡Â¥ Y
-                DEF_ITEMSPREAD_FIXED,		// Â¾Ã†Ã€ÃŒÃ…Ã› Â»Ã‘Â¸Â®Â´Ã‚ Â¹Ã¦Â¹Ã½ (RANDOM, FIXED)
-                65,				// Â¾Ã†Ã€ÃŒÃ…Ã› Â»Ã‘Â¸Â± Â¹Ã¼Ã€Â§, DEF_ITEMSPREAD_RANDOM Ã€ÃÂ¶Â§Â¸Â¸ Â»Ã§Â¿Ã«
-                iItemIDs,			// Â¹ÃžÂ¾Ã†Â¿Ãƒ Â¾Ã†Ã€ÃŒÃ…Ã› IdÂµÃ©
-                ItemPositions,			// Â¾Ã†Ã€ÃŒÃ…Ã›ÂµÃ©Ã€Ã‡ Ã€Â§Ã„Â¡
+            bGetMultipleItemNamesWhenDeleteNpc(m_pNpcList[iNpcH]->m_sType,
+                50,
+                12,
+                20,
+                m_pNpcList[iNpcH]->m_sX,
+                m_pNpcList[iNpcH]->m_sY,
+                DEF_ITEMSPREAD_FIXED,
+                65,
+                iItemIDs,
+                ItemPositions,
                 &iNumItem);
             break;
         }
@@ -10958,8 +8139,6 @@ int CGame::_iGetArrowItemIndex(int iClientH)
     for (i = 0; i < DEF_MAXITEMS; i++)
         if (m_pClientList[iClientH]->m_pItemList[i] != NULL)
         {
-
-            // Arrow Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ 1Â°Â³ Ã€ÃŒÂ»Ã³ Ã€Ã–Ã€Â¸Â¸Ã© Ã€ÃŽÂµÂ¦Â½Âº Â°ÂªÃ€Â» Â¹ÃÃˆÂ¯Ã‡Ã‘Â´Ã™.
             if ((m_pClientList[iClientH]->m_pItemList[i]->m_cItemType == DEF_ITEMTYPE_ARROW) &&
                 (m_pClientList[iClientH]->m_pItemList[i]->m_dwCount > 0))
                 return i;
@@ -11026,17 +8205,14 @@ BOOL CGame::bCheckResistingMagicSuccess(char cAttackerDir, short sTargetH, char 
 
 BOOL CGame::bCheckResistingIceSuccess(char cAttackerDir, short sTargetH, char cTargetType, int iHitRatio)
 {
-    // ³Ãµ¿µÉ °ÍÀÎ°¡ÀÇ È®·ü °è»ê.
     int    iTargetIceResistRatio, iResult;
 
     switch (cTargetType)
     {
     case DEF_OWNERTYPE_PLAYER:
         if (m_pClientList[sTargetH] == NULL) return FALSE;
-        // v1.4 ¿î¿µÀÚ¿¡ ´ëÇÑ ³Ãµ¿°ø°ÝÀº ¹«ÀÇ¹Ì 
         if (m_pClientList[sTargetH]->m_iAdminUserLevel > 0) return TRUE;
         iTargetIceResistRatio = m_pClientList[sTargetH]->m_iAddAbsWater * 2;
-        // v2.172 ÇØµ¿ Æ÷¼ÇÀ» ¸Ô°í 30ÃÊ°£Àº ¾óÁö ¾Ê´Â´Ù.
         if (m_pClientList[sTargetH]->m_dwWarmEffectTime == NULL)
         {
         }
@@ -11045,7 +8221,7 @@ BOOL CGame::bCheckResistingIceSuccess(char cAttackerDir, short sTargetH, char cT
 
     case DEF_OWNERTYPE_NPC:
         if (m_pNpcList[sTargetH] == NULL) return FALSE;
-        iTargetIceResistRatio = (m_pNpcList[sTargetH]->m_cResistMagic) - (m_pNpcList[sTargetH]->m_cResistMagic / 3); // ¿©±â¿¡ ¾óÀ½ ¹æ¾î ¼öÄ¡ ÀÔ·Â. NPCÀÇ °æ¿ì ¸¶¹ý ÀúÇ×ÀÇ 70% ¼öÁØ 
+        iTargetIceResistRatio = (m_pNpcList[sTargetH]->m_cResistMagic) - (m_pNpcList[sTargetH]->m_cResistMagic / 3);
         break;
     }
 
@@ -11068,8 +8244,7 @@ BOOL CGame::bSetItemToBankItem(int iClientH, CItem * pItem)
 
     if (m_pClientList[iClientH] == NULL) return FALSE;
     if (pItem == NULL) return FALSE;
-    //wh remove
-    //if (m_pClientList[iClientH]->m_bIsInsideWarehouse == FALSE) return FALSE;
+    if (m_pClientList[iClientH]->m_bIsInsideWarehouse == FALSE) return FALSE;
 
     for (i = 0; i < DEF_MAXBANKITEMS; i++)
         if (m_pClientList[iClientH]->m_pItemInBankList[i] == NULL)
@@ -11084,10 +8259,9 @@ BOOL CGame::bSetItemToBankItem(int iClientH, CItem * pItem)
 
             cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
 
-            *cp = i; // Ã€Â§Ã„Â¡ Ã€ÃºÃ€Ã¥ 
+            *cp = i;
             cp++;
 
-            // 1Â°Â³.
             *cp = 1;
             cp++;
 
@@ -11133,17 +8307,14 @@ BOOL CGame::bSetItemToBankItem(int iClientH, CItem * pItem)
             *cp = pItem->m_cItemColor;
             cp++;
 
-            // v1.432
             sp = (short *)cp;
             *sp = pItem->m_sItemEffectValue2;
             cp += 2;
 
-            // v1.42
             dwp = (DWORD *)cp;
             *dwp = pItem->m_dwAttribute;
             cp += 4;
 
-            // Â¾Ã†Ã€ÃŒÃ…Ã› ÃÂ¤ÂºÂ¸ Ã€Ã¼Â¼Ã› 
             iRet = m_pClientList[iClientH]->iSendMsg(cData, 55);
             switch (iRet)
             {
@@ -11151,15 +8322,13 @@ BOOL CGame::bSetItemToBankItem(int iClientH, CItem * pItem)
             case DEF_XSOCKEVENT_SOCKETERROR:
             case DEF_XSOCKEVENT_CRITICALERROR:
             case DEF_XSOCKEVENT_SOCKETCLOSED:
-                // Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ ÂºÂ¸Â³Â¾Â¶Â§ Â¿Â¡Â·Â¯Â°Â¡ Â¹ÃŸÂ»Ã½Ã‡ÃŸÂ´Ã™Â¸Ã© ÃÂ¦Â°Ã…Ã‡Ã‘Â´Ã™. v1.41 ÃÂ¦Â°Ã…Ã‡ÃÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
                 // DeleteClient(iClientH, TRUE, TRUE);
-                return TRUE; // v1.41 FALSEÂ¸Â¦ Â¹ÃÃˆÂ¯Ã‡ÃÂ¸Ã© Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¹Ã™Â´ÃšÂ¿Â¡ ÂºÂ¹Â»Ã§ÂµÃˆÂ´Ã™.
+                return TRUE;
             }
 
             return TRUE;
         }
 
-    // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» ÂºÂ¸Â°Ã¼Ã‡Ã’ Â¿Â©Ã€Â¯Â°Ã¸Â°Â£Ã€ÃŒ Â¾Ã¸Â´Ã™.
     return FALSE;
 }
 
@@ -11179,34 +8348,28 @@ BOOL CGame::bCheckTotalSkillMasteryPoints(int iClientH, int iSkill)
 
     if (iRemainPoint > 0)
     {
-        // Â½ÂºÃ…Â³Ã€Ã‡ Ã†Ã·Ã€ÃŽÃ†Â®Â°Â¡ ÃƒÃŠÂ°ÃºÂµÃ‡Â¾ÃºÂ´Ã™. ÃƒÃŠÂ°ÃºÂµÃˆ Ã†Ã·Ã€ÃŽÃ†Â® Â¸Â¸Ã…Â­ Â·Ã§Ã‡ÃÂ¸Â¦ ÂµÂ¹Â¸Ã§ SSNÃ€ÃŒ Â°Â¡Ã€Ã¥ Â³Â·Ã€Âº Â½ÂºÃ…Â³Ã€Â» Â³Â»Â¸Â°Â´Ã™.	
         while (iRemainPoint > 0)
         {
 
-            sDownSkillIndex = -1; // v1.4
+            sDownSkillIndex = -1;
             if (m_pClientList[iClientH]->m_iDownSkillIndex != -1)
             {
-                // ÃÃ¶ÃÂ¤ÂµÃˆ Â½ÂºÃ…Â³Ã€ÃŒ Ã€Ã–Â´Ã™. 
                 switch (m_pClientList[iClientH]->m_iDownSkillIndex)
                 {
-                case 3: // Â¸Â¶Â¹Ã½ Ã€ÃºÃ‡Ã—
+                case 3:
 
                 default:
-                    // Â½ÂºÃ…Â³Ã€ÃŒ 20 Ã€ÃŒÃ‡ÃÃ€Ã‡ Â»Ã³Ã…Ã‚Â¶Ã³Â¸Ã© Â±Ã—Â´Ã«Â·ÃŽ 0Ã€Â¸Â·ÃŽ Â¶Â³Â¾Ã® Â¶ÃŸÂ¸Â°Â´Ã™.
                     if (m_pClientList[iClientH]->m_cSkillMastery[m_pClientList[iClientH]->m_iDownSkillIndex] > 0)
                     {
                         sDownSkillIndex = m_pClientList[iClientH]->m_iDownSkillIndex;
                     }
                     else
                     {
-                        // Â´Ã™Â¸Â¥ Â½ÂºÃ…Â³Ã€Â» Â°Ã‹Â»Ã¶Ã‡Ã‘Â´Ã™.
-                        // Â´Ã™Â¸Â¥ Â½ÂºÃ…Â³Ã€Â» Â°Ã‹Â»Ã¶Ã‡Ã‘Â´Ã™.
                         iDownSkillSSN = 99999999;
                         for (i = 0; i < DEF_MAXSKILLTYPE; i++)
                             if ((m_pClientList[iClientH]->m_cSkillMastery[i] >= 21) && (i != iSkill) &&
                                 (m_pClientList[iClientH]->m_iSkillSSN[i] <= iDownSkillSSN))
                             {
-                                // V1.22 Â´Ã™Â¿Ã® Â½ÃƒÃ…Â³ Â½ÂºÃ…Â³Ã€Âº ÃƒÃ–Â¼Ã’ 20 Ã€ÃŒÃ‡ÃÂ·ÃŽÂ´Ã‚ Â¶Â³Â¾Ã®ÃÃº Â¼Ã¶ Â¾Ã¸Â´Ã™. 
                                 iDownSkillSSN = m_pClientList[iClientH]->m_iSkillSSN[i];
                                 sDownSkillIndex = i;
                             }
@@ -11214,28 +8377,24 @@ BOOL CGame::bCheckTotalSkillMasteryPoints(int iClientH, int iSkill)
                     break;
                 }
             }
-            // Ã‡Ã¶Ã€Ã§ 1ÂºÂ¸Â´Ã™ Ã…Â« Â½ÂºÃ…Â³ ÃÃŸÂ¿Â¡Â¼Â­ Â°Â¡Ã€Ã¥ Ã€Ã›Ã€Âº SSNÃ€Â» Â°Â®Â´Ã‚ Â½ÂºÃ…Â³Ã€Âº sDownSkillIndex 
 
             if (sDownSkillIndex != -1)
             {
 
-                if (m_pClientList[iClientH]->m_cSkillMastery[sDownSkillIndex] <= 20) // v1.4
+                if (m_pClientList[iClientH]->m_cSkillMastery[sDownSkillIndex] <= 20)
                     iDownPoint = m_pClientList[iClientH]->m_cSkillMastery[sDownSkillIndex];
                 else iDownPoint = 1;
 
-                m_pClientList[iClientH]->m_cSkillMastery[sDownSkillIndex] -= iDownPoint; // v1.4
+                m_pClientList[iClientH]->m_cSkillMastery[sDownSkillIndex] -= iDownPoint;
                 m_pClientList[iClientH]->m_iSkillSSN[sDownSkillIndex] = m_iSkillSSNpoint[m_pClientList[iClientH]->m_cSkillMastery[sDownSkillIndex] + 1] - 1;
-                iRemainPoint -= iDownPoint; // v1.4
+                iRemainPoint -= iDownPoint;
 
-                // Â¸Â¸Â¾Ã  Â³Â·Â¾Ã†ÃÃ¸ Â½ÂºÃ…Â³Ã€ÃŒ Ã‡Ã¶Ã€Ã§ Â»Ã§Â¿Ã«ÃÃŸÃ€ÃŽ Â¹Â«Â±Ã¢Â¿Ã Â°Ã¼Â·ÃƒÃ€ÃŒ Ã€Ã–Â´Ã™Â¸Ã© Â¸Ã­ÃÃŸÂ·Ã¼Ã€Â» Â³Â·ÃƒÃŸÂ¾Ã®Â¾ÃŸ Ã‡Ã‘Â´Ã™. 
                 if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND] != -1)
                 {
-                    // Â¾Ã§Â¼Ã•Â¹Â«Â±Ã¢Â°Â¡ Ã€Ã¥Ã‚Ã¸ÂµÃ‡Â¾Ã® Ã€Ã–Â¾ÃºÂ´Ã™. 
                     iWeaponIndex = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND];
                     if (m_pClientList[iClientH]->m_pItemList[iWeaponIndex]->m_sRelatedSkill == sDownSkillIndex)
                     {
-                        // ÃˆÂ°Â·Ã¹Ã€Ã‡ Â»Ã§Â¿Ã«Â¿Â¡ Ã€Ã‡Ã‡Ã‘ Â½ÂºÃ…Â³Ã€Ã‡ Ã‡ÃÂ¶Ã´Ã€ÃŒÂ¾ÃºÂ´Ã™. Â¸Ã­ÃÃŸÂ·Ã¼Ã€Â» Â³Â·ÃƒÃ¡Â´Ã™. 
-                        m_pClientList[iClientH]->m_iHitRatio -= iDownPoint; // v1.4
+                        m_pClientList[iClientH]->m_iHitRatio -= iDownPoint;
                         if (m_pClientList[iClientH]->m_iHitRatio < 0) m_pClientList[iClientH]->m_iHitRatio = 0;
                     }
                 }
@@ -11245,7 +8404,7 @@ BOOL CGame::bCheckTotalSkillMasteryPoints(int iClientH, int iSkill)
                     iWeaponIndex = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND];
                     if (m_pClientList[iClientH]->m_pItemList[iWeaponIndex]->m_sRelatedSkill == sDownSkillIndex)
                     {
-                        m_pClientList[iClientH]->m_iHitRatio -= iDownPoint; // v1.4
+                        m_pClientList[iClientH]->m_iHitRatio -= iDownPoint;
                         if (m_pClientList[iClientH]->m_iHitRatio < 0) m_pClientList[iClientH]->m_iHitRatio = 0;
                     }
                 }
@@ -11260,153 +8419,6 @@ BOOL CGame::bCheckTotalSkillMasteryPoints(int iClientH, int iSkill)
     }
 
     return FALSE;
-}
-
-void CGame::OnKeyDown(WPARAM wParam, LPARAM lParam)
-{
-    switch (wParam)
-    {
-    case VK_F1:
-        m_bF1pressed = TRUE;
-        break;
-    case VK_F4:
-        m_bF4pressed = TRUE;
-        break;
-    case VK_F5:
-        m_bF5pressed = TRUE;
-        break;
-    case VK_F12:
-        m_bF12pressed = TRUE;
-        break;
-    }
-}
-
-void CGame::OnKeyUp(WPARAM wParam, LPARAM lParam)
-{
-    int i;
-
-    switch (wParam)
-    {
-    case VK_F2:
-        break;
-
-    case VK_F1:
-        m_bF1pressed = FALSE;
-        break;
-    case VK_F4:
-        m_bF4pressed = FALSE;
-        break;
-    case VK_F5:
-        m_bF5pressed = FALSE;
-        break;
-    case VK_F12:
-        m_bF12pressed = FALSE;
-        break;
-
-    case VK_F6:
-        if (m_bF1pressed == TRUE)
-        {
-            log->info("(!) Send server shutdown announcement1...");
-            for (i = 1; i < DEF_MAXCLIENTS; i++)
-                if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
-                {
-                    SendNotifyMsg(NULL, i, DEF_NOTIFY_SERVERSHUTDOWN, 1, NULL, NULL, NULL);
-                }
-        }
-        break;
-
-    case VK_F7:
-        if (m_bF1pressed == TRUE)
-        {
-            log->info("(!) Send server shutdown announcement2...");
-            for (i = 1; i < DEF_MAXCLIENTS; i++)
-                if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
-                {
-                    SendNotifyMsg(NULL, i, DEF_NOTIFY_SERVERSHUTDOWN, 2, NULL, NULL, NULL);
-                }
-        }
-        break;
-
-    case VK_F9:
-        if ((m_bF1pressed == TRUE))
-        {
-            log->info("(!!!) Resume Crusade Mode...");
-            LocalStartCrusadeMode(NULL);
-        }
-        break;
-
-    case VK_F11:
-        if ((m_bF1pressed == TRUE))
-        {
-            log->info("(!!!) ManualEndCrusadeMode: side 0");
-            ManualEndCrusadeMode(0);
-        }
-        break;
-
-#define VK_1 0x31
-    case VK_1:
-        if ((m_bF1pressed == TRUE))
-        {
-            GlobalUpdateConfigs(1);
-        }
-        break;
-
-#define VK_2 0x32
-    case VK_2:
-        if ((m_bF1pressed == TRUE))
-        {
-            GlobalUpdateConfigs(2);
-        }
-        break;
-
-#define VK_3 0x33
-    case VK_3:
-        if ((m_bF1pressed == TRUE))
-        {
-            GlobalUpdateConfigs(3);
-        }
-        break;
-
-#define VK_4 0x34
-    case VK_4:
-        if ((m_bF1pressed == TRUE))
-        {
-            GlobalUpdateConfigs(1);
-        }
-        break;
-
-        /*#define VK_A 0x41 // a key
-        case VK_A:
-            if ((m_bF1pressed == TRUE)) {
-                GlobalStartApocalypseMode();
-            }
-            break;*/
-
-            /*#define VK_H 0x49 // H key
-            case VK_H:
-                if ((m_bF1pressed == TRUE)) {
-                    GlobalStartHeldenianMode();
-                }
-                break;*/
-
-                //Crusade Testcode
-    case VK_HOME:
-        if ((m_bF1pressed == TRUE))
-        {
-            GlobalStartCrusadeMode();
-        }
-        break;
-
-    case VK_INSERT:
-        _GrandMagicLaunchMsgSend(1, 1);
-        MeteorStrikeMsgHandler(1);
-        break;
-
-    case VK_DELETE:
-        _GrandMagicLaunchMsgSend(1, 2);
-        MeteorStrikeMsgHandler(2);
-        break;
-    }
 }
 
 int CGame::iGetFollowerNumber(short sOwnerH, char cOwnerType)
@@ -11457,8 +8469,6 @@ void CGame::DelayEventProcessor()
     for (i = 0; i < DEF_MAXDELAYEVENTS; i++)
         if ((m_pDelayEventList[i] != NULL) && (m_pDelayEventList[i]->m_dwTriggerTime < dwTime))
         {
-
-            // Ã€ÃŒÂºÂ¥Ã†Â®Â°Â¡ ÂµÂ¿Ã€Ã›Ã‡Ã’ Â½ÃƒÂ°Â£Ã€ÃŒ ÂµÃ†Â´Ã™. ÂµÂ¿Ã€Ã›ÃˆÃ„ Â»Ã¨ÃÂ¦ÂµÃˆÂ´Ã™.
             switch (m_pDelayEventList[i]->m_iDelayType)
             {
 
@@ -11493,27 +8503,21 @@ void CGame::DelayEventProcessor()
                 break;
 
             case DEF_DELAYEVENTTYPE_USEITEM_SKILL:
-                // Â¾Ã†Ã€ÃŒÃ…Ã› Â»Ã§Â¿Ã«Â¿Â¡ ÂµÃ»Â¸Â¥ Â°Ã¡Â°Ãº Â°Ã¨Â»Ãª, Ã…Ã«ÂºÂ¸ 
                 switch (m_pDelayEventList[i]->m_cTargetType)
                 {
                 case DEF_OWNERTYPE_PLAYER:
                     iSkillNum = m_pDelayEventList[i]->m_iEffectType;
 
                     if (m_pClientList[m_pDelayEventList[i]->m_iTargetH] == NULL) break;
-                    // Â±Ã¢Â¼Ãº Â»Ã§Â¿Ã«Ã€ÃŒ Â¹Â«ÃˆÂ¿ÃˆÂ­ ÂµÃ‡Â¾ÃºÂ´Ã™Â¸Ã© Â¹Â«Â½Ãƒ. 
                     if (m_pClientList[m_pDelayEventList[i]->m_iTargetH]->m_bSkillUsingStatus[iSkillNum] == FALSE) break;
-                    // Â±Ã¢Â¼Ãº Â»Ã§Â¿Ã« Â½ÃƒÂ°Â£ IDÂ°Â¡ Â´ÃžÂ¶Ã³ÂµÂµ Â¹Â«Â½Ãƒ v1.12
                     if (m_pClientList[m_pDelayEventList[i]->m_iTargetH]->m_iSkillUsingTimeID[iSkillNum] != m_pDelayEventList[i]->m_iV2) break;
 
-                    // Â±Ã¢Â¼Ãº Â»Ã§Â¿Ã« Â»Ã³Ã…Ã‚ Ã‡Ã˜ÃÂ¦ 
                     m_pClientList[m_pDelayEventList[i]->m_iTargetH]->m_bSkillUsingStatus[iSkillNum] = FALSE;
                     m_pClientList[m_pDelayEventList[i]->m_iTargetH]->m_iSkillUsingTimeID[iSkillNum] = NULL;
 
-                    // Ã€ÃŒÃÂ¦ SkillÃ€Ã‡ ÃˆÂ¿Â°ÃºÂ¿Â¡ ÂµÃ»Â¸Â¥ Â°Ã¨Â»ÃªÃ€Â» Ã‡Ã‘Â´Ã™. 
                     iResult = iCalculateUseSkillItemEffect(m_pDelayEventList[i]->m_iTargetH, m_pDelayEventList[i]->m_cTargetType,
                         m_pDelayEventList[i]->m_iV1, iSkillNum, m_pDelayEventList[i]->m_cMapIndex, m_pDelayEventList[i]->m_dX, m_pDelayEventList[i]->m_dY);
 
-                    // Â±Ã¢Â¼Ãº Â»Ã§Â¿Ã«Ã€ÃŒ ÃÃŸÃÃ¶ ÂµÃ‡Â¾ÃºÃ€Â½Ã€Â» Â¾Ã‹Â¸Â°Â´Ã™.
                     SendNotifyMsg(NULL, m_pDelayEventList[i]->m_iTargetH, DEF_NOTIFY_SKILLUSINGEND, iResult, NULL, NULL, NULL);
                     break;
                 }
@@ -11538,11 +8542,11 @@ void CGame::DelayEventProcessor()
                     if (m_pDelayEventList[i]->m_iEffectType == DEF_MAGICTYPE_INHIBITION)
                         m_pClientList[m_pDelayEventList[i]->m_iTargetH]->m_bInhibition = FALSE;
 
-                    // Invisibility È¿°ú ÇØÁ¦ 
+                    // Invisibility
                     if (m_pDelayEventList[i]->m_iEffectType == DEF_MAGICTYPE_INVISIBILITY)
                         SetInvisibilityFlag(m_pDelayEventList[i]->m_iTargetH, DEF_OWNERTYPE_PLAYER, FALSE);
 
-                    // Berserk È¿°ú ÇØÁ¦
+                    // Berserk
                     if (m_pDelayEventList[i]->m_iEffectType == DEF_MAGICTYPE_BERSERK)
                         SetBerserkFlag(m_pDelayEventList[i]->m_iTargetH, DEF_OWNERTYPE_PLAYER, FALSE);
 
@@ -11574,14 +8578,12 @@ void CGame::DelayEventProcessor()
                     }
 
 
-                    // polymorph È¿°ú ÇØÁ¦ 
                     if (m_pDelayEventList[i]->m_iEffectType == DEF_MAGICTYPE_POLYMORPH)
                     {
                         m_pClientList[m_pDelayEventList[i]->m_iTargetH]->m_sType = m_pClientList[m_pDelayEventList[i]->m_iTargetH]->m_sOriginalType;
                         SendEventToNearClient_TypeA(m_pDelayEventList[i]->m_iTargetH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
                     }
 
-                    // Ice È¿°ú ÇØÁ¦ 
                     if (m_pDelayEventList[i]->m_iEffectType == DEF_MAGICTYPE_ICE)
                         SetIceFlag(m_pDelayEventList[i]->m_iTargetH, DEF_OWNERTYPE_PLAYER, FALSE);
                     break;
@@ -11591,22 +8593,18 @@ void CGame::DelayEventProcessor()
 
                     m_pNpcList[m_pDelayEventList[i]->m_iTargetH]->m_cMagicEffectStatus[m_pDelayEventList[i]->m_iEffectType] = NULL;
 
-                    // Invisibility ÃˆÂ¿Â°Ãº Ã‡Ã˜ÃÂ¦ 
                     if (m_pDelayEventList[i]->m_iEffectType == DEF_MAGICTYPE_INVISIBILITY)
                         SetInvisibilityFlag(m_pDelayEventList[i]->m_iTargetH, DEF_OWNERTYPE_NPC, FALSE);
 
-                    // Berserk ÃˆÂ¿Â°Ãº Ã‡Ã˜ÃÂ¦
                     if (m_pDelayEventList[i]->m_iEffectType == DEF_MAGICTYPE_BERSERK)
                         SetBerserkFlag(m_pDelayEventList[i]->m_iTargetH, DEF_OWNERTYPE_NPC, FALSE);
 
-                    // polymorph ÃˆÂ¿Â°Ãº Ã‡Ã˜ÃÂ¦ 
                     if (m_pDelayEventList[i]->m_iEffectType == DEF_MAGICTYPE_POLYMORPH)
                     {
                         m_pNpcList[m_pDelayEventList[i]->m_iTargetH]->m_sType = m_pNpcList[m_pDelayEventList[i]->m_iTargetH]->m_sOriginalType;
                         SendEventToNearClient_TypeA(m_pDelayEventList[i]->m_iTargetH, DEF_OWNERTYPE_NPC, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
                     }
 
-                    // Ice ÃˆÂ¿Â°Ãº Ã‡Ã˜ÃÂ¦ 
                     if (m_pDelayEventList[i]->m_iEffectType == DEF_MAGICTYPE_ICE)
                         SetIceFlag(m_pDelayEventList[i]->m_iTargetH, DEF_OWNERTYPE_NPC, FALSE);
 
@@ -11632,8 +8630,6 @@ void CGame::DelayEventProcessor()
                             break;
                         }
                     }
-                    //	if (m_pDelayEventList[i]->m_iEffectType == /*notcoded*/)
-
                     break;
                 }
                 break;
@@ -11654,7 +8650,6 @@ BOOL CGame::bRemoveFromDelayEventList(int iH, char cType, int iEffectType)
 
             if (iEffectType == NULL)
             {
-                // Effect ÃÂ¾Â·Ã¹Â¿Â¡ Â»Ã³Â°Ã¼Â¾Ã¸Ã€ÃŒ Â¸Ã°ÂµÃŽ Â»Ã¨ÃÂ¦ 	
                 if ((m_pDelayEventList[i]->m_iTargetH == iH) && (m_pDelayEventList[i]->m_cTargetType == cType))
                 {
                     delete m_pDelayEventList[i];
@@ -11663,7 +8658,6 @@ BOOL CGame::bRemoveFromDelayEventList(int iH, char cType, int iEffectType)
             }
             else
             {
-                // Ã‡Ã˜Â´Ã§ EffectÂ¸Â¸ Â»Ã¨ÃÂ¦.
                 if ((m_pDelayEventList[i]->m_iTargetH == iH) && (m_pDelayEventList[i]->m_cTargetType == cType) &&
                     (m_pDelayEventList[i]->m_iEffectType == iEffectType))
                 {
@@ -11678,15 +8672,14 @@ BOOL CGame::bRemoveFromDelayEventList(int iH, char cType, int iEffectType)
 
 void CGame::SendObjectMotionRejectMsg(int iClientH)
 {
-    char * cp, cData[30];
+    char * cp, cData[30]{};
     DWORD * dwp;
     WORD * wp;
     short * sp;
     int     iRet;
 
-    m_pClientList[iClientH]->m_bIsMoveBlocked = TRUE; // v2.171
+    m_pClientList[iClientH]->m_bIsMoveBlocked = TRUE;
 
-    // Ã€ÃŒÂµÂ¿Ã€ÃŒ ÂºÃ’Â°Â¡Â´Ã‰Ã‡ÃÂ´Ã™. 
     dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
     *dwp = MSGID_RESPONSE_MOTION;
     wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
@@ -11707,7 +8700,6 @@ void CGame::SendObjectMotionRejectMsg(int iClientH)
     case DEF_XSOCKEVENT_SOCKETERROR:
     case DEF_XSOCKEVENT_CRITICALERROR:
     case DEF_XSOCKEVENT_SOCKETCLOSED:
-        // Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ ÂºÂ¸Â³Â¾Â¶Â§ Â¿Â¡Â·Â¯Â°Â¡ Â¹ÃŸÂ»Ã½Ã‡ÃŸÂ´Ã™Â¸Ã© ÃÂ¦Â°Ã…Ã‡Ã‘Â´Ã™.
         DeleteClient(iClientH, TRUE, TRUE);
         return;
     }
@@ -11732,7 +8724,6 @@ void CGame::DynamicObjectEffectProcessor()
     char  cOwnerType;
     DWORD dwTime = timeGetTime(), dwRegisterTime;
 
-    // 
     for (i = 0; i < DEF_MAXDYNAMICOBJECTS; i++)
         if (m_pDynamicObjectList[i] != NULL)
         {
@@ -11740,7 +8731,6 @@ void CGame::DynamicObjectEffectProcessor()
             {
 
             case DEF_DYNAMICOBJECT_PCLOUD_BEGIN:
-                // Ã†Ã·Ã€ÃŒÃÃ° Ã…Â¬Â¶Ã³Â¿Ã¬ÂµÃ¥
                 for (ix = m_pDynamicObjectList[i]->m_sX - 1; ix <= m_pDynamicObjectList[i]->m_sX + 1; ix++)
                     for (iy = m_pDynamicObjectList[i]->m_sY - 1; iy <= m_pDynamicObjectList[i]->m_sY + 1; iy++)
                     {
@@ -11748,16 +8738,14 @@ void CGame::DynamicObjectEffectProcessor()
                         m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->GetOwner(&sOwnerH, &cOwnerType, ix, iy);
                         if (sOwnerH != NULL)
                         {
-                            // Poison DamageÂ¸Â¦ Ã€Ã”Â´Ã‚Â´Ã™.
+                            // Poison Damage
                             switch (cOwnerType)
                             {
                             case DEF_OWNERTYPE_PLAYER:
                                 if (m_pClientList[sOwnerH] == NULL) break;
                                 if (m_pClientList[sOwnerH]->m_bIsKilled == TRUE) break;
-                                // v1.41 ÃÃŸÂ¸Â³Ã€ÃŒÂ°Ã­ Ã€Ã¼Ã…ÃµÂ¸Ã°ÂµÃ¥Â°Â¡ Â¾Ã†Â´ÃÂ¸Ã© Ã‡Ã‡Ã‡Ã˜Â¸Â¦ Ã€Ã”ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
                                 //if ((m_pClientList[sOwnerH]->m_bIsNeutral == TRUE) && (m_pClientList[sOwnerH]->m_sAppr2 & 0xF000) == 0) break;
 
-                                // Ã€ÃŒÂ·Â± Â½Ã„Ã€Â¸Â·ÃŽ Â´Ã«Â¹ÃŒÃÃ¶Ã€Ã‡ Ã…Â©Â±Ã¢Â¸Â¦ Â°Ã¡ÃÂ¤
                                 if (m_pDynamicObjectList[i]->m_iV1 < 20)
                                     iDamage = iDice(1, 6);
                                 else iDamage = iDice(1, 8);
@@ -11767,21 +8755,18 @@ void CGame::DynamicObjectEffectProcessor()
 
                                 if (m_pClientList[sOwnerH]->m_iHP <= 0)
                                 {
-                                    // Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Â°Â¡ Â»Ã§Â¸ÃÃ‡ÃŸÂ´Ã™.
                                     ClientKilledHandler(sOwnerH, sOwnerH, cOwnerType, iDamage);
                                 }
                                 else
                                 {
                                     if (iDamage > 0)
                                     {
-                                        // Â¹ÃžÃ€Âº Â´Ã«Â¹ÃŒÃÃ¶Â¸Â¦ Ã…Ã«ÂºÂ¸Ã‡Ã‘Â´Ã™. <- HPÂ¸Â¦ Â±Ã—Â´Ã«Â·ÃŽ Â¾Ã‹Â¸Â°Â´Ã™.
                                         SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_HP, NULL, NULL, NULL, NULL);
 
                                         if (m_pClientList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] != 0)
                                         {
-                                            // Â¸Â¶ÂºÃ± Â»Ã³Ã…Ã‚Â°Â¡ Ã‡Â®Â¸Â°Â´Ã™.	
                                             // 1: Hold-Person 
-                                            // 2: Paralize
+                                            // 2: Paralyze
                                             SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_HOLDOBJECT, m_pClientList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT], NULL, NULL);
 
                                             m_pClientList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = NULL;
@@ -11789,7 +8774,6 @@ void CGame::DynamicObjectEffectProcessor()
                                         }
                                     }
 
-                                    // v1.42 Poison ÃˆÂ¿Â°Ãº
                                     if ((bCheckResistingMagicSuccess(1, sOwnerH, DEF_OWNERTYPE_PLAYER, 100) == FALSE) &&
                                         (m_pClientList[sOwnerH]->m_bIsPoisoned == FALSE))
                                     {
@@ -11797,7 +8781,6 @@ void CGame::DynamicObjectEffectProcessor()
                                         m_pClientList[sOwnerH]->m_bIsPoisoned = TRUE;
                                         m_pClientList[sOwnerH]->m_iPoisonLevel = m_pDynamicObjectList[i]->m_iV1;
                                         m_pClientList[sOwnerH]->m_dwPoisonTime = dwTime;
-                                        // ÃÃŸÂµÂ¶ÂµÃ‡Â¾ÃºÃ€Â½Ã€Â» Â¾Ã‹Â¸Â°Â´Ã™. 
                                         SetPoisonFlag(sOwnerH, cOwnerType, TRUE);// poison aura appears from dynamic objects
                                         SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_POISON, m_pClientList[sOwnerH]->m_iPoisonLevel, NULL, NULL);
                                     }
@@ -11805,15 +8788,12 @@ void CGame::DynamicObjectEffectProcessor()
                                 break;
 
                             case DEF_OWNERTYPE_NPC:
-                                // Â¸Ã³Â½ÂºÃ…ÃÃ€Ã‡ ÃÃŸÂµÂ¶ÃˆÂ¿Â°ÃºÂ´Ã‚ Â¾Ã†ÃÃ· Â±Â¸Ã‡Ã¶ Â¾ÃˆÂµÃŠ
                                 if (m_pNpcList[sOwnerH] == NULL) break;
 
-                                // Ã€ÃŒÂ·Â± Â½Ã„Ã€Â¸Â·ÃŽ Â´Ã«Â¹ÃŒÃÃ¶Ã€Ã‡ Ã…Â©Â±Ã¢Â¸Â¦ Â°Ã¡ÃÂ¤
                                 if (m_pDynamicObjectList[i]->m_iV1 < 20)
                                     iDamage = iDice(1, 6);
                                 else iDamage = iDice(1, 8);
 
-                                // Ã€Ã¼Ã€Ã¯Â¿Ã« Â±Â¸ÃÂ¶Â¹Â°ÃÃŸ Â±Ã—Â·Â£ÂµÃ¥ Â¸Ã…ÃÃ· ÃÂ¦Â³Ã—Â·Â¹Ã€ÃŒÃ…Ã, Â¿Â¡Â³ÃŠÃÃ¶ Â½Ã‡ÂµÃ¥ ÃÂ¦Â³Ã—Â·Â¹Ã€ÃŒÃ…ÃÂ´Ã‚ Ã‡ÃŠÂµÃ¥Â·Ã¹ Â¸Â¶Â¹Ã½Â¿Â¡ Â´Ã«Â¹ÃŒÃÃ¶Â¸Â¦ Ã€Ã”ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
                                 switch (m_pNpcList[sOwnerH]->m_sType)
                                 {
                                 case 40: // ESG
@@ -11825,12 +8805,11 @@ void CGame::DynamicObjectEffectProcessor()
                                     break;
                                 }
 
-                                // HPÂ¿Â¡Â¼Â­ Â»Â«Â´Ã™. Action LimitÂ¿Â¡ ÂµÃ»Â¶Ã³ ÃƒÂ³Â¸Â®Ã‡Ã‘Â´Ã™.
                                 switch (m_pNpcList[sOwnerH]->m_cActionLimit)
                                 {
-                                case 0: // Ã€ÃÂ¹Ã
-                                case 3: // Â´ÃµÂ¹ÃŒÂ·Ã¹
-                                case 5: // Â°Ã‡ÃƒÃ Â¹Â° 
+                                case 0:
+                                case 3:
+                                case 5: 
                                     m_pNpcList[sOwnerH]->m_iHP -= iDamage;
                                     break;
                                 }
@@ -11839,22 +8818,18 @@ void CGame::DynamicObjectEffectProcessor()
 
                                 if (m_pNpcList[sOwnerH]->m_iHP <= 0)
                                 {
-                                    // NPCÂ°Â¡ Â»Ã§Â¸ÃÃ‡ÃŸÂ´Ã™.
-                                    NpcKilledHandler(sOwnerH, cOwnerType, sOwnerH, 0); //v1.2 ÃÃŸÂµÂ¶Â±Â¸Â¸Â§Â¿Â¡ ÃÃ—Ã€Â¸Â¸Ã© Â¸Â¶ÃÃ¶Â¸Â· Â´Ã«Â¹ÃŒÃÃ¶Â°Â¡ 0. Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Â½Â±Â°Ã” Â±Â¸Ã‡ÃÃÃ¶ Â¸Ã¸Ã‡ÃÂ°Ã” Ã‡ÃÂ±Ã¢ Ã€Â§Ã‡Ã”.
+                                    NpcKilledHandler(sOwnerH, cOwnerType, sOwnerH, 0);
                                 }
                                 else
                                 {
-                                    // DamageÂ¸Â¦ Ã€Ã”Ã€Âº ÃƒÃ¦Â°ÃÃ€Â¸Â·ÃŽ Ã€ÃŽÃ‡Ã‘ ÃÃ¶Â¿Â¬ÃˆÂ¿Â°Ãº.
                                     if (iDice(1, 3) == 2)
                                         m_pNpcList[sOwnerH]->m_dwTime = dwTime;
 
                                     if (m_pNpcList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] != 0)
                                     {
-                                        // Hold ÂµÃ‡Â¾Ã® Ã€Ã–Â¾ÃºÂ´Ã¸ Â»Ã³Ã…Ã‚Â¶Ã³Â¸Ã© Ã‡Â®Â¸Â°Â´Ã™. 	
                                         m_pNpcList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = NULL;
                                     }
 
-                                    // NPCÂ¸Â¦ ÂµÂµÂ¸ÃÂ°Â¡Â´Ã‚ Â¸Ã°ÂµÃ¥Â·ÃŽ Ã€Ã¼ÃˆÂ¯Â½ÃƒÃ…Â²Â´Ã™.
                                     SendEventToNearClient_TypeA(sOwnerH, DEF_OWNERTYPE_NPC, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, 0, NULL);
                                 }
                                 break;
@@ -11884,7 +8859,6 @@ void CGame::DynamicObjectEffectProcessor()
 
                                 if (m_pClientList[sOwnerH]->m_iHP <= 0)
                                 {
-                                    // Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Â°Â¡ Â»Ã§Â¸ÃÃ‡ÃŸÂ´Ã™.
                                     ClientKilledHandler(sOwnerH, sOwnerH, cOwnerType, iDamage);
                                 }
                                 else
@@ -11910,7 +8884,6 @@ void CGame::DynamicObjectEffectProcessor()
 
                                         m_pClientList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_ICE] = 1;
                                         SetIceFlag(sOwnerH, cOwnerType, TRUE);
-                                        // ÃˆÂ¿Â°ÃºÂ°Â¡ Ã‡Ã˜ÃÂ¦ÂµÃ‰ Â¶Â§ Â¹ÃŸÂ»Ã½Ã‡Ã’ ÂµÃ´Â·Â¹Ã€ÃŒ Ã€ÃŒÂºÂ¥Ã†Â®Â¸Â¦ ÂµÃ®Â·ÃÃ‡Ã‘Â´Ã™.
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (20 * 1000),
                                             sOwnerH, cOwnerType, NULL, NULL, NULL, 1, NULL, NULL);
 
@@ -11946,32 +8919,26 @@ void CGame::DynamicObjectEffectProcessor()
 
                                 if (m_pNpcList[sOwnerH]->m_iHP <= 0)
                                 {
-                                    // NPCÂ°Â¡ Â»Ã§Â¸ÃÃ‡ÃŸÂ´Ã™.
-                                    NpcKilledHandler(sOwnerH, cOwnerType, sOwnerH, 0); //v1.2 Ã…Â¸Â¼Â­ ÃÃ—Ã€Â¸Â¸Ã© Â¸Â¶ÃÃ¶Â¸Â· Â´Ã«Â¹ÃŒÃÃ¶Â°Â¡ 0. Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Â½Â±Â°Ã” Â±Â¸Ã‡ÃÃÃ¶ Â¸Ã¸Ã‡ÃÂ°Ã” Ã‡ÃÂ±Ã¢ Ã€Â§Ã‡Ã”.
+                                    NpcKilledHandler(sOwnerH, cOwnerType, sOwnerH, 0);
                                 }
                                 else
                                 {
-                                    // DamageÂ¸Â¦ Ã€Ã”Ã€Âº ÃƒÃ¦Â°ÃÃ€Â¸Â·ÃŽ Ã€ÃŽÃ‡Ã‘ ÃÃ¶Â¿Â¬ÃˆÂ¿Â°Ãº.
                                     if (iDice(1, 3) == 2)
                                         m_pNpcList[sOwnerH]->m_dwTime = dwTime;
 
                                     if (m_pNpcList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] != 0)
                                     {
-                                        // Hold ÂµÃ‡Â¾Ã® Ã€Ã–Â¾ÃºÂ´Ã¸ Â»Ã³Ã…Ã‚Â¶Ã³Â¸Ã© Ã‡Â®Â¸Â°Â´Ã™. 	
                                         m_pNpcList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = NULL;
                                     }
 
-                                    // NPCÂ¸Â¦ ÂµÂµÂ¸ÃÂ°Â¡Â´Ã‚ Â¸Ã°ÂµÃ¥Â·ÃŽ Ã€Ã¼ÃˆÂ¯Â½ÃƒÃ…Â²Â´Ã™.
                                     SendEventToNearClient_TypeA(sOwnerH, DEF_OWNERTYPE_NPC, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, 0, NULL);
 
-                                    // v1.42 Ice ÃˆÂ¿Â°Ãº
                                     if ((bCheckResistingIceSuccess(1, sOwnerH, DEF_OWNERTYPE_NPC, m_pDynamicObjectList[i]->m_iV1) == FALSE) &&
                                         (m_pNpcList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_ICE] == 0))
                                     {
 
                                         m_pNpcList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_ICE] = 1;
                                         SetIceFlag(sOwnerH, cOwnerType, TRUE);
-                                        // ÃˆÂ¿Â°ÃºÂ°Â¡ Ã‡Ã˜ÃÂ¦ÂµÃ‰ Â¶Â§ Â¹ÃŸÂ»Ã½Ã‡Ã’ ÂµÃ´Â·Â¹Ã€ÃŒ Ã€ÃŒÂºÂ¥Ã†Â®Â¸Â¦ ÂµÃ®Â·ÃÃ‡Ã‘Â´Ã™.
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (20 * 1000),
                                             sOwnerH, cOwnerType, NULL, NULL, NULL, 1, NULL, NULL);
                                     }
@@ -11980,31 +8947,26 @@ void CGame::DynamicObjectEffectProcessor()
                             }
                         }
 
-                        // ÃÃ—Ã€ÂºÃƒÂ´Ã‡ÃÂ°Ã­ Ã€Ã–Â´Ã‚ Ã„Â³Â¸Â¯Ã€ÃŒ Ã€Ã–Â´Ã™Â¸Ã©
                         m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->GetDeadOwner(&sOwnerH, &cOwnerType, ix, iy);
                         if ((cOwnerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sOwnerH] != NULL) &&
                             (m_pClientList[sOwnerH]->m_iHP > 0))
                         {
-                            // ÃÃ—Ã€Âº ÃƒÂ´Ã‡ÃÂ°Ã­ Ã€Ã–Â´Ã‚ Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Â´Ã™.
                             iDamage = iDice(3, 2);
                             m_pClientList[sOwnerH]->m_iHP -= iDamage;
 
                             if (m_pClientList[sOwnerH]->m_iHP <= 0)
                             {
-                                // Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Â°Â¡ Â»Ã§Â¸ÃÃ‡ÃŸÂ´Ã™.
                                 ClientKilledHandler(sOwnerH, sOwnerH, cOwnerType, iDamage);
                             }
                             else
                             {
                                 if (iDamage > 0)
                                 {
-                                    // Â¹ÃžÃ€Âº Â´Ã«Â¹ÃŒÃÃ¶Â¸Â¦ Ã…Ã«ÂºÂ¸Ã‡Ã‘Â´Ã™. <- HPÂ¸Â¦ Â±Ã—Â´Ã«Â·ÃŽ Â¾Ã‹Â¸Â°Â´Ã™.
                                     SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_HP, NULL, NULL, NULL, NULL);
                                 }
                             }
                         }
 
-                        // Â±Ã™ÃƒÂ³Â¿Â¡ Fire ObjectÂ°Â¡ Ã€Ã–Â´Ã™Â¸Ã© Â¼Ã¶Â¸Ã­Ã€Â» ÃÃ™Ã€ÃŽÂ´Ã™.
                         m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->bGetDynamicObject(ix, iy, &sType, &dwRegisterTime, &iIndex);
                         if (((sType == DEF_DYNAMICOBJECT_FIRE) || (sType == DEF_DYNAMICOBJECT_FIRE3)) && (m_pDynamicObjectList[iIndex] != NULL))
                             m_pDynamicObjectList[iIndex]->m_dwLastTime = m_pDynamicObjectList[iIndex]->m_dwLastTime - (m_pDynamicObjectList[iIndex]->m_dwLastTime / 10);
@@ -12013,10 +8975,8 @@ void CGame::DynamicObjectEffectProcessor()
 
             case DEF_DYNAMICOBJECT_FIRE3:
             case DEF_DYNAMICOBJECT_FIRE:
-                // Fire-WallÂ·Ã¹Ã€Ã‡ Ã…Â¸Â´Ã‚ ÂºÃ’Â²Ã‰
                 if (m_pDynamicObjectList[i]->m_iCount == 1)
                 {
-                    // Â±Ã™ÃƒÂ³Â¿Â¡ Ã…Â¸Â´Ã‚ Â¹Â°Â°Ã‡Ã€ÃŒ Ã€Ã–Â´Ã™Â¸Ã© Â¹Ã¸ÃÃ¸Â´Ã™. 
                     CheckFireBluring(m_pDynamicObjectList[i]->m_cMapIndex, m_pDynamicObjectList[i]->m_sX, m_pDynamicObjectList[i]->m_sY);
                 }
                 m_pDynamicObjectList[i]->m_iCount++;
@@ -12030,14 +8990,12 @@ void CGame::DynamicObjectEffectProcessor()
                         m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->GetOwner(&sOwnerH, &cOwnerType, ix, iy);
                         if (sOwnerH != NULL)
                         {
-                            // Fire DamageÂ¸Â¦ Ã€Ã”Â´Ã‚Â´Ã™.
                             switch (cOwnerType)
                             {
 
                             case DEF_OWNERTYPE_PLAYER:
                                 if (m_pClientList[sOwnerH] == NULL) break;
                                 if (m_pClientList[sOwnerH]->m_bIsKilled == TRUE) break;
-                                // v1.41 ÃÃŸÂ¸Â³Ã€ÃŒÂ°Ã­ Ã€Ã¼Ã…ÃµÂ¸Ã°ÂµÃ¥Â°Â¡ Â¾Ã†Â´ÃÂ¸Ã© Ã‡Ã‡Ã‡Ã˜Â¸Â¦ Ã€Ã”ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
                                 //if ((m_pClientList[sOwnerH]->m_bIsNeutral == TRUE) && (m_pClientList[sOwnerH]->m_sAppr2 & 0xF000) == 0) break;
 
                                 iDamage = iDice(1, 6);
@@ -12046,21 +9004,18 @@ void CGame::DynamicObjectEffectProcessor()
 
                                 if (m_pClientList[sOwnerH]->m_iHP <= 0)
                                 {
-                                    // Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Â°Â¡ Â»Ã§Â¸ÃÃ‡ÃŸÂ´Ã™.
                                     ClientKilledHandler(sOwnerH, sOwnerH, cOwnerType, iDamage);
                                 }
                                 else
                                 {
                                     if (iDamage > 0)
                                     {
-                                        // Â¹ÃžÃ€Âº Â´Ã«Â¹ÃŒÃÃ¶Â¸Â¦ Ã…Ã«ÂºÂ¸Ã‡Ã‘Â´Ã™. <- HPÂ¸Â¦ Â±Ã—Â´Ã«Â·ÃŽ Â¾Ã‹Â¸Â°Â´Ã™.
                                         SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_HP, NULL, NULL, NULL, NULL);
 
                                         if (m_pClientList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] != 0)
                                         {
-                                            // Hold-Person ÂµÃ‡Â¾Ã® Ã€Ã–Â¾ÃºÂ´Ã¸ Â»Ã³Ã…Ã‚Â¶Ã³Â¸Ã© Ã‡Â®Â¸Â°Â´Ã™. Fire FieldÂ·ÃŽÂ´Ã‚ Ã†ÃÂ·Â²Â¶Ã³Ã€ÃŒÃÃ® ÂµÃˆÂ°ÃÂµÂµ Ã‡Â®Â¸Â°Â´Ã™. 	
                                             // 1: Hold-Person 
-                                            // 2: Paralize	
+                                            // 2: Paralyze	
                                             SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_HOLDOBJECT, m_pClientList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT], NULL, NULL);
 
                                             m_pClientList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = NULL;
@@ -12075,7 +9030,6 @@ void CGame::DynamicObjectEffectProcessor()
 
                                 iDamage = iDice(1, 6);
 
-                                // Ã€Ã¼Ã€Ã¯Â¿Ã« Â±Â¸ÃÂ¶Â¹Â°ÃÃŸ Â±Ã—Â·Â£ÂµÃ¥ Â¸Ã…ÃÃ· ÃÂ¦Â³Ã—Â·Â¹Ã€ÃŒÃ…Ã, Â¿Â¡Â³ÃŠÃÃ¶ Â½Ã‡ÂµÃ¥ ÃÂ¦Â³Ã—Â·Â¹Ã€ÃŒÃ…ÃÂ´Ã‚ Ã‡ÃŠÂµÃ¥Â·Ã¹ Â¸Â¶Â¹Ã½Â¿Â¡ Â´Ã«Â¹ÃŒÃÃ¶Â¸Â¦ Ã€Ã”ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
                                 switch (m_pNpcList[sOwnerH]->m_sType)
                                 {
                                 case 40: // ESG
@@ -12087,12 +9041,11 @@ void CGame::DynamicObjectEffectProcessor()
                                     break;
                                 }
 
-                                // HPÂ¿Â¡Â¼Â­ Â»Â«Â´Ã™. Action LimitÂ¿Â¡ ÂµÃ»Â¶Ã³ ÃƒÂ³Â¸Â®Ã‡Ã‘Â´Ã™.
                                 switch (m_pNpcList[sOwnerH]->m_cActionLimit)
                                 {
-                                case 0: // Ã€ÃÂ¹Ã
-                                case 3: // Â´ÃµÂ¹ÃŒÂ·Ã¹
-                                case 5: // Â°Ã‡ÃƒÃ Â¹Â° 
+                                case 0:
+                                case 3:
+                                case 5:
                                     m_pNpcList[sOwnerH]->m_iHP -= iDamage;
                                     break;
                                 }
@@ -12101,53 +9054,44 @@ void CGame::DynamicObjectEffectProcessor()
 
                                 if (m_pNpcList[sOwnerH]->m_iHP <= 0)
                                 {
-                                    // NPCÂ°Â¡ Â»Ã§Â¸ÃÃ‡ÃŸÂ´Ã™.
-                                    NpcKilledHandler(sOwnerH, cOwnerType, sOwnerH, 0); //v1.2 Ã…Â¸Â¼Â­ ÃÃ—Ã€Â¸Â¸Ã© Â¸Â¶ÃÃ¶Â¸Â· Â´Ã«Â¹ÃŒÃÃ¶Â°Â¡ 0. Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Â½Â±Â°Ã” Â±Â¸Ã‡ÃÃÃ¶ Â¸Ã¸Ã‡ÃÂ°Ã” Ã‡ÃÂ±Ã¢ Ã€Â§Ã‡Ã”.
+                                    NpcKilledHandler(sOwnerH, cOwnerType, sOwnerH, 0);
                                 }
                                 else
                                 {
-                                    // DamageÂ¸Â¦ Ã€Ã”Ã€Âº ÃƒÃ¦Â°ÃÃ€Â¸Â·ÃŽ Ã€ÃŽÃ‡Ã‘ ÃÃ¶Â¿Â¬ÃˆÂ¿Â°Ãº.
                                     if (iDice(1, 3) == 2)
                                         m_pNpcList[sOwnerH]->m_dwTime = dwTime;
 
                                     if (m_pNpcList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] != 0)
                                     {
-                                        // Hold ÂµÃ‡Â¾Ã® Ã€Ã–Â¾ÃºÂ´Ã¸ Â»Ã³Ã…Ã‚Â¶Ã³Â¸Ã© Ã‡Â®Â¸Â°Â´Ã™. 	
                                         m_pNpcList[sOwnerH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = NULL;
                                     }
 
-                                    // NPCÂ¸Â¦ ÂµÂµÂ¸ÃÂ°Â¡Â´Ã‚ Â¸Ã°ÂµÃ¥Â·ÃŽ Ã€Ã¼ÃˆÂ¯Â½ÃƒÃ…Â²Â´Ã™.
                                     SendEventToNearClient_TypeA(sOwnerH, DEF_OWNERTYPE_NPC, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, 0, NULL);
                                 }
                                 break;
                             }
                         }
 
-                        // ÃÃ—Ã€ÂºÃƒÂ´Ã‡ÃÂ°Ã­ Ã€Ã–Â´Ã‚ Ã„Â³Â¸Â¯Ã€ÃŒ Ã€Ã–Â´Ã™Â¸Ã©
                         m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->GetDeadOwner(&sOwnerH, &cOwnerType, ix, iy);
                         if ((cOwnerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sOwnerH] != NULL) &&
                             (m_pClientList[sOwnerH]->m_iHP > 0))
                         {
-                            // ÃÃ—Ã€Âº ÃƒÂ´Ã‡ÃÂ°Ã­ Ã€Ã–Â´Ã‚ Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Â´Ã™.
                             iDamage = iDice(1, 6);
                             m_pClientList[sOwnerH]->m_iHP -= iDamage;
 
                             if (m_pClientList[sOwnerH]->m_iHP <= 0)
                             {
-                                // Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Â°Â¡ Â»Ã§Â¸ÃÃ‡ÃŸÂ´Ã™.
                                 ClientKilledHandler(sOwnerH, sOwnerH, cOwnerType, iDamage);
                             }
                             else
                             {
                                 if (iDamage > 0)
                                 {
-                                    // Â¹ÃžÃ€Âº Â´Ã«Â¹ÃŒÃÃ¶Â¸Â¦ Ã…Ã«ÂºÂ¸Ã‡Ã‘Â´Ã™. <- HPÂ¸Â¦ Â±Ã—Â´Ã«Â·ÃŽ Â¾Ã‹Â¸Â°Â´Ã™.
                                     SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_HP, NULL, NULL, NULL, NULL);
                                 }
                             }
                         }
 
-                        // Â±Ã™ÃƒÂ³Â¿Â¡ Ice ObjectÂ°Â¡ Ã€Ã–Â´Ã™Â¸Ã© Â¼Ã¶Â¸Ã­Ã€Â» ÃÃ™Ã€ÃŽÂ´Ã™.
                         m_pMapList[m_pDynamicObjectList[i]->m_cMapIndex]->bGetDynamicObject(ix, iy, &sType, &dwRegisterTime, &iIndex);
                         if ((sType == DEF_DYNAMICOBJECT_ICESTORM) && (m_pDynamicObjectList[iIndex] != NULL))
                             m_pDynamicObjectList[iIndex]->m_dwLastTime = m_pDynamicObjectList[iIndex]->m_dwLastTime - (m_pDynamicObjectList[iIndex]->m_dwLastTime / 10);
@@ -12229,43 +9173,33 @@ int CGame::iCalculateUseSkillItemEffect(int iOwnerH, char cOwnerType, char cOwne
         break;
     }
 
-    // Â½ÂºÃ…Â³ Â»Ã§Â¿Ã« Â¿Â©ÂºÃŽ ÃÃ–Â»Ã§Ã€Â§Â¸Â¦ Â±Â¼Â¸Â°Â´Ã™. 
     if (cOwnerSkill == 0) return 0;
 
-    // Â½ÂºÃ…Â³Ã€ÃŒ 100Ã€ÃŒÂ¶Ã³Â°Ã­ Ã‡Ã˜ÂµÂµ Â°Â¡Â²Ã» Â³Â¬Â½ÃƒÂ¸Â¦ Â½Ã‡Ã†ÃÃ‡ÃÂ°Ã” Ã‡ÃÂ±Ã¢ Ã€Â§Ã‡Ã˜Â¼Â­ 1D105 
     iResult = iDice(1, 105);
-    if (cOwnerSkill <= iResult)	return 0;  // Â½Ã‡Ã†ÃÂ´Ã™.
+    if (cOwnerSkill <= iResult)	return 0;
 
-    // Â¶Â¥Â¿Â¡Â¼Â­Â´Ã‚ Â³Â¬Â½ÃƒÂ°Â¡ ÂºÃ’Â°Â¡Â´Ã‰ 
     if (m_pMapList[cMapIndex]->bGetIsWater(dX, dY) == FALSE) return 0;
 
-    // Â¼ÂºÂ°Ã¸Ã‡ÃŸÃ€Â¸Â¹Ã‡Â·ÃŽ Â½ÂºÃ…Â³ Ã„Â«Â¿Ã®Ã†Â®Â¸Â¦ Â¿ÃƒÂ¸Â°Â´Ã™.
     if (cOwnerType == DEF_OWNERTYPE_PLAYER)
         CalculateSSN_SkillIndex(iOwnerH, iSkillNum, 1);
 
     switch (m_pSkillConfigList[iSkillNum]->m_sType)
     {
     case DEF_SKILLEFFECTTYPE_TAMING:
-        // Â±Ã¦ÂµÃ©Ã€ÃŒÂ±Ã¢ Â±Ã¢Â¼Ãº: dX, dY ÂºÃŽÂ±Ã™Ã€Ã‡ Â¸Ã³Â½ÂºÃ…ÃÂ¸Â¦ Â±Ã¦ÂµÃ©Ã€ÃŽÂ´Ã™.
         _TamingHandler(iOwnerH, iSkillNum, cMapIndex, dX, dY);
         break;
 
     case DEF_SKILLEFFECTTYPE_GET:
-        // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Â¾Ã²Â´Ã‚ Â±Ã¢Â¼ÃºÃ€ÃŒÂ¾ÃºÂ´Ã™. 
         ZeroMemory(cItemName, sizeof(cItemName));
         switch (m_pSkillConfigList[iSkillNum]->m_sValue1)
         {
         case 1:
-            // Â±Â¤Â¹Â° 
             wsprintf(cItemName, "Meat");
             break;
 
         case 2:
-            // Â¹Â°Â°Ã­Â±Ã¢ 
-            // Â³Â¬Â½ÃƒÃ€Ã‡ Â°Ã¦Â¿Ã¬ Ã€Â§Ã„Â¡Â¿Ã Â½ÃƒÂ°Â£Â´Ã«Ã€Ã‡ Â¿ÂµÃ‡Ã¢Â¿Â¡ ÂµÃ»Â¶Ã³ Â¶Ã‡ Â¼ÂºÂ°Ã¸Â·Ã¼Ã€ÃŒ Â´ÃžÂ¶Ã³ÃÃ¸Â´Ã™. 
             //if (m_pMapList[cMapIndex]->bGetIsWater(dX, dY) == FALSE) return 0; 
 
-            // Â±Ã™ÃƒÂ³Â¿Â¡ Â´Ã™Ã€ÃŒÂ³ÂªÂ¹Ã Â¿Ã€ÂºÃªÃÂ§Ã†Â® Â¹Â°Â°Ã­Â±Ã¢Â°Â¡ ÃÂ¸Ã€Ã§Ã‡Ã‘Â´Ã™Â¸Ã© ÂºÂ»Â°ÃÂ³Â¬Â½Ãƒ Â¸Ã°ÂµÃ¥Â·ÃŽ ÂµÃ©Â¾Ã®Â°Â£Â´Ã™.
             if (cOwnerType == DEF_OWNERTYPE_PLAYER)
             {
                 iFish = iCheckFish(iOwnerH, cMapIndex, dX, dY);
@@ -12277,12 +9211,9 @@ int CGame::iCalculateUseSkillItemEffect(int iOwnerH, char cOwnerType, char cOwne
 
         if (strlen(cItemName) != 0)
         {
-
-            // Â³Â¬Â½ÃƒÂ¿Â¡ Â¼ÂºÂ°Ã¸Ã‡ÃŸÂ´Ã™Â¸Ã© Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ Ã€Ã¼Â¼Ã›.
             if (memcmp(cItemName, "Fish", 6) == 0)
             {
                 SendNotifyMsg(NULL, iOwnerH, DEF_NOTIFY_FISHSUCCESS, NULL, NULL, NULL, NULL);
-                // v1.41 Â¾Ã Â°Â£Ã€Ã‡ Â°Ã¦Ã‡Ã¨Ã„Â¡ Â»Ã³Â½Ã‚ 
                 m_pClientList[iOwnerH]->m_iExpStock += iDice(1, 2);
             }
 
@@ -12290,12 +9221,10 @@ int CGame::iCalculateUseSkillItemEffect(int iOwnerH, char cOwnerType, char cOwne
             if (pItem == NULL) return 0;
             if (_bInitItemAttr(pItem, cItemName) == TRUE)
             {
-                // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Â³ÃµÂ´Ã‚Â´Ã™. 
                 m_pMapList[cMapIndex]->bSetItem(lX, lY, pItem);
 
-                // Â´Ã™Â¸Â¥ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¶Â³Â¾Ã®ÃÃ¸ Â°ÃÃ€Â» Â¾Ã‹Â¸Â°Â´Ã™. 
                 SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_ITEMDROP, cMapIndex,
-                    lX, lY, pItem->m_sSprite, pItem->m_sSpriteFrame, pItem->m_cItemColor); //v1.4
+                    lX, lY, pItem->m_sSprite, pItem->m_sSpriteFrame, pItem->m_cItemColor);
             }
         }
         break;
@@ -12312,7 +9241,6 @@ int CGame::iCalcTotalWeight(int iClientH)
     if (m_pClientList[iClientH] == NULL) return 0;
 
     m_pClientList[iClientH]->m_iAlterItemDropIndex = -1;
-    // Ã‚Ã¸Â¿Ã«Ã‡ÃÃÃ¶ Â¾ÃŠÂ¾Ã†ÂµÂµ ÃˆÂ¿Â°ÃºÂ°Â¡ Ã€Ã–Â´Ã‚ Â¾Ã†Ã€ÃŒÃ…Ã› ÃˆÂ¿Â°Ãº. Â¼Ã’ÃÃ¶Ã‡ÃÂ°Ã­ Ã€Ã–Â¾Ã®ÂµÂµ ÃˆÂ¿Â°ÃºÂ°Â¡ Ã€Ã–Â±Ã¢ Â¶Â§Â¹Â®Â¿Â¡ Â¿Â©Â±Ã¢Â¼Â­ Â°Ã‹Â»Ã§.
     for (sItemIndex = 0; sItemIndex < DEF_MAXITEMS; sItemIndex++)
         if (m_pClientList[iClientH]->m_pItemList[sItemIndex] != NULL)
         {
@@ -12321,7 +9249,6 @@ int CGame::iCalcTotalWeight(int iClientH)
             case DEF_ITEMEFFECTTYPE_ALTERITEMDROP:
                 if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_wCurLifeSpan > 0)
                 {
-                    // Â¼Ã¶Â¸Ã­Ã€ÃŒ Ã€Ã–Â¾Ã®Â¾ÃŸ ÃˆÂ¿Â°ÃºÂ°Â¡ Ã€Ã–Â´Ã™.
                     m_pClientList[iClientH]->m_iAlterItemDropIndex = sItemIndex;
                 }
                 break;
@@ -12351,7 +9278,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
     return;
     if (m_pClientList[iClientH] == NULL) return;
 
-    // Â¸Ã•Ã€Ãº Â°ÂªÃ€Â» Â¹Ã©Â¾Ã·Ã‡Ã‘Â´Ã™. 
     iStr = m_pClientList[iClientH]->m_iStr;
     iDex = m_pClientList[iClientH]->m_iDex;
     iInt = m_pClientList[iClientH]->m_iInt;
@@ -12368,13 +9294,10 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
 
     iToBeRestoredPoint = iOriginalPoint - iCurPoint;
 
-    // ÂºÂ¹Â±Â¸Ã‡Ã’ Ã‡ÃŠÂ¿Ã¤Â°Â¡ Â¾Ã¸Â´Ã™Â¸Ã© Â±ÃÃˆÂ¯.
     if (iToBeRestoredPoint == 0) return;
 
     if (iToBeRestoredPoint > 0)
     {
-        // Ã€ÃŒÃÂ¦ iToBeRestoredPoint Â¸Â¸Ã…Â­Ã€Ã‡ Ã†Ã·Ã€ÃŽÃ†Â®Â¸Â¦ ÂºÂ¹Â±Â¸Ã‡Ã‘Â´Ã™. 
-        // Â¸Ã•Ã€Ãº 10 Ã€ÃŒÃ‡ÃÃ€Ã‡ Ã†Ã·Ã€ÃŽÃ†Â®Â°Â¡ Ã€Ã–Â´Ã™Â¸Ã© Â¿Ã¬Â¼Â±Ã€Ã»Ã€Â¸Â·ÃŽ ÃƒÂ¤Â¿Ã®Â´Ã™. 
         while (1)
         {
             bFlag = FALSE;
@@ -12420,7 +9343,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
             if (iToBeRestoredPoint <= 0) break;
         }
 
-        // Â¸Ã‡Â¼Ã• Â°ÃÃ…Ãµ Â½ÂºÃ…Â³Ã€Ã‡ ÃƒÃ–Â´Ã«Ã„Â¡Â´Ã‚ iMax, StrÃ€ÃŒ iMax/2ÂºÂ¸Â´Ã™ Â³Â·Â´Ã™Â¸Ã© Â±Ã—Â¸Â¸Ã…Â­ Â¿ÃƒÂ¸Â°Â´Ã™. 
         iMax = m_pClientList[iClientH]->m_cSkillMastery[5];
 
         if (m_pClientList[iClientH]->m_iStr < (iMax / 2))
@@ -12439,7 +9361,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
             }
         }
 
-        // Â¹Â«Â±Ã¢ Â»Ã§Â¿Ã« Â½ÂºÃ…Â³Ã€Ã‡ ÃƒÃ–Â´Ã«Ã„Â¡Â´Ã‚ iMax, DexÂ°Â¡ iMax/2ÂºÂ¸Â´Ã™ Â³Â·Â´Ã™Â¸Ã© Â±Ã—Â¸Â¸Ã…Â­ Â¿ÃƒÂ¸Â°Â´Ã™. 
         iA = m_pClientList[iClientH]->m_cSkillMastery[7];
         iB = m_pClientList[iClientH]->m_cSkillMastery[8];
         if (iA > iB)
@@ -12453,7 +9374,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
 
         if (m_pClientList[iClientH]->m_iDex < (iMax / 2))
         {
-
             while (1)
             {
                 if ((iToBeRestoredPoint > 0) && (m_pClientList[iClientH]->m_iDex < (iMax / 2)))
@@ -12467,12 +9387,10 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
             }
         }
 
-        // ÃÃ—Ã€ÂºÃƒÂ´Ã‡ÃÂ±Ã¢ Â½ÂºÃ…Â³Ã€Ã‡ ÃƒÃ–Â´Ã«Ã„Â¡Â´Ã‚ iMax, IntÃ€ÃŒ iMax/2ÂºÂ¸Â´Ã™ Â³Â·Â´Ã™Â¸Ã© Â±Ã—Â¸Â¸Ã…Â­ Â¿ÃƒÂ¸Â°Â´Ã™. 
         iMax = m_pClientList[iClientH]->m_cSkillMastery[19];
 
         if (m_pClientList[iClientH]->m_iInt < (iMax / 2))
         {
-
             while (1)
             {
                 if ((iToBeRestoredPoint > 0) && (m_pClientList[iClientH]->m_iInt < (iMax / 2)))
@@ -12486,7 +9404,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
             }
         }
 
-        // Â¸Â¶Â¹Ã½ Â½ÂºÃ…Â³Ã€Ã‡ ÃƒÃ–Â´Ã«Ã„Â¡Â´Ã‚ iMax, MagÃ€ÃŒ iMax/2ÂºÂ¸Â´Ã™ Â³Â·Â´Ã™Â¸Ã© Â±Ã—Â¸Â¸Ã…Â­ Â¿ÃƒÂ¸Â°Â´Ã™. 
         iA = m_pClientList[iClientH]->m_cSkillMastery[3];
         iB = m_pClientList[iClientH]->m_cSkillMastery[4];
         if (iA > iB)
@@ -12495,7 +9412,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
 
         if (m_pClientList[iClientH]->m_iMag < (iMax / 2))
         {
-
             while (1)
             {
                 if ((iToBeRestoredPoint > 0) && (m_pClientList[iClientH]->m_iMag < (iMax / 2)))
@@ -12509,7 +9425,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
             }
         }
 
-        // Â³Â²Ã€Âº Ã†Ã·Ã€ÃŽÃ†Â®Â¸Â¦ Â·Â£Â´Ã½Ã‡ÃÂ°Ã” Â¿ÃƒÂ¸Â°Â´Ã™.
         while (iToBeRestoredPoint != 0)
         {
             switch (iDice(1, 6))
@@ -12559,7 +9474,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
             }
         }
 
-        // ÂºÂ¹Â±Â¸Â°Â¡ Â¼ÂºÂ°Ã¸Ã€Ã»Ã€Â¸Â·ÃŽ ÂµÃ‡Â¾ÃºÂ´Ã‚ÃÃ¶ ÃˆÂ®Ã€ÃŽÃ‡Ã‘Â´Ã™. 
         iVerifyPoint = m_pClientList[iClientH]->m_iStr + m_pClientList[iClientH]->m_iInt +
             m_pClientList[iClientH]->m_iVit + m_pClientList[iClientH]->m_iDex +
             m_pClientList[iClientH]->m_iMag + m_pClientList[iClientH]->m_iCharisma;
@@ -12569,7 +9483,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
             wsprintf(cTxt, "(T_T) RestorePlayerCharacteristics(Minor) FAIL! Player(%s)-(%d/%d)", m_pClientList[iClientH]->m_cCharName, iVerifyPoint, iOriginalPoint);
             log->info(cTxt);
 
-            // Â¿Â¡Â·Â¯Â´Ã™. Ã€ÃŒÃ€Ã¼ Â°ÂªÃ€Â¸Â·ÃŽ ÂºÂ¹Â±Â¸.
             m_pClientList[iClientH]->m_iStr = iStr;
             m_pClientList[iClientH]->m_iDex = iDex;
             m_pClientList[iClientH]->m_iInt = iInt;
@@ -12585,9 +9498,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
     }
     else
     {
-        // Ã‡Ã˜Ã…Â·Ã€ÃŒÂ³Âª Â¿Â¡Â·Â¯Â¿Â¡ Ã€Ã‡Ã‡Ã˜Â¼Â­ Ã†Â¯Â¼ÂºÃ„Â¡Â°Â¡ Â¿Ã€Â¹Ã¶ÂµÃˆ Â°Ã¦Â¿Ã¬Ã€ÃŒÂ´Ã™. Â¿Ã€Â¹Ã¶ÂµÃˆ Ã†Ã·Ã€ÃŽÃ†Â®Â¸Â¸Ã…Â­ Â»Â«Â´Ã™. iToBeRestoredPointÂ°Â¡ Â¸Â¶Ã€ÃŒÂ³ÃŠÂ½ÂºÂ»Ã³Ã…Ã‚! 
-
-        // Â¸Ã•Ã€Ãº Ã†Â¯Â¼ÂºÃ„Â¡ ÃÂ¦Ã‡Ã‘Ã„Â¡Â¸Â¦ Â¿Ã€Â¹Ã¶Ã‡Ã‘ Â°ÂªÃ€Â» Â»Â«Â´Ã™.
         while (1)
         {
             bFlag = FALSE;
@@ -12639,7 +9549,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
 
         if (iToBeRestoredPoint < 0)
         {
-            // Â³Â²Ã€Âº Ã†Ã·Ã€ÃŽÃ†Â® Â¸Â¸Ã…Â­ Â·Â£Â´Ã½Ã‡ÃÂ°Ã” Â¼Â±Ã…ÃƒÂµÃˆ Ã†Â¯Â¼ÂºÃ„Â¡Ã€Ã‡ Â°ÂªÃ€Â» Â³Â»Â¸Â°Â´Ã™.
             while (iToBeRestoredPoint != 0)
             {
                 switch (iDice(1, 6))
@@ -12691,7 +9600,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
         }
         else
         {
-            // Â°Ã¨Â»ÃªÃ€Â» Ã‡ÃŸÂ´ÃµÂ´Ã Â´Ã™Â½Ãƒ Â°ÂªÃ€ÃŒ Â¿Ã€Â¹Ã¶ÂµÃ‡Â¾ÃºÂ´Ã™. Ã€ÃŒÂ·Â²Â¼Ã¶Â°Â¡ Ã€Ã–Ã€Â»Â±Ã®?
             while (iToBeRestoredPoint != 0)
             {
                 switch (iDice(1, 6))
@@ -12742,7 +9650,6 @@ void CGame::___RestorePlayerCharacteristics(int iClientH)
             }
         }
 
-        // ÂºÂ¹Â±Â¸Â°Â¡ Â¼ÂºÂ°Ã¸Ã€Ã»Ã€Â¸Â·ÃŽ ÂµÃ‡Â¾ÃºÂ´Ã‚ÃÃ¶ ÃˆÂ®Ã€ÃŽÃ‡Ã‘Â´Ã™. 
         iVerifyPoint = m_pClientList[iClientH]->m_iStr + m_pClientList[iClientH]->m_iInt +
             m_pClientList[iClientH]->m_iVit + m_pClientList[iClientH]->m_iDex +
             m_pClientList[iClientH]->m_iMag + m_pClientList[iClientH]->m_iCharisma;
@@ -12776,10 +9683,8 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
         (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND] != -1))
     {
 
-        // Àß¸øµÈ ¹«±â ÀåÂø Á¶ÇÕÀÌ´Ù. µÑ Áß ÇÏ³ª¸¦ ³»·Á ³õ´Â´Ù. 
         if (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND]] != NULL)
         {
-            // ÇÑ¼Õ °ËÀÇ ÀåÂø »óÅÂ¸¦ ÇØÁ¦ÇÑ´Ù. 
             m_pClientList[iClientH]->m_bIsItemEquipped[m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND]] = FALSE;
             m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND] = -1;
         }
@@ -12810,7 +9715,7 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
     m_pClientList[iClientH]->m_iMagicDamageSaveItemIndex = -1;
     m_pClientList[iClientH]->m_iSideEffect_MaxHPdown = 0;
 
-    m_pClientList[iClientH]->m_iAddAbsAir = 0;	// ¼Ó¼ºº° ´ë¹ÌÁö Èí¼ö
+    m_pClientList[iClientH]->m_iAddAbsAir = 0;
     m_pClientList[iClientH]->m_iAddAbsEarth = 0;
     m_pClientList[iClientH]->m_iAddAbsFire = 0;
     m_pClientList[iClientH]->m_iAddAbsWater = 0;
@@ -12824,8 +9729,8 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
     m_pClientList[iClientH]->m_iMaxAP_SM = 0;
     m_pClientList[iClientH]->m_iMaxAP_L = 0;
 
-    m_pClientList[iClientH]->m_iSpecialWeaponEffectType = 0;	// Èñ±Í ¾ÆÀÌÅÛ È¿°ú Á¾·ù: 0-None 1-ÇÊ»ì±â´ë¹ÌÁöÃß°¡ 2-Áßµ¶È¿°ú 3-Á¤ÀÇÀÇ 4-ÀúÁÖÀÇ
-    m_pClientList[iClientH]->m_iSpecialWeaponEffectValue = 0;	// Èñ±Í ¾ÆÀÌÅÛ È¿°ú °ª
+    m_pClientList[iClientH]->m_iSpecialWeaponEffectType = 0;
+    m_pClientList[iClientH]->m_iSpecialWeaponEffectValue = 0;
 
     m_pClientList[iClientH]->m_iAddHP = m_pClientList[iClientH]->m_iAddSP = m_pClientList[iClientH]->m_iAddMP = 0;
     m_pClientList[iClientH]->m_iAddAR = m_pClientList[iClientH]->m_iAddPR = m_pClientList[iClientH]->m_iAddDR = 0;
@@ -12842,7 +9747,6 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
     m_pClientList[iClientH]->m_iAddChargeCritical = 0;
 
     m_pClientList[iClientH]->m_iAlterItemDropIndex = -1;
-    // Âø¿ëÇÏÁö ¾Ê¾Æµµ È¿°ú°¡ ÀÖ´Â ¾ÆÀÌÅÛ.
     for (sItemIndex = 0; sItemIndex < DEF_MAXITEMS; sItemIndex++)
         if (m_pClientList[iClientH]->m_pItemList[sItemIndex] != NULL)
         {
@@ -12851,14 +9755,12 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
             case DEF_ITEMEFFECTTYPE_ALTERITEMDROP:
                 if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_wCurLifeSpan > 0)
                 {
-                    // ¼ö¸íÀÌ ÀÖ¾î¾ß È¿°ú°¡ ÀÖ´Ù.
                     m_pClientList[iClientH]->m_iAlterItemDropIndex = sItemIndex;
                 }
                 break;
             }
         }
 
-    // Âø¿ëÀ» ÇØ¾ß È¿°ú°¡ ÀÖ´Â ¾ÆÀÌÅÛ 
     for (sItemIndex = 0; sItemIndex < DEF_MAXITEMS; sItemIndex++)
         if ((m_pClientList[iClientH]->m_pItemList[sItemIndex] != NULL) &&
             (m_pClientList[iClientH]->m_bIsItemEquipped[sItemIndex] == TRUE))
@@ -12870,7 +9772,6 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
             {
 
             case DEF_ITEMEFFECTTYPE_MAGICDAMAGESAVE:
-                // ¸¶¹ý µ¥¹ÌÁö Àý°¨ ¾ÆÀÌÅÛ. ÀÎµ¦½º¸¦ ÀúÀåÇÑ´Ù.
                 m_pClientList[iClientH]->m_iMagicDamageSaveItemIndex = sItemIndex;
                 break;
 
@@ -12879,7 +9780,6 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
             case DEF_ITEMEFFECTTYPE_ATTACK_MANASAVE:
             case DEF_ITEMEFFECTTYPE_ATTACK_MAXHPDOWN:
             case DEF_ITEMEFFECTTYPE_ATTACK:
-                // ¹«±â ÀåÂø È¿°ú
                 m_pClientList[iClientH]->m_cAttackDiceThrow_SM = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue1;
                 m_pClientList[iClientH]->m_cAttackDiceRange_SM = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2;
                 m_pClientList[iClientH]->m_cAttackBonus_SM = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue3;
@@ -12887,30 +9787,20 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
                 m_pClientList[iClientH]->m_cAttackDiceRange_L = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue5;
                 m_pClientList[iClientH]->m_cAttackBonus_L = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue6;
 
-                // v2.05 ¹«±âÀÇ Æ¯¼ºÄ¡ Ãß°¡ 
                 iTemp = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0xF0000000) >> 28;
-                //testcode
-                //wsprintf(G_cTxt, "Add Damage: %d", iTemp);
-                //log->info(G_cTxt);
 
-                // °íÁ¤ ´ë¹ÌÁö Ãß°¡
                 m_pClientList[iClientH]->m_iAddPhysicalDamage += iTemp;
                 m_pClientList[iClientH]->m_iAddMagicalDamage += iTemp;
 
-                // °ø°Ý¹«±âÀÇ ÇØ´ç ½ºÅ³¸¸Å­ÀÇ ¸íÁß·üÀ» ´õÇÑ´Ù. 
                 m_pClientList[iClientH]->m_iHitRatio += m_pClientList[iClientH]->m_cSkillMastery[m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sRelatedSkill];
 
-                // v1.432 »ç¿ëÇÏÁö ¾Ê´Â´Ù. ¹«±âÀÇ °ø°Ý´ë»óº° ¸íÁß·ü °¡°¨Ä¡¸¦ ´õÇÑ´Ù.
                 //m_pClientList[iClientH]->m_iHitRatio_ItemEffect_SM += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSM_HitRatio;
                 //m_pClientList[iClientH]->m_iHitRatio_ItemEffect_L  += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sL_HitRatio;
-                // ÇÃ·¹ÀÌ¾î°¡ »ç¿ëÇÏ´Â ¹«±âÀÇ ½ºÅ³À» ÀúÀåÇÑ´Ù. 
                 m_pClientList[iClientH]->m_sUsingWeaponSkill = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sRelatedSkill;
 
-                // v1.41 Custom-Made ¾ÆÀÌÅÛÀÌ¶ó¸é È¿°ú¸¦ ¼³Á¤ÇÑ´Ù. °ø°Ý¹«±â´Â 1°³¸¸ ÀåÂøµÈ´Ù°í ÇßÀ»¶§¸¸ À¯È¿ÇÔ.
                 if ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x00000001) != NULL)
                 {
                     m_pClientList[iClientH]->m_iCustomItemValue_Attack += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemSpecEffectValue2;
-                    // ¿¡·¯ º¸Á¤¿ë 
                     if (m_pClientList[iClientH]->m_iCustomItemValue_Attack > 100)
                         m_pClientList[iClientH]->m_iCustomItemValue_Attack = 100;
 
@@ -12919,7 +9809,6 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
 
                     if (m_pClientList[iClientH]->m_iCustomItemValue_Attack > 0)
                     {
-                        // ¾ç¼ö¸é ¹«±âÀÇ Å¸°ÝÄ¡ ÃÖ¼Ò°ªÀÌ ÃÖ´ë 5±îÁö ¿Ã¶ó°£´Ù.
                         dV2 = (double)m_pClientList[iClientH]->m_iCustomItemValue_Attack;
                         dV1 = (dV2 / 100.0f) * (5.0f);
                         m_pClientList[iClientH]->m_iMinAP_SM = m_pClientList[iClientH]->m_cAttackDiceThrow_SM +
@@ -12928,24 +9817,17 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
                         m_pClientList[iClientH]->m_iMinAP_L = m_pClientList[iClientH]->m_cAttackDiceThrow_L +
                             m_pClientList[iClientH]->m_cAttackBonus_L + (int)dV1;
 
-                        // ¼öÄ¡ Á¶Á¤ 
                         if (m_pClientList[iClientH]->m_iMinAP_SM < 1) m_pClientList[iClientH]->m_iMinAP_SM = 1;
                         if (m_pClientList[iClientH]->m_iMinAP_L < 1)  m_pClientList[iClientH]->m_iMinAP_L = 1;
 
-                        // ÃÖ¼Ò°ªÀÌ ÃÖ´ë°ªº¸´Ù Å©¸é ÃÖ´ë°ª¸¸Å­ 
                         if (m_pClientList[iClientH]->m_iMinAP_SM > (m_pClientList[iClientH]->m_cAttackDiceThrow_SM * m_pClientList[iClientH]->m_cAttackDiceRange_SM + m_pClientList[iClientH]->m_cAttackBonus_SM))
                             m_pClientList[iClientH]->m_iMinAP_SM = (m_pClientList[iClientH]->m_cAttackDiceThrow_SM * m_pClientList[iClientH]->m_cAttackDiceRange_SM + m_pClientList[iClientH]->m_cAttackBonus_SM);
 
                         if (m_pClientList[iClientH]->m_iMinAP_L > (m_pClientList[iClientH]->m_cAttackDiceThrow_L * m_pClientList[iClientH]->m_cAttackDiceRange_L + m_pClientList[iClientH]->m_cAttackBonus_L))
                             m_pClientList[iClientH]->m_iMinAP_L = (m_pClientList[iClientH]->m_cAttackDiceThrow_L * m_pClientList[iClientH]->m_cAttackDiceRange_L + m_pClientList[iClientH]->m_cAttackBonus_L);
-
-                        //testcode
-                        //wsprintf(G_cTxt, "MinAP: %d %d +(%d)", m_pClientList[iClientH]->m_iMinAP_SM, m_pClientList[iClientH]->m_iMinAP_L, (int)dV1);
-                        //log->info(G_cTxt);
                     }
                     else if (m_pClientList[iClientH]->m_iCustomItemValue_Attack < 0)
                     {
-                        // À½¼ö¸é ¹«±âÀÇ Å¸°ÝÄ¡ ÃÖ´ë°ªÀÌ ÃÖ´ë 5±îÁö ³»·Á°£´Ù.
                         dV2 = (double)m_pClientList[iClientH]->m_iCustomItemValue_Attack;
                         dV1 = (dV2 / 100.0f) * (5.0f);
                         m_pClientList[iClientH]->m_iMaxAP_SM = m_pClientList[iClientH]->m_cAttackDiceThrow_SM * m_pClientList[iClientH]->m_cAttackDiceRange_SM
@@ -12954,112 +9836,87 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
                         m_pClientList[iClientH]->m_iMaxAP_L = m_pClientList[iClientH]->m_cAttackDiceThrow_L * m_pClientList[iClientH]->m_cAttackDiceRange_L
                             + m_pClientList[iClientH]->m_cAttackBonus_L + (int)dV1;
 
-                        // ¼öÄ¡ Á¶Á¤ 
                         if (m_pClientList[iClientH]->m_iMaxAP_SM < 1) m_pClientList[iClientH]->m_iMaxAP_SM = 1;
                         if (m_pClientList[iClientH]->m_iMaxAP_L < 1)  m_pClientList[iClientH]->m_iMaxAP_L = 1;
 
-                        // ÃÖ´ë°ªÀÌ ÃÖ¼Ò°ªº¸´Ù ÀÛÀ¸¸é ÃÖ¼Ò°ª¸¸Å­ 
                         if (m_pClientList[iClientH]->m_iMaxAP_SM < (m_pClientList[iClientH]->m_cAttackDiceThrow_SM * m_pClientList[iClientH]->m_cAttackDiceRange_SM + m_pClientList[iClientH]->m_cAttackBonus_SM))
                             m_pClientList[iClientH]->m_iMaxAP_SM = (m_pClientList[iClientH]->m_cAttackDiceThrow_SM * m_pClientList[iClientH]->m_cAttackDiceRange_SM + m_pClientList[iClientH]->m_cAttackBonus_SM);
 
                         if (m_pClientList[iClientH]->m_iMaxAP_L < (m_pClientList[iClientH]->m_cAttackDiceThrow_L * m_pClientList[iClientH]->m_cAttackDiceRange_L + m_pClientList[iClientH]->m_cAttackBonus_L))
                             m_pClientList[iClientH]->m_iMaxAP_L = (m_pClientList[iClientH]->m_cAttackDiceThrow_L * m_pClientList[iClientH]->m_cAttackDiceRange_L + m_pClientList[iClientH]->m_cAttackBonus_L);
-
-                        //testcode
-                        //wsprintf(G_cTxt, "MaxAP: %d %d +(%d)", m_pClientList[iClientH]->m_iMaxAP_SM, m_pClientList[iClientH]->m_iMaxAP_L, (int)dV1);
-                        //log->info(G_cTxt);
                     }
                 }
 
-                // v1.42 Èñ±Í ¾ÆÀÌÅÛÀÌ¶ó¸é Main È¿°ú¸¦ ¼³Á¤ÇÑ´Ù. °ø°Ý¹«±â´Â 1°³¸¸ ÀåÂøµÈ´Ù°í ÇßÀ»¶§¸¸ À¯È¿ÇÔ.
                 if ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x00F00000) != NULL)
                 {
                     dwSWEType = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x00F00000) >> 20;
                     dwSWEValue = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x000F0000) >> 16;
 
-                    // Èñ±Í ¾ÆÀÌÅÛ È¿°ú Á¾·ù: 
-                    // 0-None 1-ÇÊ»ì±â´ë¹ÌÁöÃß°¡ 2-Áßµ¶È¿°ú 3-Á¤ÀÇÀÇ 4-ÀúÁÖÀÇ 
-                    // 5-¹ÎÃ¸ÀÇ 6-°¡º­¿î 7-¿¹¸®ÇÑ 8-°­È­µÈ 9-°í´ë¹®¸íÀÇ 10-¸¶¹ý ¼º°øÀÇ
                     m_pClientList[iClientH]->m_iSpecialWeaponEffectType = (int)dwSWEType;
                     m_pClientList[iClientH]->m_iSpecialWeaponEffectValue = (int)dwSWEValue;
 
                     switch (dwSWEType)
                     {
-                    case 7: // ¿¹¸®ÇÑ 
+                    case 7:
                         m_pClientList[iClientH]->m_cAttackDiceRange_SM++;
                         m_pClientList[iClientH]->m_cAttackDiceRange_L++;
                         break;
 
-                    case 9: // °í´ë¹®¸íÀÇ
+                    case 9:
                         m_pClientList[iClientH]->m_cAttackDiceRange_SM += 2;
                         m_pClientList[iClientH]->m_cAttackDiceRange_L += 2;
                         break;
                     }
                 }
 
-                // v1.42 Èñ±Í ¾ÆÀÌÅÛÀÌ¶ó¸é Sub È¿°ú¸¦ ¼³Á¤ÇÑ´Ù. °ø°Ý¹«±â´Â 1°³¸¸ ÀåÂøµÈ´Ù°í ÇßÀ»¶§¸¸ À¯È¿ÇÔ.
                 if ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x0000F000) != NULL)
                 {
                     dwSWEType = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x0000F000) >> 12;
                     dwSWEValue = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x00000F00) >> 8;
 
-                    // Èñ±Í ¾ÆÀÌÅÛ È¿°ú Á¾·ù: 
-                    //Ãß°¡ µ¶¼ºÀúÇ×(1), Ãß°¡ ¸íÁß°ª(2), Ãß°¡ ¹æ¾î°ª(3), HP È¸º¹·® Ãß°¡(4), SP È¸º¹·® Ãß°¡(5)
-                    //MP È¸º¹·® Ãß°¡(6), Ãß°¡ ¸¶¹ýÀúÇ×(7), ¹°¸® ´ë¹ÌÁö Èí¼ö(8), ¸¶¹ý ´ë¹ÌÁö Èí¼ö(9)
-                    //¿¬Å¸ ´ë¹ÌÁö Ãß°¡(10), ´õ ¸¹Àº °æÇèÄ¡(11), ´õ¸¹Àº Gold(12)
-
                     switch (dwSWEType)
                     {
-                    case 0:  break;
-                    case 1:  m_pClientList[iClientH]->m_iAddPR += (int)dwSWEValue * 7; break;
-                    case 2:  m_pClientList[iClientH]->m_iAddAR += (int)dwSWEValue * 7; break;
-                    case 3:  m_pClientList[iClientH]->m_iAddDR += (int)dwSWEValue * 7; break;
-                    case 4:  m_pClientList[iClientH]->m_iAddHP += (int)dwSWEValue * 7; break;
-                    case 5:  m_pClientList[iClientH]->m_iAddSP += (int)dwSWEValue * 7; break;
-                    case 6:  m_pClientList[iClientH]->m_iAddMP += (int)dwSWEValue * 7; break;
-                    case 7:  m_pClientList[iClientH]->m_iAddMR += (int)dwSWEValue * 7; break;
-                    case 8:  m_pClientList[iClientH]->m_iDamageAbsorption_Armor[m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos] += (int)dwSWEValue * 3; break;
-                    case 9:  m_pClientList[iClientH]->m_iAddAbsMD += (int)dwSWEValue * 3; break;
-                    case 10: m_pClientList[iClientH]->m_iAddCD += (int)dwSWEValue; break;
-                    case 11: m_pClientList[iClientH]->m_iAddExp += (int)dwSWEValue * 10; break;
-                    case 12: m_pClientList[iClientH]->m_iAddGold += (int)dwSWEValue * 10; break;
+                        case 0:  break;
+                        case 1:  m_pClientList[iClientH]->m_iAddPR += (int)dwSWEValue * 7; break;
+                        case 2:  m_pClientList[iClientH]->m_iAddAR += (int)dwSWEValue * 7; break;
+                        case 3:  m_pClientList[iClientH]->m_iAddDR += (int)dwSWEValue * 7; break;
+                        case 4:  m_pClientList[iClientH]->m_iAddHP += (int)dwSWEValue * 7; break;
+                        case 5:  m_pClientList[iClientH]->m_iAddSP += (int)dwSWEValue * 7; break;
+                        case 6:  m_pClientList[iClientH]->m_iAddMP += (int)dwSWEValue * 7; break;
+                        case 7:  m_pClientList[iClientH]->m_iAddMR += (int)dwSWEValue * 7; break;
+                        case 8:  m_pClientList[iClientH]->m_iDamageAbsorption_Armor[m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos] += (int)dwSWEValue * 3; break;
+                        case 9:  m_pClientList[iClientH]->m_iAddAbsMD += (int)dwSWEValue * 3; break;
+                        case 10: m_pClientList[iClientH]->m_iAddCD += (int)dwSWEValue; break;
+                        case 11: m_pClientList[iClientH]->m_iAddExp += (int)dwSWEValue * 10; break;
+                        case 12: m_pClientList[iClientH]->m_iAddGold += (int)dwSWEValue * 10; break;
                     }
 
-                    // v2.04 Æ¯¼ºÄ¡ Á¦ÇÑÀ» ºÙÀÓ.
                     switch (dwSWEType)
                     {
                     case 9: if (m_pClientList[iClientH]->m_iAddAbsMD > 80) m_pClientList[iClientH]->m_iAddAbsMD = 80; break;
                     }
                 }
 
-                // ÀÏ¹Ý °ø°Ý ÀÌ¿ÜÀÇ È¿°ú¸¦ ¼³Á¤.
                 switch (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectType)
                 {
                 case DEF_ITEMEFFECTTYPE_ATTACK_MAXHPDOWN:
-                    // ÃÖ´ë HP °¨¼Ò È¿°ú
                     m_pClientList[iClientH]->m_iSideEffect_MaxHPdown = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSpecialEffect;
                     break;
 
                 case DEF_ITEMEFFECTTYPE_ATTACK_MANASAVE:
-                    // ¸¶³ª Àý¾à È¿°ú: ¸¶³ª Àý°¨·üÀº ÃÖ´ë 80%
                     m_pClientList[iClientH]->m_iManaSaveRatio += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue4;
                     if (m_pClientList[iClientH]->m_iManaSaveRatio > 80) m_pClientList[iClientH]->m_iManaSaveRatio = 80;
                     break;
 
                 case DEF_ITEMEFFECTTYPE_ATTACK_DEFENSE:
-                    // Ãß°¡ ¹°¸® ¹æ¾î ´É·Â È¿°ú 
                     m_pClientList[iClientH]->m_iDamageAbsorption_Armor[DEF_EQUIPPOS_BODY] += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSpecialEffect;
                     break;
 
                 case DEF_ITEMEFFECTTYPE_ATTACK_SPECABLTY:
-                    // Æ¯¼ö ´É·Â Á¾·ù
                     m_pClientList[iClientH]->m_iSpecialAbilityType = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSpecialEffect;
-                    // Æ¯¼ö ´É·Â Áö¼Ó ½Ã°£
                     m_pClientList[iClientH]->m_iSpecialAbilityLastSec = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSpecialEffectValue1;
-                    // ÀåÂø À§Ä¡ ±â¾ïÇØ ³õ´Â´Ù.
                     m_pClientList[iClientH]->m_iSpecialAbilityEquipPos = (int)cEquipPos;
 
-                    // Æ¯¼ö ´É·Â ¼³Á¤µÊÀ» ¾Ë·ÁÁØ´Ù.
                     if ((bNotify == TRUE) && (iEquipItemID == (int)sItemIndex))
                         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SPECIALABILITYSTATUS, 2, m_pClientList[iClientH]->m_iSpecialAbilityType, m_pClientList[iClientH]->m_iSpecialAbilityTime, NULL);
                     break;
@@ -13070,36 +9927,29 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
                 switch (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue1)
                 {
                 case 1:
-                    // Ãß°¡ ¸¶¹ý ÀúÇ× Áõ°¡ 
                     m_pClientList[iClientH]->m_iAddResistMagic += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2;
                     break;
 
                 case 2:
-                    // ¸¶³ª Àý¾à È¿°ú 
                     m_pClientList[iClientH]->m_iManaSaveRatio += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2;
-                    // ¸¶³ª Àý°¨·üÀº ÃÖ´ë 80%
                     if (m_pClientList[iClientH]->m_iManaSaveRatio > 80) m_pClientList[iClientH]->m_iManaSaveRatio = 80;
                     break;
 
                 case 3:
-                    // °íÁ¤ ¹°¸® ´ë¹ÌÁö È¿°ú. ¸ðµç ¹°¸® °ø°Ý¿¡ ´ëÇØ¼­ °íÁ¤ ´ë¹ÌÁö°¡ ºÙ´Â´Ù. 
                     m_pClientList[iClientH]->m_iAddPhysicalDamage += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2;
                     break;
 
                 case 4:
-                    // Ãß°¡ ¹°¸® ¹æ¾î·Â 
                     m_pClientList[iClientH]->m_iDefenseRatio += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2;
                     break;
 
                 case 5:
-                    // Çà¿î È¿°ú?
                     if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2 != 0)
                         m_pClientList[iClientH]->m_bIsLuckyEffect = TRUE;
                     else m_pClientList[iClientH]->m_bIsLuckyEffect = FALSE;
                     break;
 
                 case 6:
-                    // °íÁ¤ ¸¶¹ý ´ë¹ÌÁö È¿°ú. ¸ðµç ¸¶¹ý °ø°Ý¿¡ ´ëÇØ¼­ °íÁ¤ ´ë¹ÌÁö°¡ ºÙ´Â´Ù. 
                     m_pClientList[iClientH]->m_iAddMagicalDamage += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2;
                     break;
 
@@ -13116,12 +9966,10 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
                     break;
 
                 case 10:
-                    // ¹°°è¿­ °ø°Ý ´ë¹ÌÁö °¨¼Ò´Â ¾ó¾îºÙÀ» È®·üÀÇ °¨¼ÒÈ¿°ú°¡ ÀÖ´Ù. (2¹è·Î È®·ü °è»êµÊ)
                     m_pClientList[iClientH]->m_iAddAbsWater += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2;
                     break;
 
                 case 11:
-                    // µ¶¼º ÀúÇ×.
                     m_pClientList[iClientH]->m_iAddPR += m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2;
                     break;
 
@@ -13132,12 +9980,9 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
                 break;
 
             case DEF_ITEMEFFECTTYPE_ATTACK_ARROW:
-                // È­»ìÀ» ÇÊ¿ä·Î ÇÏ´Â ¹«±â(È°·ù)
-                // ¹«±âÀÇ °ø°ÝÈ¿°ú´Â ¾î¶² È­»ìÀÌ ¼±ÅÃµÇ´À³Ä¿¡ µû¶ó ´Þ¶óÁø´Ù. ¾ÆÀÌÅÛÁß È­»ìÀ» Ã£¾Æ ÇÒ´çÇÑ´Ù.
                 if ((m_pClientList[iClientH]->m_cArrowIndex != -1) &&
                     (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cArrowIndex] == NULL))
                 {
-                    // ArrowIndex¿¡ È­»ìÀÌ ¾ø´Ù. (ºñ¾îÀÖ´Â ¾ÆÀÌÅÛ) 
                     m_pClientList[iClientH]->m_cArrowIndex = _iGetArrowItemIndex(iClientH);
                 }
                 else if (m_pClientList[iClientH]->m_cArrowIndex == -1)
@@ -13145,7 +9990,6 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
 
                 if (m_pClientList[iClientH]->m_cArrowIndex == -1)
                 {
-                    // È­»ìÀÌ ¾ø´Ù.
                     m_pClientList[iClientH]->m_cAttackDiceThrow_SM = 0;
                     m_pClientList[iClientH]->m_cAttackDiceRange_SM = 0;
                     m_pClientList[iClientH]->m_cAttackBonus_SM = 0;
@@ -13182,10 +10026,6 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
                     dV1 = dV1 / 2.0f;
                     m_pClientList[iClientH]->m_iDefenseRatio += (int)dV1;
                     if (m_pClientList[iClientH]->m_iDefenseRatio <= 0) m_pClientList[iClientH]->m_iDefenseRatio = 1;
-
-                    //testcode
-                    //wsprintf(G_cTxt, "Custom-Defense: %d", (int)dV1);
-                    //log->info(G_cTxt);
                 }
 
                 if ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x00F00000) != NULL)
@@ -13193,95 +10033,75 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
                     dwSWEType = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x00F00000) >> 20;
                     dwSWEValue = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x000F0000) >> 16;
 
-                    // Èñ±Í ¾ÆÀÌÅÛ È¿°ú Á¾·ù: 
-                    // 0-None 1-ÇÊ»ì±â´ë¹ÌÁöÃß°¡ 2-Áßµ¶È¿°ú 3-Á¤ÀÇÀÇ 4-ÀúÁÖÀÇ 
-                    // 5-¹ÎÃ¸ÀÇ 6-°¡º­¿î 7-¿¹¸®ÇÑ 8-°­È­µÈ 9-°í´ë¹®¸íÀÇ 10-¸¶¹ý¼º°øÀÇ 11-¸¶³ªº¯È¯ÀÇ 12-ÇÊ»ìÃæÀüÀÇ
-
                     switch (dwSWEType)
                     {
-                    case 7: // ¿¹¸®ÇÑ 
+                    case 7:
                         m_pClientList[iClientH]->m_cAttackDiceRange_SM++;
                         m_pClientList[iClientH]->m_cAttackDiceRange_L++;
                         break;
 
-                    case 9: // °í´ë¹®¸íÀÇ
+                    case 9:
                         m_pClientList[iClientH]->m_cAttackDiceRange_SM += 2;
                         m_pClientList[iClientH]->m_cAttackDiceRange_L += 2;
                         break;
 
-                        // v2.04 
-                    case 11: // ¸¶³ª º¯È¯ÀÇ 
+                    case 11:
                         m_pClientList[iClientH]->m_iAddTransMana += dwSWEValue;
                         if (m_pClientList[iClientH]->m_iAddTransMana > 13) m_pClientList[iClientH]->m_iAddTransMana = 13;
                         break;
 
-                    case 12: // ÇÊ»ì ÃæÀüÀÇ 
+                    case 12:
                         m_pClientList[iClientH]->m_iAddChargeCritical += dwSWEValue;
                         if (m_pClientList[iClientH]->m_iAddChargeCritical > 20) m_pClientList[iClientH]->m_iAddChargeCritical = 20;
                         break;
                     }
                 }
 
-                // v1.42 Èñ±Í ¾ÆÀÌÅÛÀÌ¶ó¸é Sub È¿°ú¸¦ ¼³Á¤ÇÑ´Ù. °ø°Ý¹«±â´Â 1°³¸¸ ÀåÂøµÈ´Ù°í ÇßÀ»¶§¸¸ À¯È¿ÇÔ.
                 if ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x0000F000) != NULL)
                 {
                     dwSWEType = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x0000F000) >> 12;
                     dwSWEValue = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x00000F00) >> 8;
 
-                    // Èñ±Í ¾ÆÀÌÅÛ È¿°ú Á¾·ù: 
-                    //Ãß°¡ µ¶¼ºÀúÇ×(1), Ãß°¡ ¸íÁß°ª(2), Ãß°¡ ¹æ¾î°ª(3), HP È¸º¹·® Ãß°¡(4), SP È¸º¹·® Ãß°¡(5)
-                    //MP È¸º¹·® Ãß°¡(6), Ãß°¡ ¸¶¹ýÀúÇ×(7), ¹°¸® ´ë¹ÌÁö Èí¼ö(8), ¸¶¹ý ´ë¹ÌÁö Èí¼ö(9)
-                    //¿¬Å¸ ´ë¹ÌÁö Ãß°¡(10), ´õ ¸¹Àº °æÇèÄ¡(11), ´õ¸¹Àº Gold(12)
-
                     switch (dwSWEType)
                     {
-                    case 0:  break;
-                    case 1:  m_pClientList[iClientH]->m_iAddPR += (int)dwSWEValue * 7; break;
-                    case 2:  m_pClientList[iClientH]->m_iAddAR += (int)dwSWEValue * 7; break;
-                    case 3:  m_pClientList[iClientH]->m_iAddDR += (int)dwSWEValue * 7; break;
-                    case 4:  m_pClientList[iClientH]->m_iAddHP += (int)dwSWEValue * 7; break;
-                    case 5:  m_pClientList[iClientH]->m_iAddSP += (int)dwSWEValue * 7; break;
-                    case 6:  m_pClientList[iClientH]->m_iAddMP += (int)dwSWEValue * 7; break;
-                    case 7:  m_pClientList[iClientH]->m_iAddMR += (int)dwSWEValue * 7; break;
-                    case 8:  m_pClientList[iClientH]->m_iDamageAbsorption_Armor[m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos] += (int)dwSWEValue * 3; break;
-                    case 9:  m_pClientList[iClientH]->m_iAddAbsMD += (int)dwSWEValue * 3; break;
-                    case 10: m_pClientList[iClientH]->m_iAddCD += (int)dwSWEValue; break;
-                    case 11: m_pClientList[iClientH]->m_iAddExp += (int)dwSWEValue * 10; break;
-                    case 12: m_pClientList[iClientH]->m_iAddGold += (int)dwSWEValue * 10; break;
+                        case 0:  break;
+                        case 1:  m_pClientList[iClientH]->m_iAddPR += (int)dwSWEValue * 7; break;
+                        case 2:  m_pClientList[iClientH]->m_iAddAR += (int)dwSWEValue * 7; break;
+                        case 3:  m_pClientList[iClientH]->m_iAddDR += (int)dwSWEValue * 7; break;
+                        case 4:  m_pClientList[iClientH]->m_iAddHP += (int)dwSWEValue * 7; break;
+                        case 5:  m_pClientList[iClientH]->m_iAddSP += (int)dwSWEValue * 7; break;
+                        case 6:  m_pClientList[iClientH]->m_iAddMP += (int)dwSWEValue * 7; break;
+                        case 7:  m_pClientList[iClientH]->m_iAddMR += (int)dwSWEValue * 7; break;
+                        case 8:  m_pClientList[iClientH]->m_iDamageAbsorption_Armor[m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos] += (int)dwSWEValue * 3; break;
+                        case 9:  m_pClientList[iClientH]->m_iAddAbsMD += (int)dwSWEValue * 3; break;
+                        case 10: m_pClientList[iClientH]->m_iAddCD += (int)dwSWEValue; break;
+                        case 11: m_pClientList[iClientH]->m_iAddExp += (int)dwSWEValue * 10; break;
+                        case 12: m_pClientList[iClientH]->m_iAddGold += (int)dwSWEValue * 10; break;
                     }
 
-                    // v2.04 Æ¯¼ºÄ¡ Á¦ÇÑÀ» ºÙÀÓ.
                     switch (dwSWEType)
                     {
-                    case 9: if (m_pClientList[iClientH]->m_iAddAbsMD > 80) m_pClientList[iClientH]->m_iAddAbsMD = 80; break; // ¸¶¹ý ´ë¹ÌÁö Èí¼ö ÃÖ´ë 80%
+                    case 9: if (m_pClientList[iClientH]->m_iAddAbsMD > 80) m_pClientList[iClientH]->m_iAddAbsMD = 80; break;
                     }
                 }
 
                 switch (cEquipPos)
                 {
                 case DEF_EQUIPPOS_LHAND:
-                    // ¹æ¾î±¸ Áß ¹æÆÐ°¡ ÀåÂø µÇ¾ú´Ù. 
-                    // ¹æÆÐ¿¡ ÀÇÇÑ Ãæ°Ý Èí¼ö È¿°ú ÇÒ´çÇÑ´Ù. ¹æ¾î°ªÀÇ 70% ¼öÁØ 
                     m_pClientList[iClientH]->m_iDamageAbsorption_Shield = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue1) - (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue1) / 3;
                     break;
                 default:
-                    // °©¿Ê¿¡ ÀÇÇÑ Ãæ°Ý Èí¼ö È¿°ú¸¦ ´õÇÑ´Ù. ¹æ¾î°ªÀÇ 70% ¼öÁØ <- v1.43 100%·Î º¯°æµÇ¾ú´Ù. V2!
                     m_pClientList[iClientH]->m_iDamageAbsorption_Armor[m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos] += (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2);
                     break;
                 }
 
-                // ÀÏ¹Ý °ø°Ý ÀÌ¿ÜÀÇ È¿°ú¸¦ ¼³Á¤.
                 switch (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectType)
                 {
                 case DEF_ITEMEFFECTTYPE_DEFENSE_SPECABLTY:
-                    // Æ¯¼ö ´É·Â Á¾·ù
                     m_pClientList[iClientH]->m_iSpecialAbilityType = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSpecialEffect;
-                    // Æ¯¼ö ´É·Â Áö¼Ó ½Ã°£
                     m_pClientList[iClientH]->m_iSpecialAbilityLastSec = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSpecialEffectValue1;
-                    // ÀåÂø À§Ä¡ ±â¾ïÇØ ³õ´Â´Ù.
                     m_pClientList[iClientH]->m_iSpecialAbilityEquipPos = (int)cEquipPos;
 
-                    // Æ¯¼ö ´É·Â ¼³Á¤µÊÀ» ¾Ë·ÁÁØ´Ù.
                     if ((bNotify == TRUE) && (iEquipItemID == (int)sItemIndex))
                         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SPECIALABILITYSTATUS, 2, m_pClientList[iClientH]->m_iSpecialAbilityType, m_pClientList[iClientH]->m_iSpecialAbilityTime, NULL);
                     break;
@@ -13290,22 +10110,16 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
             }
         }
 
-    //v1.432
     if ((iPrevSAType != 0) && (m_pClientList[iClientH]->m_iSpecialAbilityType == 0) && (bNotify == TRUE))
     {
-        // Æ¯¼ö ´É·ÂÀÌ ÇØÁ¦µÇ¾ú´Ù.
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SPECIALABILITYSTATUS, 4, NULL, NULL, NULL);
-        // ¸¸¾à Æ¯¼ö ´É·Â »ç¿ë ÁßÀÌ¾ú´Ù¸é ¿Ü¸ðµµ º¯È­ÇÏ¸ç »ç¿ëµµ Á¾·á.
         if (m_pClientList[iClientH]->m_bIsSpecialAbilityEnabled == TRUE)
         {
             m_pClientList[iClientH]->m_bIsSpecialAbilityEnabled = FALSE;
-            // ´ÙÀ½ »ç¿ë °¡´É ½Ã°£À» ÀÔ·ÂÇÑ´Ù.
             m_pClientList[iClientH]->m_iSpecialAbilityTime = DEF_SPECABLTYTIMESEC;
-            // È¿°ú ºñÆ® Å¬¸®¾î
             sTemp = m_pClientList[iClientH]->m_sAppr4;
             sTemp = sTemp & 0xFF0F;
             m_pClientList[iClientH]->m_sAppr4 = sTemp;
-            // ¿ÜÇüÀÌ º¯ÇßÀ½À» ¾Ë¸°´Ù.
             SendEventToNearClient_TypeA(iClientH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
         }
     }
@@ -13313,19 +10127,14 @@ void CGame::CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify)
     if ((iPrevSAType != 0) && (m_pClientList[iClientH]->m_iSpecialAbilityType != 0) &&
         (iPrevSAType != m_pClientList[iClientH]->m_iSpecialAbilityType) && (bNotify == TRUE))
     {
-        // Æ¯¼ö ´É·Â »ç¿ë µµÁß¿¡ Æ¯¼ö ´É·ÂÀ» ¹Ù²Ù¸é ´É·Â »ç¿ëÀÌ ¸ØÃá´Ù.
         if (m_pClientList[iClientH]->m_bIsSpecialAbilityEnabled == TRUE)
         {
-            // »ç¿ë½Ã°£ÀÌ ´Ù µÇ¾ú´Ù.
             SendNotifyMsg(NULL, i, DEF_NOTIFY_SPECIALABILITYSTATUS, 3, NULL, NULL, NULL);
             m_pClientList[iClientH]->m_bIsSpecialAbilityEnabled = FALSE;
-            // ´ÙÀ½ »ç¿ë °¡´É ½Ã°£À» ÀÔ·ÂÇÑ´Ù.
             m_pClientList[iClientH]->m_iSpecialAbilityTime = DEF_SPECABLTYTIMESEC;
-            // È¿°ú ºñÆ® Å¬¸®¾î
             sTemp = m_pClientList[iClientH]->m_sAppr4;
             sTemp = sTemp & 0xFF0F;
             m_pClientList[iClientH]->m_sAppr4 = sTemp;
-            // ¿ÜÇüÀÌ º¯ÇßÀ½À» ¾Ë¸°´Ù.
             SendEventToNearClient_TypeA(iClientH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
         }
     }
@@ -13410,23 +10219,18 @@ BOOL CGame::_bGetIsPlayerHostile(int iClientH, int sOwnerH)
     if (m_pClientList[iClientH] == NULL) return FALSE;
     if (m_pClientList[sOwnerH] == NULL) return FALSE;
 
-    // Ã€ÃšÂ±Ã¢ Ã€ÃšÂ½Ã…Â¿Â¡ Â´Ã«Ã‡Ã‘ Â°Ã¸Â°ÃÃ€Âº Â¹Ã¼ÃÃ‹Â¶Ã³ ÂºÂ¼ Â¼Ã¶ Â¾Ã¸Â´Ã™. 
     if (iClientH == sOwnerH) return TRUE;
 
     if (m_pClientList[iClientH]->m_cSide == 0)
     {
-        // Â°Ã¸Â°ÃÃ€ÃšÂ´Ã‚ Â¿Â©Ã‡Ã Ã€ÃšÃ€ÃŒÂ´Ã™.
-        // Â»Ã³Â´Ã«Â¹Ã¦Ã€ÃŒ Â¹Ã¼ÃÃ‹Ã€ÃšÃ€ÃŒÂ¸Ã© Ã€Ã»Â¼ÂºÃ€ÃŒÂ¸Ã§ Â±Ã— Ã€ÃŒÂ¿ÃœÂ¿Â¡Â´Ã‚ Â¾Ã†Â´ÃÂ´Ã™. 
         if (m_pClientList[sOwnerH]->m_iPKCount != 0)
             return TRUE;
         else return FALSE;
     }
     else
     {
-        // Â°Ã¸Â°ÃÃ€ÃšÂ´Ã‚ Â¼Ã’Â¼Ã“ Â¸Â¶Ã€Â»Ã€Â» Â°Â®Â°Ã­ Ã€Ã–Â´Ã™. 
         if (m_pClientList[iClientH]->m_cSide != m_pClientList[sOwnerH]->m_cSide)
         {
-            // Â¼Â­Â·ÃŽ Â»Ã§Ã€ÃŒÂµÃ¥Â°Â¡ Â´Ã™Â¸Â£Â´Ã™. 
             if (m_pClientList[sOwnerH]->m_cSide == 0)
             {
                 if (m_pClientList[sOwnerH]->m_iPKCount != 0)
@@ -13455,11 +10259,8 @@ void CGame::bSetNpcAttackMode(char * cName, int iTargetH, char cTargetType, BOOL
         {
             iIndex = i;
             goto NEXT_STEP_SNAM1;
-
-            //testcode
-            //log->info("bSetNpcAttackMode - Npc found");
         }
-    // Â°Â°Ã€Âº Ã€ÃŒÂ¸Â§Ã€Â» Â°Â¡ÃÃ¸ NPCÂ°Â¡ Â¾Ã¸Â´Ã™.
+
     return;
 
     NEXT_STEP_SNAM1:;
@@ -13475,24 +10276,18 @@ void CGame::bSetNpcAttackMode(char * cName, int iTargetH, char cTargetType, BOOL
         break;
     }
 
-    // Â¸Ã±Ã‡Â¥Â¹Â°Ã€Â» Ã‡Ã’Â´Ã§Ã‡Ã‘Â´Ã™. 
     m_pNpcList[iIndex]->m_cBehavior = DEF_BEHAVIOR_ATTACK;
     m_pNpcList[iIndex]->m_sBehaviorTurnCount = 0;
     m_pNpcList[iIndex]->m_iTargetIndex = iTargetH;
     m_pNpcList[iIndex]->m_cTargetType = cTargetType;
 
-    // Â¿ÂµÂ±Â¸ Â°Ã¸Â°Ã Â¸Ã°ÂµÃ¥ Â¿Â©ÂºÃŽ Â¼Â³ÃÂ¤ 
     m_pNpcList[iIndex]->m_bIsPermAttackMode = bIsPermAttack;
-
-    //testcode
-    //log->info("bSetNpcAttackMode - complete");
 }
 
 void CGame::PoisonEffect(int iClientH, int iV1)
 {
     int iPoisonLevel, iDamage, iPrevHP, iProb;
 
-    // ÃÃŸÂµÂ¶Ã€Â¸Â·ÃŽ ÃÃ—ÃÃ¶Â´Ã‚ Â¾ÃŠÂ´Ã‚Â´Ã™. Â´Ã™Â¸Â¸ ÃƒÂ¼Â·Ã‚Ã€ÃŒ Â°Ã¨Â¼Ã“ Â±Ã¯Ã€ÃŒÂ°Ã­ ÃƒÃ–Â¼Ã’ 1Â¸Â¸ Â³Â²Â´Ã‚Â´Ã™. 
     if (m_pClientList[iClientH] == NULL)     return;
     if (m_pClientList[iClientH]->m_bIsKilled == TRUE) return;
     if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return;
@@ -13508,14 +10303,11 @@ void CGame::PoisonEffect(int iClientH, int iV1)
     if (iPrevHP != m_pClientList[iClientH]->m_iHP)
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_HP, NULL, NULL, NULL, NULL);
 
-
-    // ÂµÂ¶Â¼Âº Ã€ÃºÃ‡Ã— ÃˆÂ®Â·Ã¼Â·ÃŽ ÃÃŸÂµÂ¶Ã€ÃŒ Ã‡Â®Â¸Â± Â¼Ã¶ Ã€Ã–Â´Ã™.
     iProb = m_pClientList[iClientH]->m_cSkillMastery[23] - 10 + m_pClientList[iClientH]->m_iAddPR;
     if (iProb <= 10) iProb = 10;
     if (iDice(1, 100) <= iProb)
     {
         m_pClientList[iClientH]->m_bIsPoisoned = FALSE;
-        // ÃÃŸÂµÂ¶Ã€ÃŒ Ã‡Â®Â·ÃˆÃ€Â½Ã€Â» Â¾Ã‹Â¸Â°Â´Ã™. 
         SetPoisonFlag(iClientH, DEF_OWNERTYPE_PLAYER, FALSE); // remove poison aura after effect complete
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_POISON, NULL, NULL, NULL);
     }
@@ -13525,7 +10317,6 @@ BOOL CGame::bCheckResistingPoisonSuccess(short sOwnerH, char cOwnerType)
 {
     int iResist, iResult;
 
-    // ÂµÂ¶Â¼Âº Ã€ÃºÃ‡Ã—Ã€ÃŒ Â¼ÂºÂ°Ã¸Ã‡ÃŸÂ´Ã‚ÃÃ¶Â¸Â¦ Â°Ã¨Â»ÃªÃ‡Ã‘Â´Ã™. 
     switch (cOwnerType)
     {
     case DEF_OWNERTYPE_PLAYER:
@@ -13540,10 +10331,9 @@ BOOL CGame::bCheckResistingPoisonSuccess(short sOwnerH, char cOwnerType)
     }
 
     iResult = iDice(1, 100);
-    if (iResult >= iResist) // ÂµÂ¶Â¼Âº Ã€ÃºÃ‡Ã— Â½Ã‡Ã†Ã. ÃÃŸÂµÂ¶ÂµÃˆÂ´Ã™.
+    if (iResult >= iResist)
         return FALSE;
 
-    // ÂµÂ¶Â¼Âº Ã€ÃºÃ‡Ã— Â¼ÂºÂ°Ã¸. Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Â¶Ã³Â¸Ã© Â½ÂºÃ…Â³Ã€Â» Â¿ÃƒÂ¸Â°Â´Ã™. 
     if (cOwnerType == DEF_OWNERTYPE_PLAYER)
         CalculateSSN_SkillIndex(sOwnerH, 23, 1);
 
@@ -13554,7 +10344,6 @@ BOOL CGame::bCheckBadWord(char * pString)
 {
     char * cp;
 
-    // Â½ÂºÃ†Â®Â¸ÂµÃ€Â» Â°Ã‹Â»Ã¶Ã‡ÃÂ¸Ã§ Â¿Ã¥Â¼Â³Ã€ÃŒ Ã€Ã–Â´Ã‚ÃÃ¶Â¸Â¦ ÃƒÂ£Â´Ã‚Â´Ã™. 
     cp = pString;
     while (*cp != NULL)
     {
@@ -13573,8 +10362,6 @@ void CGame::CheckDayOrNightMode()
 
     if (m_bManualTime = TRUE) return;
 
-    // Ã‡Ã¶Ã€Ã§ Â½ÃƒÂ°Â£Â¿Â¡ ÂµÃ»Â¶Ã³ Â³Â· ÃˆÂ¤Ã€Âº Â¹Ã£Ã€Â» Â°Ã¡ÃÂ¤Ã‡Ã‘Â´Ã™. 
-    // ÃÃ–, Â¾ÃŸÂ°Â£ Â¸Ã°ÂµÃ¥ Â¼Â³ÃÂ¤ 
     cPrevMode = m_cDayOrNight;
 
     GetLocalTime(&SysTime);
@@ -13584,7 +10371,6 @@ void CGame::CheckDayOrNightMode()
 
     if (cPrevMode != m_cDayOrNight)
     {
-        // ÃÃ–, Â¾ÃŸÂ°Â£ Â¸Ã°ÂµÃ¥Â°Â¡ ÂºÂ¯Â°Ã¦ÂµÃ‡Â¾ÃºÂ´Ã™. ÃÃ–, Â¾ÃŸÂ°Â£ Â¸Ã°ÂµÃ¥Ã€Ã‡ Â¿ÂµÃ‡Ã¢Ã€Â» Â¹ÃžÂ´Ã‚ Â¸ÃŠÂ¿Â¡ ÃÂ¸Ã€Ã§Ã‡ÃÂ´Ã‚ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®ÂµÃ©Â¿Â¡Â°Ã” Â¾Ã‹Â¸Â°Â´Ã™. 
         for (i = 1; i < DEF_MAXCLIENTS; i++)
             if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
             {
@@ -13606,13 +10392,11 @@ void CGame::ResponseSavePlayerDataReplyHandler(char * pData, DWORD dwMsgSize)
     cp = (char *)(pData + DEF_INDEX2_MSGTYPE + 2);
     memcpy(cCharName, cp, 10);
 
-    // Ã€ÃŒÃÂ¦ Ã€ÃŒ Ã€ÃŒÂ¸Â§Ã€Â» Â°Â®Â´Ã‚ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¸Â¦ ÃƒÂ£Â¾Ã† ÃÂ¢Â¼Ã“Ã€Â» Â²Ã·Â¾Ã®ÂµÂµ ÃÃÂ´Ã™Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ ÂºÂ¸Â³Â½Â´Ã™. 
     for (i = 0; i < DEF_MAXCLIENTS; i++)
         if (m_pClientList[i] != NULL)
         {
             if (memcmp(m_pClientList[i]->m_cCharName, cCharName, 10) == 0)
             {
-                // Â°Â°Ã€Âº Ã€ÃŒÂ¸Â§Ã€Â» Â°Â¡ÃÃ¸ Ã„Â³Â¸Â¯Ã…ÃÂ¸Â¦ ÃƒÂ£Â¾Ã’Â´Ã™. ÃÂ¢Â¼Ã“Ã€Â» ÃÂ¾Â·Ã¡Ã‡ÃÂ¶Ã³Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ ÂºÂ¸Â³Â½Â´Ã™.
                 SendNotifyMsg(NULL, i, DEF_NOTIFY_SERVERCHANGE, NULL, NULL, NULL, NULL);
             }
         }
@@ -13626,34 +10410,26 @@ void CGame::CalcExpStock(int iClientH)
     if (m_pClientList[iClientH] == NULL) return;
     if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return;
     if (m_pClientList[iClientH]->m_iExpStock <= 0) return;
-    // !!!!
-    // v2.12 2002-2-6 ÃÃ¶ÃÂ¸ÂµÂµ Ã‡Ã¶Ã€Ã§ Â°Ã¦Ã‡Ã¨Ã„Â¡Â°Â¡ ÃƒÃ–Â´Ã« Â·Â¹ÂºÂ§ Â°Ã¦Ã‡Ã¨Ã„Â¡ÂºÂ¸Â´Ã™ Ã€Ã»Ã€Â¸Â¸Ã© Â°Ã¦Ã‡Ã¨Ã„Â¡Â¸Â¦ Â¾Ã²Ã€Â»Â¼Ã¶ Ã€Ã–Â°Ã” ÂºÂ¯Â°Ã¦ .. v2.15 Â»Ã¨ÃÂ¦. ÃÃ¶ÃÂ¸ÂµÂµ Â°Ã¦Ã‡Ã¨Ã„Â¡ Â¾Ã²Â´Ã‚Â´Ã™.
     //if ((m_pClientList[iClientH]->m_iLevel >= m_iPlayerMaxLevel) && (m_pClientList[iClientH]->m_iExp >= m_iLevelExpTable[m_iPlayerMaxLevel])) return;
 
-    // Ã†Ã·Â»Ã³Â°Ãº Ã†Ã¤Â³ÃŽÃ†Â¼Â°Â¡ Â¾Ã¸Â´Ã‚ Â¸ÃŠ Ã€Â§Â¿Â¡ Â¼Â­ Ã€Ã–Â´Ã™Â¸Ã© Â°Ã¦Ã‡Ã¨Ã„Â¡Â´Ã‚ Â¿ÃƒÂ¶Ã³Â°Â¡ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
     if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_cType == DEF_MAPTYPE_NOPENALTY_NOREWARD)
     {
         m_pClientList[iClientH]->m_iExpStock = 0;
         return;
     }
 
-    // Â±Ã—ÂµÂ¿Â¾Ãˆ ÃƒÃ Ã€Ã» ÂµÃ‡Â¾ÃºÂ´Ã¸ Â°Ã¦Ã‡Ã¨Ã„Â¡Â¸Â¦ Â°Ã¨Â»ÃªÃ‡Ã‘Â´Ã™. 
     m_pClientList[iClientH]->m_iExp += m_pClientList[iClientH]->m_iExpStock;
     m_pClientList[iClientH]->m_iAutoExpAmount += m_pClientList[iClientH]->m_iExpStock;
     m_pClientList[iClientH]->m_iExpStock = 0;
 
     if (bCheckLimitedUser(iClientH) == FALSE)
     {
-        // ÃƒÂ¼Ã‡Ã¨Ã†Ã‡ Â»Ã§Â¿Ã«Ã€Ãš ÃÂ¦Ã‡Ã‘Â¿Â¡ Ã‡Ã˜Â´Ã§ÂµÃ‡ÃÃ¶ Â¾ÃŠÃ€Â¸Â¸Ã© Â°Ã¦Ã‡Ã¨Ã„Â¡Â°Â¡ Â¿ÃƒÂ¶ÃºÂ´Ã™Â´Ã‚ Ã…Ã«ÂºÂ¸Â¸Â¦ Ã‡Ã‘Â´Ã™.
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_EXP, NULL, NULL, NULL, NULL);
     }
-    // Â·Â¹ÂºÂ§Ã€ÃŒ Â¿ÃƒÂ¶ÃºÂ´Ã‚ÃÃ¶Â¸Â¦ Â°Ã‹Â»Ã§Ã‡Ã‘Â´Ã™.
     bIsLevelUp = bCheckLevelUp(iClientH);
 
-    // v2.03 ÂºÂ¯Â°Ã¦ 9/1
     if ((bIsLevelUp == TRUE) && (m_pClientList[iClientH]->m_iLevel <= 5))
     {
-        // ÃƒÃŠÂºÂ¸Â¿Ã« Gold ÃÃ¶Â±Ãž. Â·Â¹ÂºÂ§ 1~5Â±Ã®ÃÃ¶ 100 Gold ÃÃ¶Â±Ãž.
         pItem = new CItem;
         if (_bInitItemAttr(pItem, "Gold") == FALSE)
         {
@@ -13664,10 +10440,8 @@ void CGame::CalcExpStock(int iClientH)
         bAddItem(iClientH, pItem, NULL);
     }
 
-    // v2.03 ÂºÂ¯Â°Ã¦ 9/1
     if ((bIsLevelUp == TRUE) && (m_pClientList[iClientH]->m_iLevel > 5) && (m_pClientList[iClientH]->m_iLevel <= 20))
     {
-        // ÃƒÃŠÂºÂ¸Â¿Ã« Gold ÃÃ¶Â±Ãž. Â·Â¹ÂºÂ§ 5~20Â±Ã®ÃÃ¶ 300 Gold ÃÃ¶Â±Ãž.
         pItem = new CItem;
         if (_bInitItemAttr(pItem, "Gold") == FALSE)
         {
@@ -13691,7 +10465,6 @@ int CGame::iGetExpLevel(int iExp)
 {
     int i;
 
-    // Â°Ã¦Ã‡Ã¨Ã„Â¡Â°Â¡ Â¾Ã®Â´Ã€ Â·Â¹ÂºÂ§ Â¼Ã¶ÃÃ˜Â¿Â¡ Â¼Ã“Ã‡ÃÂ´Ã‚ÃÃ¶ Ã†Ã‡Â´ÃœÃ‡Ã‘Â´Ã™.
     for (i = 1; i < 200; i++)
         if ((m_iLevelExpTable[i] <= iExp) && (m_iLevelExpTable[i + 1] > iExp)) return i;
 
@@ -13702,7 +10475,6 @@ int CGame::iCreateFish(char cMapIndex, short sX, short sY, short sType, CItem * 
 {
     int i, iDynamicHandle;
 
-    // Â¸ÃŠÃ€Ã‡ Ã€Â§Ã„Â¡Â°Â¡ Â¹Â°Ã€ÃŽÃÃ¶ ÃˆÂ®Ã€ÃŽÃ‡Ã‘Â´Ã™. 
     if ((cMapIndex < 0) || (cMapIndex >= DEF_MAXMAPS)) return NULL;
     if (m_pMapList[cMapIndex] == NULL) return NULL;
     if (m_pMapList[cMapIndex]->bGetIsWater(sX, sY) == FALSE) return NULL;
@@ -13710,16 +10482,14 @@ int CGame::iCreateFish(char cMapIndex, short sX, short sY, short sType, CItem * 
     for (i = 1; i < DEF_MAXFISHS; i++)
         if (m_pFish[i] == NULL)
         {
-            // ÂºÃ³ Â°Ã¸Â°Â£Â¿Â¡ Â¹Â°Â°Ã­Â±Ã¢Â¸Â¦ Â¸Â¸ÂµÃ§Â´Ã™.
             m_pFish[i] = new CFish(cMapIndex, sX, sY, sType, pItem, iDifficulty);
             if (m_pFish[i] == NULL) return NULL;
 
-            // Dynamic ObjectÂ¸Â¦ Â¹ÃŸÂ»Ã½Â½ÃƒÃ…Â²Â´Ã™. OwnerÂ¿Â¡ Fish Ã€ÃŽÂµÂ¦Â½ÂºÂ¸Â¦ Â³Ã–Â´Ã‚Â´Ã™.
             switch (pItem->m_sIDnum)
             {
-            case 101: // Â»Â¡Â°Â­Â¹Â°Â°Ã­Â±Ã¢
-            case 102: // ÃƒÃŠÂ·ÃÂ¹Â°Â°Ã­Â±Ã¢
-            case 103: // Â³Ã«Â¶Ã»Â¹Â°Â°Ã­Â±Ã¢
+            case 101:
+            case 102:
+            case 103:
             case 570:
             case 571:
             case 572:
@@ -13731,7 +10501,6 @@ int CGame::iCreateFish(char cMapIndex, short sX, short sY, short sType, CItem * 
                 iDynamicHandle = iAddDynamicObjectList(i, NULL, DEF_DYNAMICOBJECT_FISH, cMapIndex, sX, sY, dwLastTime);
                 break;
             default:
-                // Â¹Â°Â°Ã­Â±Ã¢Â°Â¡ Â¾Ã†Â´Ã‘ Â´Ã™Â¸Â¥ Â¾Ã†Ã€ÃŒÃ…Ã› 
                 iDynamicHandle = iAddDynamicObjectList(i, NULL, DEF_DYNAMICOBJECT_FISHOBJECT, cMapIndex, sX, sY, dwLastTime);
                 break;
             }
@@ -13760,13 +10529,11 @@ BOOL CGame::bDeleteFish(int iHandle, int iDelMode)
 
     dwTime = timeGetTime();
 
-    // Â¿Â¬Â°Ã¼ÂµÃ‡Â¾Ã® Ã€Ã–Â´Ã‚ DynamicObjectÂ¸Â¦ Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™.
     iH = m_pFish[iHandle]->m_sDynamicObjectHandle;
 
     if (m_pDynamicObjectList[iH] != NULL)
     {
         SendEventToNearClient_TypeB(MSGID_DYNAMICOBJECT, DEF_MSGTYPE_REJECT, m_pDynamicObjectList[iH]->m_cMapIndex, m_pDynamicObjectList[iH]->m_sX, m_pDynamicObjectList[iH]->m_sY, m_pDynamicObjectList[iH]->m_sType, iH, NULL);
-        // Â¸ÃŠÂ¿Â¡Â¼Â­ Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™.
         m_pMapList[m_pDynamicObjectList[iH]->m_cMapIndex]->SetDynamicObject(NULL, NULL, m_pDynamicObjectList[iH]->m_sX, m_pDynamicObjectList[iH]->m_sY, dwTime);
         m_pMapList[m_pDynamicObjectList[iH]->m_cMapIndex]->m_iCurFish--;
 
@@ -13774,19 +10541,16 @@ BOOL CGame::bDeleteFish(int iHandle, int iDelMode)
         m_pDynamicObjectList[iH] = NULL;
     }
 
-    // Ã€ÃŒ Â¹Â°Â°Ã­Â±Ã¢Â¿Ã Â¿Â¬Â°Ã¡ÂµÃ‡Â¾Ã® Ã€Ã–Â´Ã‚ Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®ÂµÃ©Â¿Â¡Â°Ã” Â¹Â°Â°Ã­Â±Ã¢Â°Â¡ Â»Ã§Â¶Ã³ÃÂ® Â³Â¬Â½ÃƒÂ°Â¡ ÃƒÃ«Â¼Ã’ÂµÃ‡Â¾ÃºÃ€Â½Ã€Â» Â¾Ã‹Â·ÃÃÃ˜Â´Ã™. 
     for (i = 1; i < DEF_MAXCLIENTS; i++)
     {
         if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE) &&
             (m_pClientList[i]->m_iAllocatedFish == iHandle))
         {
-            // Â¸ÃžÂ½ÃƒÃÃ¶ Ã€Ã¼Â¼Ã› 
             SendNotifyMsg(NULL, i, DEF_NOTIFY_FISHCANCELED, iDelMode, NULL, NULL, NULL);
-            ClearSkillUsingStatus(i); // v1.4 Â³Â¬Â½Ãƒ Â½ÂºÃ…Â³Ã€Â» Ã…Â¬Â¸Â®Â¾Ã®Ã‡Ã‘Â´Ã™.
+            ClearSkillUsingStatus(i);
         }
     }
 
-    // Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™.
     delete m_pFish[iHandle];
     m_pFish[iHandle] = NULL;
 
@@ -13803,7 +10567,6 @@ int CGame::iCheckFish(int iClientH, char cMapIndex, short dX, short dY)
 
     if ((cMapIndex < 0) || (cMapIndex >= DEF_MAXMAPS)) return 0;
 
-    // Â¸ÃŠÃ€Ã‡ Ã†Â¯ÃÂ¤ Ã€Â§Ã„Â¡ Â³Â»Â¿Â¡ Â¹Â°Â°Ã­Â±Ã¢ Â´Ã™Ã€ÃŒÂ³ÂªÂ¹Ã Â¿Ã€ÂºÃªÃÂ§Ã†Â®Â°Â¡ Ã€Ã–Â´Ã‚ÃÃ¶ Ã†Ã‡Â´ÃœÃ‡Ã‘Â´Ã™. 
     for (i = 1; i < DEF_MAXDYNAMICOBJECTS; i++)
         if (m_pDynamicObjectList[i] != NULL)
         {
@@ -13814,24 +10577,18 @@ int CGame::iCheckFish(int iClientH, char cMapIndex, short dX, short dY)
                 ((m_pDynamicObjectList[i]->m_sType == DEF_DYNAMICOBJECT_FISH) || (m_pDynamicObjectList[i]->m_sType == DEF_DYNAMICOBJECT_FISHOBJECT)) &&
                 (sDistX <= 2) && (sDistY <= 2))
             {
-                // Â¹Â°Â°Ã­Â±Ã¢ Â´Ã™Ã€ÃŒÂ³ÂªÂ¹Ã Â¿Ã€ÂºÃªÃÂ§Ã†Â®Â¸Â¦ ÃƒÂ£Â¾Ã’Â´Ã™. Ã€ÃŒÃÂ¦ Ã€ÃŒ Â´Ã™Ã€ÃŒÂ³ÂªÂ¹Ã Â¿Ã€ÂºÃªÃÂ§Ã†Â® Ã€ÃŽÂµÂ¦Â½ÂºÂ¸Â¦ Â¼Ã’Ã€Â¯Ã‡Ã‘ FishÃ€Ã‡ Ã€ÃŽÂµÂ¦Â½ÂºÂ¸Â¦ Â¹ÃÃˆÂ¯Ã‡Ã‘Â´Ã™. 
-
                 if (m_pFish[m_pDynamicObjectList[i]->m_sOwner] == NULL) return 0;
                 if (m_pFish[m_pDynamicObjectList[i]->m_sOwner]->m_sEngagingCount >= DEF_MAXENGAGINGFISH) return 0;
 
-                // Ã€ÃŒÂ¹ÃŒ Â³Â¬Â½ÃƒÂ¸Ã°ÂµÃ¥Â¿Â¡ ÂµÃ©Â¾Ã®Â°Â¡ Ã€Ã–Â´Ã‚ Ã„Â³Â¸Â¯Ã…ÃÂ´Ã‚ ÃÃŸÂºÂ¹ ÂµÂ¿Ã€Ã›Ã€ÃŒ ÂºÃ’Â°Â¡Â´Ã‰.
                 if (m_pClientList[iClientH]->m_iAllocatedFish != NULL) return 0;
                 if (m_pClientList[iClientH]->m_cMapIndex != cMapIndex) return 0;
-                // Ã€ÃŒÃÂ¦ Ã„Â³Â¸Â¯Ã…ÃÂ¿Â¡Â°Ã” Â³Â¬Â½Ãƒ Â¸Ã°ÂµÃ¥Â¸Â¦ Â½ÃƒÃ€Ã›Ã‡Ã’ Â°ÃÃ€Â» Ã‡Ã’Â´Ã§Ã‡Ã‘Â´Ã™.
                 m_pClientList[iClientH]->m_iAllocatedFish = m_pDynamicObjectList[i]->m_sOwner;
                 m_pClientList[iClientH]->m_iFishChance = 1;
-                // Ã€ÃŒ Ã„Â³Â¸Â¯Ã…ÃÂ´Ã‚ Â³Â¬Â½Ãƒ Â½ÂºÃ…Â³Ã€Â» Â»Ã§Â¿Ã«ÃÃŸÃ€Ã“Ã€Â» Â¼Â³ÃÂ¤.
                 m_pClientList[iClientH]->m_bSkillUsingStatus[1] = TRUE;
 
                 SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_EVENTFISHMODE, (m_pFish[m_pDynamicObjectList[i]->m_sOwner]->m_pItem->m_wPrice / 2), m_pFish[m_pDynamicObjectList[i]->m_sOwner]->m_pItem->m_sSprite,
                     m_pFish[m_pDynamicObjectList[i]->m_sOwner]->m_pItem->m_sSpriteFrame, m_pFish[m_pDynamicObjectList[i]->m_sOwner]->m_pItem->m_cName);
 
-                // Ã„Â«Â¿Ã®Ã†Â® ÃÃµÂ°Â¡ 
                 m_pFish[m_pDynamicObjectList[i]->m_sOwner]->m_sEngagingCount++;
 
                 return i;
@@ -13845,7 +10602,6 @@ void CGame::FishProcessor()
 {
     int i, iSkillLevel, iResult, iChangeValue;
 
-    // ÀÌº¥Æ® ³¬½Ã ¸ðµå°¡ ÇÒ´çµÈ ÇÃ·¹ÀÌ¾îµéÀ» Ã³¸®ÇÑ´Ù.
     for (i = 1; i < DEF_MAXCLIENTS; i++)
     {
         if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE) &&
@@ -13854,10 +10610,7 @@ void CGame::FishProcessor()
 
             if (m_pFish[m_pClientList[i]->m_iAllocatedFish] == NULL) break;
 
-            // ÀÌ ÇÃ·¹ÀÌ¾î¿¡°Ô ÇÒ´çµÈ ¹°°í±â°¡ ÀÖ´Ù. ³¬À» È®·üÀ» Àç°è»êÇÏ¿© Åëº¸ÇØ ÁØ´Ù. 
-            // ³¬½Ã ±â¼úÀÇ ½ºÅ³ 
             iSkillLevel = m_pClientList[i]->m_cSkillMastery[1];
-            // ¹°°í±âÀÇ ³­ÀÌµµ¿¡ µû¶ó ½ºÅ³ ·¹º§ÀÌ ¶³¾îÁø´Ù. 
             iSkillLevel -= m_pFish[m_pClientList[i]->m_iAllocatedFish]->m_iDifficulty;
             if (iSkillLevel <= 0) iSkillLevel = 1;
 
@@ -13868,7 +10621,6 @@ void CGame::FishProcessor()
             iResult = iDice(1, 100);
             if (iSkillLevel > iResult)
             {
-                // ½ºÅ³ ÁÖ»çÀ§ ±¼¸² ¼º°ø. ³¬À» È®·ü Áõ°¡.
                 m_pClientList[i]->m_iFishChance += iChangeValue;
                 if (m_pClientList[i]->m_iFishChance > 99) m_pClientList[i]->m_iFishChance = 99;
 
@@ -13876,7 +10628,6 @@ void CGame::FishProcessor()
             }
             else if (iSkillLevel < iResult)
             {
-                // ½ºÅ³ ÁÖ»çÀ§ ±¼¸² ½ÇÆÐ. ³¬À» È®·ü °¨¼Ò.	
                 m_pClientList[i]->m_iFishChance -= iChangeValue;
                 if (m_pClientList[i]->m_iFishChance < 1) m_pClientList[i]->m_iFishChance = 1;
 
@@ -13909,7 +10660,6 @@ void CGame::FishGenerator()
             pItem = new CItem;
             if (pItem == NULL) break;
 
-            // Â¸Â¸ÂµÃ© Â¹Â°Â°Ã­Â±Ã¢ ÃÂ¾Â·Ã¹Â¿Ã Â³Â­Ã€ÃŒÂµÂµ, ÃÃ¶Â¼Ã“ Â½ÃƒÂ°Â£Ã€Â» Â°Ã¡ÃÂ¤Ã‡Ã‘Â´Ã™. 
             ZeroMemory(cItemName, sizeof(cItemName));
             switch (iDice(1, 9))
             {
@@ -13922,7 +10672,6 @@ void CGame::FishGenerator()
             case 7:   strcpy(cItemName, "Salmon"); sDifficulty = iDice(1, 12) + 1;  break;
             case 8:   strcpy(cItemName, "GrayMullet"); sDifficulty = iDice(1, 10) + 1;  break;
             case 9:
-                // Â°Â¡Â²Ã» Â°Â¡Â´Ã™ Â³Â¬Ã€Â» Â¼Ã¶ Ã€Ã–Â´Ã‚ Ã†Â¯Â¼Ã¶ Â¾Ã†Ã€ÃŒÃ…Ã› 
                 switch (iDice(1, 150))
                 {
                 case 1:
@@ -14000,7 +10749,6 @@ int CGame::_iCalcPlayerNum(char cMapIndex, short dX, short dY, char cRadius)
     int ix, iy, iRet;
     CTile * pTile;
 
-    // ÃƒÂ³Â¸Â® Â¼Ã“ÂµÂµÂ¸Â¦ Â³Ã´Ã€ÃŒÂ±Ã¢ Ã€Â§Ã‡Ã˜ Ã‡Ã”Â¼Ã¶Â¸Â¦ Ã„ÃÃ‡ÃÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
     if ((cMapIndex < 0) || (cMapIndex > DEF_MAXMAPS)) return 0;
     if (m_pMapList[cMapIndex] == NULL) return 0;
 
@@ -14011,7 +10759,6 @@ int CGame::_iCalcPlayerNum(char cMapIndex, short dX, short dY, char cRadius)
             if ((ix < 0) || (ix >= m_pMapList[cMapIndex]->m_sSizeX) ||
                 (iy < 0) || (iy >= m_pMapList[cMapIndex]->m_sSizeY))
             {
-                // ÃÃ‚Ã‡Â¥Â¸Â¦ Â¹Ã¾Â¾Ã®Â³ÂªÂ¹Ã‡Â·ÃŽ ÃƒÂ³Â¸Â®Ã‡ÃÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.	
             }
             else
             {
@@ -14046,8 +10793,7 @@ void CGame::WhetherProcessor()
             {
                 if (iDice(1, 300) == 13)
                 {
-                    m_pMapList[i]->m_cWhetherStatus = iDice(1, 3); //This looks better or else we only get snow :(
-                    //m_pMapList[i]->m_cWhetherStatus = iDice(1,3)+3; <- This original code looks fucked
+                    m_pMapList[i]->m_cWhetherStatus = iDice(1, 3);
                     m_pMapList[i]->m_dwWhetherStartTime = dwTime;
                     m_pMapList[i]->m_dwWhetherLastTime = 60000 * 3 + 60000 * iDice(1, 7);
                 }
@@ -14066,8 +10812,8 @@ void CGame::WhetherProcessor()
                     if ((m_pClientList[j] != NULL) && (m_pClientList[j]->m_bIsInitComplete == TRUE) && (m_pClientList[j]->m_cMapIndex == i))
                         SendNotifyMsg(NULL, j, DEF_NOTIFY_WHETHERCHANGE, m_pMapList[i]->m_cWhetherStatus, NULL, NULL, NULL);
             }
-        } //If
-    } //for Loop
+        }
+    }
 }
 
 void CGame::FightzoneReserveProcessor()
@@ -14118,21 +10864,19 @@ int CGame::iGetPlayerRelationship(int iClientH, int iOpponentH)
 
     if (m_pClientList[iClientH]->m_iPKCount != 0)
     {
-        // ÂºÂ»Ã€ÃŽÃ€ÃŒ Â¹Ã¼ÃÃ‹Ã€ÃšÃ€ÃŒÃ‡ÃÂ¸Ã© Â»Ã³Â´Ã«Â¹Ã¦Ã€ÃŒ Â¸Â¶Ã€Â»Ã€ÃŒ Â°Â°Ã€Âº Â°Ã¦Â¿Ã¬ Ã€Â§Ã‡Ã¹. Â´Ã™Â¸Â£Â¸Ã© Ã€Ã» 
         if ((memcmp(m_pClientList[iClientH]->m_cLocation, m_pClientList[iOpponentH]->m_cLocation, 10) == 0) &&
             (memcmp(m_pClientList[iClientH]->m_cLocation, "NONE", 4) != 0) && (memcmp(m_pClientList[iOpponentH]->m_cLocation, "NONE", 4) != 0))
         {
-            iRet = 7; // Ã€Â§Ã‡Ã¹ 
+            iRet = 7;
         }
-        else iRet = 2; // Ã€Ã»   
+        else iRet = 2; 
     }
     else if (m_pClientList[iOpponentH]->m_iPKCount != 0)
     {
-        // Â»Ã³Â´Ã«Â¹Ã¦Ã€ÃŒ Â¹Ã¼ÃÃ‹Ã€ÃšÃ€ÃŒÃ‡ÃÂ¸Ã©
         if ((memcmp(m_pClientList[iClientH]->m_cLocation, m_pClientList[iOpponentH]->m_cLocation, 10) == 0) &&
             (memcmp(m_pClientList[iClientH]->m_cLocation, "NONE", 4) != 0))
-            iRet = 6; // Â¸Â¶Ã€Â»Ã€ÃŒ Â°Â°Ã€Â¸Â¸Ã© PK
-        else iRet = 2; // Â´Ã™Â¸Â£Â¸Ã© Â±Ã—Â³Ã‰ Ã€Ã» 
+            iRet = 6;
+        else iRet = 2;
     }
     else
     {
@@ -14140,7 +10884,6 @@ int CGame::iGetPlayerRelationship(int iClientH, int iOpponentH)
         {
             if ((m_pClientList[iClientH]->m_cSide != 0) && (m_pClientList[iOpponentH]->m_cSide != 0))
             {
-                // ÂµÃ‘ Â´Ã™ 0(Traveler)Ã€ÃŒ Â¾Ã†Â´ÃÂ¸Ã© Ã€Ã»Ã€ÃŒÂ´Ã™.
                 iRet = 2;
             }
             else
@@ -14150,14 +10893,12 @@ int CGame::iGetPlayerRelationship(int iClientH, int iOpponentH)
         }
         else
         {
-            // Â¾Ã†Â±ÂºÃ€ÃŒÂ´Ã™. Â±Ã¦ÂµÃ¥Â¿Ã¸Â¿Â©ÂºÃŽÂ¸Â¦ Ã†Ã‡Â´Ãœ.
             if ((memcmp(m_pClientList[iClientH]->m_cGuildName, m_pClientList[iOpponentH]->m_cGuildName, 20) == 0) &&
                 (memcmp(m_pClientList[iClientH]->m_cGuildName, "NONE", 4) != 0))
             {
-                // Â±Ã¦ÂµÃ¥ Ã€ÃŒÂ¸Â§Ã€ÃŒ Â°Â°Â´Ã™. 
                 if (m_pClientList[iOpponentH]->m_iGuildRank == 0)
-                    iRet = 5;	// Â±Ã¦ÂµÃ¥ Â·Â©Ã…Â©Â°Â¡ 0. Â±Ã¦ÂµÃ¥Â¸Â¶Â½ÂºÃ…ÃÃ€ÃŒÂ´Ã™.
-                else iRet = 3;	// Â°Â°Ã€Âº Â±Ã¦ÂµÃ¥Â¿Ã¸
+                    iRet = 5;
+                else iRet = 3;
             }
             else
                 if ((memcmp(m_pClientList[iClientH]->m_cLocation, m_pClientList[iOpponentH]->m_cLocation, 10) == 0) &&
@@ -14165,10 +10906,9 @@ int CGame::iGetPlayerRelationship(int iClientH, int iOpponentH)
                     (memcmp(m_pClientList[iOpponentH]->m_cGuildName, "NONE", 4) != 0) &&
                     (memcmp(m_pClientList[iClientH]->m_cGuildName, m_pClientList[iOpponentH]->m_cGuildName, 20) != 0))
                 {
-                    // Â±Ã¦ÂµÃ¥ Ã€Â§Ã„Â¡Â´Ã‚ Â°Â°Â°Ã­ Â±Ã¦ÂµÃ¥ Ã€ÃŒÂ¸Â§Ã€ÃŒ Â´Ã™Â¸Â£Â´Ã™.
-                    iRet = 4; // Â´Ã™Â¸Â¥ Â±Ã¦ÂµÃ¥Â¿Ã¸ 
+                    iRet = 4;
                 }
-                else iRet = 1; // Â±Ã—Â³Ã‰ Â°Â°Ã€ÂºÃ†Ã­ 
+                else iRet = 1;
         }
     }
 
@@ -14221,9 +10961,9 @@ int CGame::iGetNpcRelationship(int iWhatH, int iRecvH)
     iRet = 0;
     switch (m_pNpcList[iWhatH]->m_cSide)
     {
-    case 10: iRet |= 8; //Fixed, Original 15 
-    case 1:  iRet = (iRet | 4) | 2; //Fixed, Original 1 
-    case 2:  iRet |= 4; //Fixed, Orignal 8 
+        case 10: iRet |= 8;
+        case 1:  iRet = (iRet | 4) | 2;
+        case 2:  iRet |= 4;
     }
 
     return iRet;
@@ -14260,7 +11000,7 @@ int CGame::iGetNpcRelationship_SendEvent(int iNpcH, int iOpponentH)
                     else iRet = 2;
 
         }
-        else iRet = 1; // Â°Â°Ã€Âº Ã†Ã­ 
+        else iRet = 1;
     }
 
     return iRet;
@@ -14309,7 +11049,6 @@ void CGame::NpcRequestAssistance(int iNpcH)
     short sOwnerH;
     char  cOwnerType;
 
-    // iNpc Â±Ã™Â¹Ã¦Â¿Â¡ Ã€Ã–Â´Ã‚ Ã€Ã¼Ã…ÃµÃÃŸÃ€ÃŒ Â¾Ã†Â´Ã‘ NPCÂ¿Â¡Â°Ã” ÂµÂµÂ¿Ã²Ã€Â» Â¿Ã¤ÃƒÂ»Ã‡Ã‘Â´Ã™. 
     if (m_pNpcList[iNpcH] == NULL) return;
 
     sX = m_pNpcList[iNpcH]->m_sX;
@@ -14323,8 +11062,6 @@ void CGame::NpcRequestAssistance(int iNpcH)
                 (iNpcH != sOwnerH) && (m_pNpcList[sOwnerH]->m_cSide == m_pNpcList[iNpcH]->m_cSide) &&
                 (m_pNpcList[sOwnerH]->m_bIsPermAttackMode == FALSE) && (m_pNpcList[sOwnerH]->m_cBehavior == DEF_BEHAVIOR_MOVE))
             {
-
-                // ÃÂ¶Â°Ã‡Â¿Â¡ ÂºÃŽÃ‡Ã•Ã‡ÃÂ´Ã‚ NPCÂ¸Â¦ ÃƒÂ£Â¾Ã’Â´Ã™. 
                 m_pNpcList[sOwnerH]->m_cBehavior = DEF_BEHAVIOR_ATTACK;
                 m_pNpcList[sOwnerH]->m_sBehaviorTurnCount = 0;
                 m_pNpcList[sOwnerH]->m_iTargetIndex = m_pNpcList[iNpcH]->m_iTargetIndex;
@@ -14339,17 +11076,14 @@ void CGame::ForceDisconnectAccount(char * pAccountName, WORD wCount)
 {
     int i;
 
-    // ÃÃŸÂºÂ¹ÂµÃˆ Â°Ã¨ÃÂ¤Ã€Â» Â°Â®Â°Ã­Ã€Ã–Â´Ã‚ Ã„Â³Â¸Â¯Ã…ÃÂ¸Â¦ Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™. 
     for (i = 1; i < DEF_MAXCLIENTS; i++)
         if ((m_pClientList[i] != NULL) && (memcmp(m_pClientList[i]->m_cAccountName, pAccountName, 10) == 0))
         {
             wsprintf(G_cTxt, "<%d> Force disconnect account: CharName(%s) AccntName(%s) Count(%d)", i, m_pClientList[i]->m_cCharName, m_pClientList[i]->m_cAccountName, wCount);
             log->info(G_cTxt);
 
-            // v1.42 Ã„Â«Â¿Ã®Ã†Ãƒ Ã‡ÃƒÂ·Â¡Â±Ã—Â¸Â¦ ÃˆÂ°Â¼ÂºÃˆÂ­ Ã‡Ã˜Â¾ÃŸ Ã‡Ã‘Â´Ã™. 
             //DeleteClient(i, TRUE, TRUE);
 
-            //v1.4312
             SendNotifyMsg(NULL, i, DEF_NOTIFY_FORCEDISCONN, wCount, NULL, NULL, NULL);
         }
 }
@@ -14374,59 +11108,48 @@ void CGame::_CheckAttackType(int iClientH, short * spType)
     switch (*spType)
     {
     case 2:
-        // ÃƒË†Ã‚Â­Ã‚Â»ÃƒÂ¬Ãƒâ‚¬ÃƒÅ’ Ã‚Â¾ÃƒÂ¸Ã‚Â´Ãƒâ„¢Ã‚Â¸ÃƒÂ© ÃƒË†Ã‚Â­Ã‚Â»ÃƒÂ¬ EffectÃ‚Â´Ãƒâ€š Ã‚Â³Ãƒâ€“ÃƒÂÃƒÂ¶ Ã‚Â¾ÃƒÅ Ã‚Â´Ãƒâ€šÃ‚Â´Ãƒâ„¢. 
         if (m_pClientList[iClientH]->m_cArrowIndex == -1) *spType = 0;
-        // ÃƒË†Ã‚Â° Ã‚Â°ÃƒÂ¸Ã‚Â°ÃƒÂÃƒâ‚¬ÃƒÅ½Ã‚ÂµÃ‚Â¥ Ãƒâ‚¬ÃƒÂ¥Ãƒâ€šÃƒÂ¸Ãƒâ€¡Ãƒâ€˜ Ã‚Â¹Ã‚Â«Ã‚Â±ÃƒÂ¢Ã‚Â°Ã‚Â¡ ÃƒË†Ã‚Â°Ãƒâ‚¬ÃƒÅ’ Ã‚Â¾Ãƒâ€ Ã‚Â´ÃƒÂÃ‚Â´Ãƒâ„¢. Ãƒâ‚¬ÃƒÂÃ‚Â¹ÃƒÂ Ã‚Â°ÃƒÂ¸Ã‚Â°ÃƒÂÃƒâ‚¬Ã‚Â¸Ã‚Â·ÃƒÅ½ Ãƒâ‚¬ÃƒÂ¼ÃƒË†Ã‚Â¯.
         if (wType < 40) *spType = 1;
         break;
 
     case 20:
-        // Ã‚Â¸Ãƒâ€¡Ã‚Â¼Ãƒâ€¢ Ãƒâ€¡ÃƒÅ Ã‚Â»ÃƒÂ¬Ã‚Â±ÃƒÂ¢ 
         if (m_pClientList[iClientH]->m_iSuperAttackLeft <= 0)  *spType = 1;
         if (m_pClientList[iClientH]->m_cSkillMastery[5] < 100) *spType = 1;
         break;
 
     case 21:
-        // Ã‚Â´ÃƒÅ“Ã‚Â°Ãƒâ€¹ Ãƒâ€¡ÃƒÅ Ã‚Â»ÃƒÂ¬Ã‚Â±ÃƒÂ¢ 
         if (m_pClientList[iClientH]->m_iSuperAttackLeft <= 0)  *spType = 1;
         if (m_pClientList[iClientH]->m_cSkillMastery[7] < 100) *spType = 1;
         break;
 
     case 22:
-        // Ãƒâ€ ÃƒÂ¦Ã‚Â½ÃƒÅ’ Ãƒâ€¡ÃƒÅ Ã‚Â»ÃƒÂ¬Ã‚Â±ÃƒÂ¢ 
         if (m_pClientList[iClientH]->m_iSuperAttackLeft <= 0)  *spType = 1;
         if (m_pClientList[iClientH]->m_cSkillMastery[9] < 100) *spType = 1;
         break;
 
     case 23:
-        // Ãƒâ‚¬ÃƒÂ¥Ã‚Â°Ãƒâ€¹ Ãƒâ€¡ÃƒÅ Ã‚Â»ÃƒÂ¬Ã‚Â±ÃƒÂ¢ 
         if (m_pClientList[iClientH]->m_iSuperAttackLeft <= 0)   *spType = 1;
         if (m_pClientList[iClientH]->m_cSkillMastery[8] < 100) *spType = 1;
         break;
 
     case 24:
-        // Ã‚ÂµÃ‚ÂµÃ‚Â³Ã‚Â¢ Ãƒâ€¡ÃƒÅ Ã‚Â»ÃƒÂ¬Ã‚Â±ÃƒÂ¢ 
         if (m_pClientList[iClientH]->m_iSuperAttackLeft <= 0)  *spType = 1;
         if (m_pClientList[iClientH]->m_cSkillMastery[10] < 100) *spType = 1;
         break;
 
     case 25:
-        // ÃƒË†Ã‚Â° Ãƒâ€¡ÃƒÅ Ã‚Â»ÃƒÂ¬Ã‚Â±ÃƒÂ¢ 
         if (m_pClientList[iClientH]->m_iSuperAttackLeft <= 0)  *spType = 2;
         if (m_pClientList[iClientH]->m_cSkillMastery[6] < 100) *spType = 2;
         if (m_pClientList[iClientH]->m_cArrowIndex == -1)      *spType = 0;
-        // ÃƒË†Ã‚Â° Ã‚Â°ÃƒÂ¸Ã‚Â°ÃƒÂÃƒâ‚¬ÃƒÅ½Ã‚ÂµÃ‚Â¥ Ãƒâ‚¬ÃƒÂ¥Ãƒâ€šÃƒÂ¸Ãƒâ€¡Ãƒâ€˜ Ã‚Â¹Ã‚Â«Ã‚Â±ÃƒÂ¢Ã‚Â°Ã‚Â¡ ÃƒË†Ã‚Â°Ãƒâ‚¬ÃƒÅ’ Ã‚Â¾Ãƒâ€ Ã‚Â´ÃƒÂÃ‚Â´Ãƒâ„¢. Ãƒâ‚¬ÃƒÂÃ‚Â¹ÃƒÂ Ã‚Â°ÃƒÂ¸Ã‚Â°ÃƒÂÃƒâ‚¬Ã‚Â¸Ã‚Â·ÃƒÅ½ Ãƒâ‚¬ÃƒÂ¼ÃƒË†Ã‚Â¯.
         if (wType < 40) *spType = 1;
         break;
 
     case 26:
-        // v2.16 2002-5-27 Ã‡Ã˜Â¸Ã“ Ã‡ÃŠÂ»Ã¬Â±Ã¢ 
         if (m_pClientList[iClientH]->m_iSuperAttackLeft <= 0)  *spType = 1;
         if (m_pClientList[iClientH]->m_cSkillMastery[14] < 100) *spType = 1;
         break;
 
     case 27:
-        // v2.16 2002-5-27 ÃÃ¶Ã†ÃŽÃ€ÃŒ Ã‡ÃŠÂ»Ã¬Â±Ã¢ 
         if (m_pClientList[iClientH]->m_iSuperAttackLeft <= 0)  *spType = 1;
         if (m_pClientList[iClientH]->m_cSkillMastery[21] < 100) *spType = 1;
         break;
@@ -14440,7 +11163,6 @@ void CGame::LocalSavePlayerData(int iClientH)
     FILE * pFile;
     SYSTEMTIME SysTime;
 
-    // Â·ÃŽÂ±Ã— Â¼Â­Â¹Ã¶Â·ÃŽÃ€Ã‡ Â¿Â¬Â°Ã¡Ã€ÃŒ ÃÂ¾Â·Ã¡ÂµÃ‡Â¾Ã® Ã€Ã“Â½ÃƒÂ·ÃŽ Â°Ã”Ã€Ã“Â¼Â­Â¹Ã¶ Â³Â»Ã€Ã‡ Ã†ÃºÂ´ÃµÂ¿Â¡ Ã€ÃºÃ€Ã¥Ã‡Ã‘Â´Ã™. 
     if (m_pClientList[iClientH] == NULL) return;
 
     pData = new char[30000];
@@ -14467,11 +11189,9 @@ void CGame::LocalSavePlayerData(int iClientH)
     strcat(cFn, m_pClientList[iClientH]->m_cCharName);
     strcat(cFn, ".txt");
 
-    // ÂµÃ°Â·ÂºÃ…Ã¤Â¸Â®Â¸Â¦ Â¸Â¸ÂµÃ§Â´Ã™.
     _mkdir(cCharDir);
     _mkdir(cDir);
 
-    // (char*)cp ÂºÃŽÃ…Ã (dwMsgSize - 36)Ã…Â©Â±Ã¢Â±Ã®ÃÃ¶Â°Â¡ Ã†Ã„Ã€ÃÂ¿Â¡ Ã€ÃºÃ€Ã¥ÂµÃ‰ ÂµÂ¥Ã€ÃŒÃ…ÃÃ€ÃŒÂ´Ã™.
     if (iSize == 0)
     {
         log->info("(!) Character data body empty: Cannot create & save temporal player data file.");
@@ -14528,7 +11248,6 @@ int CGame::iCreateMineral(char cMapIndex, int tX, int tY, char cLevel)
     for (i = 1; i < DEF_MAXMINERALS; i++)
         if (m_pMineral[i] == NULL)
         {
-            // ÂºÃ³ Â°Ã¸Â°Â£Â¿Â¡ Â±Â¤Â¹Â°ÂµÂ¢Ã€ÃŒÂ¸Â¦ Â¸Â¸ÂµÃ§Â´Ã™.
             iMineralType = iDice(1, cLevel);
             m_pMineral[i] = new CMineral(iMineralType, cMapIndex, tX, tY, 1);
             if (m_pMineral[i] == NULL) return NULL;
@@ -14536,20 +11255,19 @@ int CGame::iCreateMineral(char cMapIndex, int tX, int tY, char cLevel)
             iDynamicHandle = NULL;
             switch (iMineralType)
             {
-            case 1: // Â±Â¤Â¹Â°Â·Ã¹
+            case 1:
             case 2:
             case 3:
             case 4:
                 iDynamicHandle = iAddDynamicObjectList(NULL, NULL, DEF_DYNAMICOBJECT_MINERAL1, cMapIndex, tX, tY, NULL, i);
                 break;
 
-            case 5: // ÂºÂ¸Â¼Â®Â·Ã¹ 
+            case 5:
             case 6:
                 iDynamicHandle = iAddDynamicObjectList(NULL, NULL, DEF_DYNAMICOBJECT_MINERAL2, cMapIndex, tX, tY, NULL, i);
                 break;
 
             default:
-                // Â¿Â¡Â·Â¯ Â¹Ã¦ÃÃ¶Â¿Ã« Ã„ÃšÂµÃ¥ 
                 iDynamicHandle = iAddDynamicObjectList(NULL, NULL, DEF_DYNAMICOBJECT_MINERAL1, cMapIndex, tX, tY, NULL, i);
                 break;
             }
@@ -14563,19 +11281,17 @@ int CGame::iCreateMineral(char cMapIndex, int tX, int tY, char cLevel)
             m_pMineral[i]->m_sDynamicObjectHandle = iDynamicHandle;
             m_pMineral[i]->m_cMapIndex = cMapIndex;
 
-            // Â³Â­Ã€ÃŒÂµÂµÂ¿Ã Â¼Ã¶Â·Â®Ã€Â» Ã€Ã”Â·Ã‚Ã‡Ã‘Â´Ã™.
             switch (iMineralType)
             {
-            case 1: m_pMineral[i]->m_iDifficulty = 10; m_pMineral[i]->m_iRemain = 20; break;
-            case 2: m_pMineral[i]->m_iDifficulty = 15; m_pMineral[i]->m_iRemain = 15; break;
-            case 3: m_pMineral[i]->m_iDifficulty = 20; m_pMineral[i]->m_iRemain = 10; break;
-            case 4: m_pMineral[i]->m_iDifficulty = 50; m_pMineral[i]->m_iRemain = 8; break;
-            case 5: m_pMineral[i]->m_iDifficulty = 70; m_pMineral[i]->m_iRemain = 6; break;
-            case 6: m_pMineral[i]->m_iDifficulty = 90; m_pMineral[i]->m_iRemain = 4; break;
-            default: m_pMineral[i]->m_iDifficulty = 10; m_pMineral[i]->m_iRemain = 20; break;
+                case 1: m_pMineral[i]->m_iDifficulty = 10; m_pMineral[i]->m_iRemain = 20; break;
+                case 2: m_pMineral[i]->m_iDifficulty = 15; m_pMineral[i]->m_iRemain = 15; break;
+                case 3: m_pMineral[i]->m_iDifficulty = 20; m_pMineral[i]->m_iRemain = 10; break;
+                case 4: m_pMineral[i]->m_iDifficulty = 50; m_pMineral[i]->m_iRemain = 8; break;
+                case 5: m_pMineral[i]->m_iDifficulty = 70; m_pMineral[i]->m_iRemain = 6; break;
+                case 6: m_pMineral[i]->m_iDifficulty = 90; m_pMineral[i]->m_iRemain = 4; break;
+                default: m_pMineral[i]->m_iDifficulty = 10; m_pMineral[i]->m_iRemain = 20; break;
             }
 
-            // Â¸ÃŠÃ€Ã‡ Â¹ÃŒÂ³Ã—Â¶Ã¶ Â¼Ã¶ ÃÃµÂ°Â¡
             m_pMapList[cMapIndex]->m_iCurMineral++;
 
             return i;
@@ -14609,33 +11325,26 @@ void CGame::_CheckMiningAction(int iClientH, int dX, int dY)
     {
     case DEF_DYNAMICOBJECT_MINERAL1:
     case DEF_DYNAMICOBJECT_MINERAL2:
-        // Â±Â¤Â¹Â°ÃƒÂ¤ÃƒÃ«Â¸Â¦ Â½ÃƒÂµÂµÃ‡Ã‘ Ã„Â³Â¸Â¯Ã…ÃÃ€Ã‡ ÃÂ¶Â°Ã‡Ã€Â» Â»Ã¬Ã‡Ã‰Â´Ã™. Â°Ã®Â±ÂªÃ€ÃŒÂ¸Â¦ ÂµÃ©Â°Ã­ Ã€Ã–Â´Ã‚Â°Â¡? Â±Â¤Â¹Â° ÃƒÂ¤ÃƒÃ« Â½ÂºÃ…Â³Ã€Âº? 
-        // Â°Ã®Â±ÂªÃ€ÃŒÂ¿Â¡ Ã‡Ã˜Â´Ã§Ã‡ÃÂ´Ã‚ Â¿ÃœÃ‡Ã¼Ã€ÃŒÂ¸Ã© Ã…Ã«Â°Ãº 
         wWeaponType = ((m_pClientList[iClientH]->m_sAppr2 & 0x0FF0) >> 4);
         if (wWeaponType == 25)
         {
-            // Ã‡ÃˆÂ¾Ã—Â½ÂºÂ¸Â¦ ÂµÃ©Â°Ã­ Ã€Ã–Â´Ã™. Â±Â¤Â¹Â° ÃƒÂ¤ÃƒÃ« Â°Â¡Â´Ã‰ 
         }
         else return;
 
-        // Ã€Ã¼Ã…Ãµ Â¸Ã°Â¼Ã‡Ã€ÃŒ Â¾Ã†Â´ÃÂ´ÃµÂ¶Ã³ÂµÂµ Â¸Â®Ã…Ã 
         if ((m_pClientList[iClientH]->m_sAppr2 & 0xF000) == 0) return;
 
         iSkillLevel = m_pClientList[iClientH]->m_cSkillMastery[0];
         if (iSkillLevel == 0) break;
 
         if (m_pDynamicObjectList[iDynamicIndex] == NULL) break;
-        // Ã„Â³Â´Ã‚ Â±Â¤Â¹Â°Ã€Ã‡ Â³Â­Ã€ÃŒÂµÂµÂ¸Â¸Ã…Â­ Â½ÂºÃ…Â³Ã€Â» Â³Â·ÃƒÃ¡Â´Ã™.
         iSkillLevel -= m_pMineral[m_pDynamicObjectList[iDynamicIndex]->m_iV1]->m_iDifficulty;
         if (iSkillLevel <= 0) iSkillLevel = 1;
 
         iResult = iDice(1, 100);
         if (iResult <= iSkillLevel)
         {
-            // ÃˆÂ®Â·Ã¼Ã€Âº Â¼ÂºÂ°Ã¸Ã‡ÃŸÂ´Ã™. Â±Â¤Â¹Â°ÃƒÂ¤ÃƒÃ« Â±Ã¢Â¼Ãº ÃÃµÂ°Â¡ 
             CalculateSSN_SkillIndex(iClientH, 0, 1);
 
-            // Ã‡ÃƒÂ·Â¹Ã€ÃŒÂ¾Ã®Ã€Ã‡ Â¹ÃŸ Â¹Ã˜Â¿Â¡ Â±Â¤Â¹Â°Ã€Â» Â¶Â³Â¾Ã®Â¶ÃŸÂ¸Â°Â´Ã™. 
             switch (m_pMineral[m_pDynamicObjectList[iDynamicIndex]->m_iV1]->m_cType)
             {
             case 1:
@@ -14867,26 +11576,18 @@ void CGame::_CheckMiningAction(int iClientH, int dX, int dY)
             }
             else
             {
-                // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Â¼Â­Ã€Ã–Â´Ã‚ Ã€Â§Ã„Â¡Â¿Â¡ Â¹Ã¶Â¸Â°Â´Ã™. 
                 m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->bSetItem(m_pClientList[iClientH]->m_sX,
                     m_pClientList[iClientH]->m_sY, pItem);
-                // Â´Ã™Â¸Â¥ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¶Â³Â¾Ã®ÃÃ¸ Â°ÃÃ€Â» Â¾Ã‹Â¸Â°Â´Ã™. 
                 SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_ITEMDROP, m_pClientList[iClientH]->m_cMapIndex,
                     m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY,
-                    pItem->m_sSprite, pItem->m_sSpriteFrame, pItem->m_cItemColor); // v1.4
-                // testcode
-                // wsprintf(G_cTxt, "Mining Success: %d", iItemID); 
-                // log->info(G_cTxt);
+                    pItem->m_sSprite, pItem->m_sSpriteFrame, pItem->m_cItemColor);
             }
 
-            // Â±Â¤Â¹Â°Ã€Ã‡ Â³Â²Ã€Âº Â·Â®Ã€Â» ÃÃ™Ã€ÃŒÂ°Ã­ 0Ã€ÃŽÂ°Ã¦Â¿Ã¬ Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™.
             m_pMineral[m_pDynamicObjectList[iDynamicIndex]->m_iV1]->m_iRemain--;
             if (m_pMineral[m_pDynamicObjectList[iDynamicIndex]->m_iV1]->m_iRemain <= 0)
             {
-                // Â±Â¤Â¹Â°Ã€ÃŒ Â¸Ã°ÂµÃŽ Â¼Ã’Â¸Ã°ÂµÃ‡Â¾ÃºÂ´Ã™. Delete Mineral 
                 bDeleteMineral(m_pDynamicObjectList[iDynamicIndex]->m_iV1);
 
-                // ÂµÂ¿Ã€Ã» Â°Â´ÃƒÂ¼ Â»Ã¨ÃÂ¦
                 delete m_pDynamicObjectList[iDynamicIndex];
                 m_pDynamicObjectList[iDynamicIndex] = NULL;
             }
@@ -14912,15 +11613,11 @@ BOOL CGame::bDeleteMineral(int iIndex)
     SendEventToNearClient_TypeB(MSGID_DYNAMICOBJECT, DEF_MSGTYPE_REJECT, m_pDynamicObjectList[iDynamicIndex]->m_cMapIndex,
         m_pDynamicObjectList[iDynamicIndex]->m_sX, m_pDynamicObjectList[iDynamicIndex]->m_sY,
         m_pDynamicObjectList[iDynamicIndex]->m_sType, iDynamicIndex, NULL);
-    // Â¸ÃŠÂ¿Â¡Â¼Â­ Â±Â¤Â¹Â° ÂµÂ¿Ã€Ã» Â°Â´ÃƒÂ¼Â¸Â¦ Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™.
     m_pMapList[m_pDynamicObjectList[iDynamicIndex]->m_cMapIndex]->SetDynamicObject(NULL, NULL, m_pDynamicObjectList[iDynamicIndex]->m_sX, m_pDynamicObjectList[iDynamicIndex]->m_sY, dwTime);
-    // Â±Â¤Â¹Â°Ã€ÃŒ Â»Ã§Â¶Ã³ÃÂ³Ã€Â¸Â¹Ã‡Â·ÃŽ Ã€ÃŒÂµÂ¿Ã€ÃŒ Â°Â¡Â´Ã‰Ã‡ÃÂ°Ã” Ã‡Ã‘Â´Ã™. 
     m_pMapList[m_pMineral[iIndex]->m_cMapIndex]->SetTempMoveAllowedFlag(m_pDynamicObjectList[iDynamicIndex]->m_sX, m_pDynamicObjectList[iDynamicIndex]->m_sY, TRUE);
 
-    // Â±Â¤Â¹Â° Â°Â³ÃƒÂ¼ Â¼Ã¶ Â°Â¨Â¼Ã’ 
     m_pMapList[m_pMineral[iIndex]->m_cMapIndex]->m_iCurMineral--;
 
-    // Â±Â¤Â¹Â° Â°Â´ÃƒÂ¼ Â»Ã¨ÃÂ¦ 
     delete m_pMineral[iIndex];
     m_pMineral[iIndex] = NULL;
 
@@ -14937,13 +11634,11 @@ void CGame::CheckFireBluring(char cMapIndex, int sX, int sY)
     for (ix = sX - 1; ix <= sX + 1; ix++)
         for (iy = sY - 1; iy <= sY + 1; iy++)
         {
-            // Â¸Â¸Â¾Ã  Ã€ÃŒ Ã€Â§Ã„Â¡Â¿Â¡ Â¹ÃŸÃˆÂ­Â¼Âº Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Ã€Ã–Â´Ã™Â¸Ã© ÃÃ¶Â¿Ã¬Â°Ã­ ÂºÃ’ Â¿Ã€ÂºÃªÃÂ§Ã†Â®Â¸Â¦ Â³ÃµÂ´Ã‚Â´Ã™.	
             iItemNum = m_pMapList[cMapIndex]->iCheckItem(ix, iy);
 
             switch (iItemNum)
             {
             case 355:
-                // Â¼Â®Ã…ÂºÃ€ÃŒÂ´Ã™. Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» ÃÃ¶Â¿Ã¬Â°Ã­ ÂºÃ’Ã€Â» Â¸Â¸ÂµÃ§Â´Ã™.
                 pItem = m_pMapList[cMapIndex]->pGetItem(ix, iy, &sSpr, &sSprFrame, &cItemColor);
                 if (pItem != NULL) delete pItem;
                 iAddDynamicObjectList(NULL, NULL, DEF_DYNAMICOBJECT_FIRE, cMapIndex, ix, iy, 6000);
@@ -15043,7 +11738,6 @@ BOOL CGame::_bDepleteDestTypeItemUseEffect(int iClientH, int dX, int dY, short s
 {
     BOOL bRet;
 
-    // Ã€Â§Ã„Â¡Â¸Â¦ ÃÃ¶ÃÂ¤Ã‡ÃÂ°Ã­ Â»Ã§Â¿Ã« ÃˆÃ„ Â»Ã§Â¶Ã³ÃÃ¶Â´Ã‚ Â¾Ã†Ã€ÃŒÃ…Ã› ÃˆÂ¿Â°Ãº ÃƒÂ³Â¸Â® ÂºÃŽÂºÃ 
     if (m_pClientList[iClientH] == NULL) return FALSE;
     if ((sItemIndex < 0) || (sItemIndex >= DEF_MAXITEMS)) return FALSE;
     if (m_pClientList[iClientH]->m_pItemList[sItemIndex] == NULL) return FALSE;
@@ -15064,25 +11758,20 @@ BOOL CGame::_bDepleteDestTypeItemUseEffect(int iClientH, int dX, int dY, short s
         }
         return bRet;
 
-        // crusade
     case DEF_ITEMEFFECTTYPE_CONSTRUCTIONKIT:
-        // Â°Ã‡Â¼Â³ Ã…Â°Ã†Â®Ã€ÃŒÂ´Ã™. Â¹ÃŒÂµÃ©Â·Â£ÂµÃ¥Â¿Â¡Â¼Â­Â¸Â¸ Â»Ã§Â¿Ã« Â°Â¡Â´Ã‰Ã‡Ã”. m_sItemEffectValue1: Â°Ã‡ÃƒÃ Â¹Â° ÃÂ¾Â·Ã¹, m_sItemEffectValue2: Â°Ã‡ÃƒÃ  Â½ÃƒÂ°Â£ 
-        bRet = __bSetConstructionKit(m_pClientList[iClientH]->m_cMapIndex, dX, dY,                                 // 
-            m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue1,        //
-            m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2,        //
-            iClientH); // Â¼Â³Ã„Â¡Ã€Ãš 
+        bRet = __bSetConstructionKit(m_pClientList[iClientH]->m_cMapIndex, dX, dY,
+            m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue1,
+            m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2,
+            iClientH);
         if (bRet == TRUE)
         {
-            // Â°Ã‡Â¼Â³ Â½ÃƒÃ€Ã› 
         }
         else
         {
-            // Â°Ã‡Â¼Â³ Â½Ã‡Ã†Ã			
         }
         return bRet;
 
     case DEF_ITEMEFFECTTYPE_DYE:
-        // Â¾Ã†Ã€ÃŒÃ…Ã› Â¿Â°Â»Ã¶: Â¾Ã†Ã€ÃŒÃ…Ã› Â°ÂªÃ€ÃŒ Ã€Â¯ÃˆÂ¿Ã‡Ã‘Â°Â¡ ÃƒÂ¼Ã…Â©.
         if ((sDestItemID >= 0) && (sDestItemID < DEF_MAXITEMS))
         {
             if (m_pClientList[iClientH]->m_pItemList[sDestItemID] != NULL)
@@ -15090,15 +11779,12 @@ BOOL CGame::_bDepleteDestTypeItemUseEffect(int iClientH, int dX, int dY, short s
                 if ((m_pClientList[iClientH]->m_pItemList[sDestItemID]->m_cCategory == 11) ||
                     (m_pClientList[iClientH]->m_pItemList[sDestItemID]->m_cCategory == 12))
                 {
-                    // Â¿Â°Â»Ã¶Ã€ÃŒ Â°Â¡Â´Ã‰Ã‡Ã‘ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒÂ´Ã™.
                     m_pClientList[iClientH]->m_pItemList[sDestItemID]->m_cItemColor = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue1;
-                    // Â»Ã¶ Â¼Ã“Â¼ÂºÃ€ÃŒ Â¹Ã™Â²Ã®Â¾ÃºÃ€Â½Ã€Â» Â¾Ã‹Â·ÃÃÃ˜Â´Ã™. 
                     SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMCOLORCHANGE, sDestItemID, m_pClientList[iClientH]->m_pItemList[sDestItemID]->m_cItemColor, NULL, NULL);
                     return TRUE;
                 }
                 else
                 {
-                    // Â¿Â°Â»Ã¶Ã€ÃŒ ÂºÃ’Â°Â¡Â´Ã‰Ã‡Ã‘ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒÂ´Ã™. 
                     SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMCOLORCHANGE, sDestItemID, -1, NULL, NULL);
                     return FALSE;
                 }
@@ -15267,7 +11953,6 @@ BOOL CGame::__bSetOccupyFlag(char cMapIndex, int dX, int dY, int iSide, int iEKN
         if (iSide == m_sLastHeldenianWinner)
         {
             m_cHeldenianVictoryType = iSide;
-            //sub_4AB9D0
         }
     }
     return TRUE;
@@ -15281,14 +11966,12 @@ void CGame::SetSummonMobAction(int iClientH, int iMode, DWORD dwMsgSize, char * 
     CStrTok * pStrTok;
 
     if (m_pClientList[iClientH] == NULL) return;
-    // v2.1 Áß¸³Àº ¸÷°ø°Ý ¸í·ÉÀ» ÇÒ ¼ö ¾ø´Ù.
     if (m_pClientList[iClientH]->m_cSide == 0) return;
 
     switch (iMode)
     {
-    case 0: // Free ¸ðµå
-    case 1: // Hold ¸ðµå
-        //  ¸¶½ºÅÍ°¡ iClientHÀÎ ¸÷µéÀÇ Á¦¾î¸ðµå¸¦ º¯°æÇÑ´Ù.
+    case 0:
+    case 1:
         for (i = 0; i < DEF_MAXNPCS; i++)
             if (m_pNpcList[i] != NULL)
             {
@@ -15307,7 +11990,6 @@ void CGame::SetSummonMobAction(int iClientH, int iMode, DWORD dwMsgSize, char * 
         break;
 
     case 2:
-        // °ø°Ý ¸ðµå - ¸ñÇ¥¹°À» ¾ò¾î¿Â´Ù. 
         if ((dwMsgSize) <= 0) return;
         memcpy(cBuff, pData, dwMsgSize);
 
@@ -15318,20 +12000,16 @@ void CGame::SetSummonMobAction(int iClientH, int iMode, DWORD dwMsgSize, char * 
         iTargetIndex = 0;
         if (token != NULL)
         {
-            // tokenÀÌ °ð °ø°ÝÇÒ »ç¿ëÀÚ ÀÌ¸§ 
             if (strlen(token) > 10)
                 memcpy(cTargetName, token, 10);
             else memcpy(cTargetName, token, strlen(token));
 
-            // 2002.8.17 ÀåÁøÈ£ ¼öÁ¤
             for (i = 1; i < DEF_MAXCLIENTS; i++)
             {
-                // if ((m_pClientList[i] != NULL) && (memcmp(m_pClientList[i]->m_cCharName, cTargetName, 10) == 0)) { // original
                 if ((m_pClientList[i] != NULL) &&
                     (memcmp(m_pClientList[i]->m_cCharName, cTargetName, 10) == 0) &&
-                    (strcmp(m_pClientList[iClientH]->m_cMapName, m_pClientList[i]->m_cMapName) == 0)) // adamas(mapÀÌ °°¾Æ¾ß ÇÑ´Ù.)
+                    (strcmp(m_pClientList[iClientH]->m_cMapName, m_pClientList[i]->m_cMapName) == 0))
                 {
-                    // ¸ñÇ¥ Ä³¸¯ÅÍ¸¦ Ã£¾Ò´Ù. ÀÎµ¦½º ÀúÀå
                     iTargetIndex = i;
                     goto SSMA_SKIPSEARCH;
                 }
@@ -15343,7 +12021,6 @@ void CGame::SetSummonMobAction(int iClientH, int iMode, DWORD dwMsgSize, char * 
         if ((iTargetIndex != 0) && (m_pClientList[iTargetIndex]->m_cSide != 0) &&
             (m_pClientList[iTargetIndex]->m_cSide != m_pClientList[iClientH]->m_cSide))
         {
-            // ¸ñÇ¥¹°ÀÌ Á¸ÀçÇÑ´Ù¸é ÇÒ´çÇÑ´Ù. 
             for (i = 0; i < DEF_MAXNPCS; i++)
                 if (m_pNpcList[i] != NULL)
                 {
@@ -15380,7 +12057,6 @@ int CGame::_iComposeFlagStatusContents(char * pData)
     strcat(pData, cTxt);
     strcat(pData, "\n\n");
 
-    // 
     for (i = 1; i < DEF_MAXOCCUPYFLAG; i++)
         if (m_pMapList[m_iMiddlelandMapIndex]->m_pOccupyFlag[i] != NULL)
         {
@@ -15403,7 +12079,6 @@ void CGame::CheckUniqueItemEquipment(int iClientH)
     int i, iDamage;
 
     if (m_pClientList[iClientH] == NULL) return;
-    // v1.3 Ã€Â¯Â´ÃÃ…Â© Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Ã‡ Ã€Ã¥Ã‚Ã¸ Â»Ã³Ã…Ã‚Â¸Â¦ Ã†Ã‡Â´ÃœÃ‡Ã‘Â´Ã™. Ã†Â¯ÃÂ¤Ã€ÃŽÂ¸Â¸Ã€ÃŒ Ã‚Ã¸Â¿Ã« Â°Â¡Â´Ã‰Ã‡Ã‘ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Ã€Ã¥Ã‚Ã¸Ã‡Ã‘ Â°Ã¦Â¿Ã¬ Â¹Ã¾Â°ÃœÃÃ¸Â´Ã™.
 
     for (i = 0; i < DEF_MAXITEMS; i++)
         if (m_pClientList[iClientH]->m_pItemList[i] != NULL)
@@ -15411,20 +12086,16 @@ void CGame::CheckUniqueItemEquipment(int iClientH)
             if ((m_pClientList[iClientH]->m_pItemList[i]->m_sTouchEffectType == DEF_ITET_UNIQUE_OWNER) &&
                 (m_pClientList[iClientH]->m_bIsItemEquipped[i] == TRUE))
             {
-                // Touch Effect TypeÃ€ÃŒ DEF_ITET_OWNERÃ€ÃŒÂ¸Ã© Touch Effect Value 1, 2, 3Ã€ÃŒ ÃÃ–Ã€ÃŽ Ã„Â³Â¸Â¯Ã…ÃÃ€Ã‡ Â°Ã­Ã€Â¯Â°ÂªÃ€Â» Â°Â®Â´Ã‚Â´Ã™. 
 
                 if ((m_pClientList[iClientH]->m_pItemList[i]->m_sTouchEffectValue1 == m_pClientList[iClientH]->m_sCharIDnum1) &&
                     (m_pClientList[iClientH]->m_pItemList[i]->m_sTouchEffectValue2 == m_pClientList[iClientH]->m_sCharIDnum2) &&
                     (m_pClientList[iClientH]->m_pItemList[i]->m_sTouchEffectValue3 == m_pClientList[iClientH]->m_sCharIDnum3))
                 {
-                    // ID Â°ÂªÃ€ÃŒ Â¸Ã‚Â´Ã™.
                 }
                 else
                 {
-                    // Ã€ÃšÂ½Ã…Ã€Ã‡ Â°ÃÃ€ÃŒ Â¾Ã†Â´ÃÂ¹Ã‡Â·ÃŽ Ã‚Ã¸Â¿Ã«Ã€ÃŒ Ã‡Ã˜ÃÂ¦ÂµÃˆÂ´Ã™.
                     SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_pItemList[i]->m_cEquipPos, i, NULL, NULL);
                     ReleaseItemHandler(iClientH, i, TRUE);
-                    // v1.4 Â´Ã«Â¹ÃŒÃÃ¶Â¸Â¦ Â¾Ã²Â´Ã‚Â´Ã™. 
                     iDamage = iDice(10, 10);
                     m_pClientList[iClientH]->m_iHP -= iDamage;
                     if (m_pClientList[iClientH]->m_iHP <= 0)
@@ -15436,51 +12107,14 @@ void CGame::CheckUniqueItemEquipment(int iClientH)
         }
 }
 
-void CGame::_BWM_Init(int iClientH, char * pData)
-{
-    if (m_pClientList[iClientH] == NULL) return;
-
-    m_pClientList[iClientH]->m_bIsBWMonitor = TRUE;
-    wsprintf(G_cTxt, "(*) BWMonitor(%d) registered.", iClientH);
-    log->info(G_cTxt);
-}
-
-void CGame::_BWM_Command_Shutup(char * pData)
-{
-    char * cp, cName[11];
-    int i;
-
-    cp = (char *)(pData + 16);
-
-    ZeroMemory(cName, sizeof(cName));
-    memcpy(cName, cp, 10);
-
-    for (i = 1; i < DEF_MAXCLIENTS; i++)
-        if (m_pClientList[i] != NULL)
-        {
-            if (memcmp(m_pClientList[i]->m_cCharName, cName, 10) == 0)
-            {
-                m_pClientList[i]->m_iTimeLeft_ShutUp = 20 * 3 * 10; // 1Ã€ÃŒ 3ÃƒÃŠÂ´Ã™. 20Ã€ÃŒÂ¸Ã© 1ÂºÃ Â¿Ã¥Ã€Â» Ã‡ÃÂ¸Ã© Â¹Â«ÃÂ¶Â°Ã‡ Ã†Ã¤Â³ÃŽÃ†Â¼ 10ÂºÃ  
-                SendNotifyMsg(NULL, i, DEF_NOTIFY_PLAYERSHUTUP, 20 * 3 * 10, NULL, NULL, cName);
-
-                // Admin Log
-                wsprintf(G_cTxt, "BWordMonitor shutup(%s %d)", cName, 20 * 3 * 10);
-                log->info(G_cTxt);
-
-                return;
-            }
-        }
-}
-
 void CGame::SetExchangeItem(int iClientH, int iItemIndex, int iAmount)
 {
     int iExH;
 
     if (m_pClientList[iClientH] == NULL) return;
     if (m_pClientList[iClientH]->m_bIsOnServerChange == TRUE) return;
-    if (m_pClientList[iClientH]->iExchangeCount > 4) return;	//only 4 items trade
+    if (m_pClientList[iClientH]->iExchangeCount > 4) return;
 
-    //no admin trade
     if ((m_bAdminSecurity == TRUE) && (m_pClientList[iClientH]->m_iAdminUserLevel > 0))
     {
         _ClearExchangeStatus(m_pClientList[iClientH]->m_iExchangeH);
@@ -15493,18 +12127,13 @@ void CGame::SetExchangeItem(int iClientH, int iItemIndex, int iAmount)
         iExH = m_pClientList[iClientH]->m_iExchangeH;
         if ((m_pClientList[iExH] == NULL) || (memcmp(m_pClientList[iClientH]->m_cExchangeName, m_pClientList[iExH]->m_cCharName, 10) != 0))
         {
-            // ±³È¯ÇÒ »ó´ë¹æÀÌ ¾ø°Å³ª ±³È¯ÇÏ°íÀÚ Çß´ø ±× Ä³¸¯ÅÍ°¡ ¾Æ´Ï´Ù. 	
-
         }
         else
         {
-            // ±³È¯ÇÏ°íÀÚ ÇÏ´Â »ó´ë¹æ¿¡°Ô ¾ÆÀÌÅÛÀ» ¾Ë·ÁÁØ´Ù. 
-            // ÇØ´ç ¾ÆÀÌÅÛÀÌ Á¸ÀçÇÏ´ÂÁö, ¼ö·®ÀÌ ¸Â´ÂÁö Ã¼Å©ÇÑ´Ù. 
             if ((iItemIndex < 0) || (iItemIndex >= DEF_MAXITEMS)) return;
             if (m_pClientList[iClientH]->m_pItemList[iItemIndex] == NULL) return;
             if (m_pClientList[iClientH]->m_pItemList[iItemIndex]->m_dwCount < iAmount) return;
 
-            //No Duplicate items
             for (int i = 0; i < m_pClientList[iClientH]->iExchangeCount; i++)
             {
                 if (m_pClientList[iClientH]->m_cExchangeItemIndex[i] == (char)iItemIndex)
@@ -15515,7 +12144,6 @@ void CGame::SetExchangeItem(int iClientH, int iItemIndex, int iAmount)
                 }
             }
 
-            // ±³È¯ÇÏ°íÀÚ ÇÏ´Â ¾ÆÀÌÅÛ ÀÎµ¦½º, ¼ö·® ÀúÀå 
             m_pClientList[iClientH]->m_cExchangeItemIndex[m_pClientList[iClientH]->iExchangeCount] = (char)iItemIndex;
             m_pClientList[iClientH]->m_iExchangeItemAmount[m_pClientList[iClientH]->iExchangeCount] = iAmount;
 
@@ -15545,7 +12173,6 @@ void CGame::SetExchangeItem(int iClientH, int iItemIndex, int iAmount)
     }
     else
     {
-        // ±³È¯ ¸ðµå°¡ ¾Æ´Ï¹Ç·Î 
     }
 }
 
@@ -15564,7 +12191,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
     {
         iExH = m_pClientList[iClientH]->m_iExchangeH;
 
-        // v1.42 ¼³¸¶ ÀÌ·± °æ¿ì°¡?
         if (iClientH == iExH) return;
 
         if (m_pClientList[iExH] != NULL)
@@ -15573,7 +12199,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
                 (m_pClientList[iExH]->m_bIsExchangeMode != TRUE) ||
                 (memcmp(m_pClientList[iExH]->m_cExchangeName, m_pClientList[iClientH]->m_cCharName, 10) != 0))
             {
-                // ±³È¯ÇÏ°íÀÚ Çß´ø ±× Ä³¸¯ÅÍ°¡ ¾Æ´Ï´Ù. ±³È¯ »óÅÂ´Â Ãë¼Ò.
                 _ClearExchangeStatus(iClientH);
                 _ClearExchangeStatus(iExH);
                 return;
@@ -15583,8 +12208,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
                 m_pClientList[iClientH]->m_bIsExchangeConfirm = TRUE;
                 if (m_pClientList[iExH]->m_bIsExchangeConfirm == TRUE)
                 {
-                    // »ó´ë¹æµµ ±³È¯ÀÇ»ç¸¦ ¹àÇû´Ù. ±³È¯ÀÌ ¼º¸³ÇÒ ¼ö ÀÖ´ÂÁö °è»êÇÑ´Ù. ¾ÆÀÌÅÛ °¹¼ö, ¹«°Ô Á¦ÇÑÀ» ÆÇ´Ü.
-
                     //Check all items
                     for (int i = 0; i < m_pClientList[iClientH]->iExchangeCount; i++)
                     {
@@ -15627,7 +12250,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
                     //See if the other person can take the item weightload
                     if ((iWeightLeftA < iItemWeightB) || (iWeightLeftB < iItemWeightA))
                     {
-                        // ±³È¯ÇÏ°íÀÚ ÇÏ´Â ¾ÆÀÌÅÛÀ» ¹ÞÀ» ¹«°Ô°ø°£ÀÌ ¾ø´Ù. ±³È¯ ºÒ°¡´É. 
                         _ClearExchangeStatus(iClientH);
                         _ClearExchangeStatus(iExH);
                         return;
@@ -15635,14 +12257,12 @@ void CGame::ConfirmExchangeItem(int iClientH)
 
                     for (i = 0; i < m_pClientList[iClientH]->iExchangeCount; i++)
                     {
-                        // ¼ö·®´ÜÀ§°¡ ÀÖ´Â ¾ÆÀÌÅÛÀÇ °æ¿ì´Â »õ·Î »ý¼ºÀ» ½ÃÄÑ¾ß ³ª´­¼ö ÀÖ´Ù.
                         if ((m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]]->m_cItemType == DEF_ITEMTYPE_CONSUME) ||
                             (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]]->m_cItemType == DEF_ITEMTYPE_ARROW))
                         {
 
                             if (m_pClientList[iClientH]->m_iExchangeItemAmount[i] > m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]]->m_dwCount)
                             {
-                                // ±³È¯ÇÏ°íÀÚ Çß´ø ¼ö·®º¸´Ù ¾ÆÀÌÅÛÀÌ Àû´Ù. ±×µ¿¾È ÁÙ¾îµé¾ú´Ù.
                                 _ClearExchangeStatus(iClientH);
                                 _ClearExchangeStatus(iExH);
                                 return;
@@ -15651,7 +12271,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
                             _bInitItemAttr(pItemA[i], m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]]->m_cName);
                             pItemA[i]->m_dwCount = m_pClientList[iClientH]->m_iExchangeItemAmount[i];
 
-                            // ·Î±×¸¦ ³²±â±â À§ÇÑ ¾ÆÀÌÅÛ º¹»ç¹° 
                             pItemAcopy[i] = new CItem;
                             _bInitItemAttr(pItemAcopy[i], m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]]->m_cName);
                             bCopyItemContents(pItemAcopy[i], pItemA[i]);
@@ -15662,7 +12281,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
                             pItemA[i] = (CItem *)m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]];
                             pItemA[i]->m_dwCount = m_pClientList[iClientH]->m_iExchangeItemAmount[i];
 
-                            // ·Î±×¸¦ ³²±â±â À§ÇÑ ¾ÆÀÌÅÛ º¹»ç¹° 
                             pItemAcopy[i] = new CItem;
                             _bInitItemAttr(pItemAcopy[i], m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]]->m_cName);
                             bCopyItemContents(pItemAcopy[i], pItemA[i]);
@@ -15678,7 +12296,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
 
                             if (m_pClientList[iExH]->m_iExchangeItemAmount[i] > m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex[i]]->m_dwCount)
                             {
-                                // ±³È¯ÇÏ°íÀÚ Çß´ø ¼ö·®º¸´Ù ¾ÆÀÌÅÛÀÌ Àû´Ù. ±×µ¿¾È ÁÙ¾îµé¾ú´Ù.
                                 _ClearExchangeStatus(iClientH);
                                 _ClearExchangeStatus(iExH);
                                 return;
@@ -15687,7 +12304,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
                             _bInitItemAttr(pItemB[i], m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex[i]]->m_cName);
                             pItemB[i]->m_dwCount = m_pClientList[iExH]->m_iExchangeItemAmount[i];
 
-                            // ·Î±×¸¦ ³²±â±â À§ÇÑ ¾ÆÀÌÅÛ º¹»ç¹° 
                             pItemBcopy[i] = new CItem;
                             _bInitItemAttr(pItemBcopy[i], m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex[i]]->m_cName);
                             bCopyItemContents(pItemBcopy[i], pItemB[i]);
@@ -15698,7 +12314,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
                             pItemB[i] = (CItem *)m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex[i]];
                             pItemB[i]->m_dwCount = m_pClientList[iExH]->m_iExchangeItemAmount[i];
 
-                            // ·Î±×¸¦ ³²±â±â À§ÇÑ ¾ÆÀÌÅÛ º¹»ç¹° 
                             pItemBcopy[i] = new CItem;
                             _bInitItemAttr(pItemBcopy[i], m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex[i]]->m_cName);
                             bCopyItemContents(pItemBcopy[i], pItemB[i]);
@@ -15706,7 +12321,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
                         }
                     }
 
-                    // ¸ÕÀú ¾ÆÀÌÅÛÀ» ³ÖÀº ÈÄ 
                     for (i = 0; i < m_pClientList[iExH]->iExchangeCount; i++)
                     {
                         bAddItem(iClientH, pItemB[i], NULL);
@@ -15716,17 +12330,13 @@ void CGame::ConfirmExchangeItem(int iClientH)
                         if ((m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex[i]]->m_cItemType == DEF_ITEMTYPE_CONSUME) ||
                             (m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex[i]]->m_cItemType == DEF_ITEMTYPE_ARROW))
                         {
-                            //
                             iAmountLeft = (int)m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex[i]]->m_dwCount - m_pClientList[iExH]->m_iExchangeItemAmount[i];
                             if (iAmountLeft < 0) iAmountLeft = 0;
-                            // v1.41 !!!
                             SetItemCount(iExH, m_pClientList[iExH]->m_cExchangeItemIndex[i], iAmountLeft);
                             // m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex]->m_cName, iAmountLeft);
-                            //
                         }
                         else
                         {
-                            // ¸¸¾à ÀåÂøµÈ ¾ÆÀÌÅÛÀÌ¶ó¸é ÇØÁ¦ÇÑ´Ù.
                             ReleaseItemHandler(iExH, m_pClientList[iExH]->m_cExchangeItemIndex[i], TRUE);
                             SendNotifyMsg(NULL, iExH, DEF_NOTIFY_GIVEITEMFIN_ERASEITEM, m_pClientList[iExH]->m_cExchangeItemIndex[i], m_pClientList[iExH]->m_iExchangeItemAmount[i], NULL, m_pClientList[iClientH]->m_cCharName);
                             m_pClientList[iExH]->m_pItemList[m_pClientList[iExH]->m_cExchangeItemIndex[i]] = NULL;
@@ -15743,17 +12353,13 @@ void CGame::ConfirmExchangeItem(int iClientH)
                         if ((m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]]->m_cItemType == DEF_ITEMTYPE_CONSUME) ||
                             (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]]->m_cItemType == DEF_ITEMTYPE_ARROW))
                         {
-                            //
                             iAmountLeft = (int)m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]]->m_dwCount - m_pClientList[iClientH]->m_iExchangeItemAmount[i];
                             if (iAmountLeft < 0) iAmountLeft = 0;
-                            // v1.41 !!!
                             SetItemCount(iClientH, m_pClientList[iClientH]->m_cExchangeItemIndex[i], iAmountLeft);
                             // m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex]->m_cName, iAmountLeft);
-                            //
                         }
                         else
                         {
-                            // ¸¸¾à ÀåÂøµÈ ¾ÆÀÌÅÛÀÌ¶ó¸é ÇØÁ¦ÇÑ´Ù.
                             ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_cExchangeItemIndex[i], TRUE);
                             SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_GIVEITEMFIN_ERASEITEM, m_pClientList[iClientH]->m_cExchangeItemIndex[i], m_pClientList[iClientH]->m_iExchangeItemAmount[i], NULL, m_pClientList[iExH]->m_cCharName);
                             m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_cExchangeItemIndex[i]] = NULL;
@@ -15781,7 +12387,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
                     SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_EXCHANGEITEMCOMPLETE, NULL, NULL, NULL, NULL);
                     SendNotifyMsg(NULL, iExH, DEF_NOTIFY_EXCHANGEITEMCOMPLETE, NULL, NULL, NULL, NULL);
 
-                    // ¹«°Ô Àç¼³Á¤
                     iCalcTotalWeight(iClientH);
                     iCalcTotalWeight(iExH);
                     return;
@@ -15790,7 +12395,6 @@ void CGame::ConfirmExchangeItem(int iClientH)
         }
         else
         {
-            // ±³È¯ÇÒ »ó´ë¹æÀÌ ¾ø´Ù. ±³È¯Àº Ãë¼Ò µÈ´Ù.
             _ClearExchangeStatus(iClientH);
             return;
         }
@@ -15820,7 +12424,6 @@ BOOL CGame::bAddItem(int iClientH, CItem * pItem, char cMode)
     ZeroMemory(cData, sizeof(cData));
     if (_bAddClientItemList(iClientH, pItem, &iEraseReq) == TRUE)
     {
-        // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» ÃˆÂ¹ÂµÃ¦Ã‡ÃŸÂ´Ã™.
         dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
         *dwp = MSGID_NOTIFY;
         wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
@@ -15828,7 +12431,6 @@ BOOL CGame::bAddItem(int iClientH, CItem * pItem, char cMode)
 
         cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
 
-        // 1Â°Â³ ÃˆÂ¹ÂµÃ¦Ã‡ÃŸÂ´Ã™. AmountÂ°Â¡ Â¾Ã†Â´ÃÂ´Ã™!
         *cp = 1;
         cp++;
 
@@ -15836,7 +12438,7 @@ BOOL CGame::bAddItem(int iClientH, CItem * pItem, char cMode)
         cp += 20;
 
         dwp = (DWORD *)cp;
-        *dwp = pItem->m_dwCount;	// Â¼Ã¶Â·Â®Ã€Â» Ã€Ã”Â·Ã‚ 
+        *dwp = pItem->m_dwCount;
         cp += 4;
 
         *cp = pItem->m_cItemType;
@@ -15845,7 +12447,7 @@ BOOL CGame::bAddItem(int iClientH, CItem * pItem, char cMode)
         *cp = pItem->m_cEquipPos;
         cp++;
 
-        *cp = (char)0; // Â¾Ã²Ã€Âº Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒÂ¹Ã‡Â·ÃŽ Ã€Ã¥Ã‚Ã¸ÂµÃ‡ÃÃ¶ Â¾ÃŠÂ¾Ã’Â´Ã™.
+        *cp = (char)0;
         cp++;
 
         sp = (short *)cp;
@@ -15874,45 +12476,37 @@ BOOL CGame::bAddItem(int iClientH, CItem * pItem, char cMode)
         *cp = pItem->m_cItemColor;
         cp++;
 
-        *cp = (char)pItem->m_sItemSpecEffectValue2; // v1.41 
+        *cp = (char)pItem->m_sItemSpecEffectValue2;
         cp++;
 
         dwp = (DWORD *)cp;
         *dwp = pItem->m_dwAttribute;
         cp += 4;
         /*
-        *cp = (char)(pItem->m_dwAttribute & 0x00000001); // Custom-ItemÃ€ÃŽÃÃ¶Ã€Ã‡ Â¿Â©ÂºÃŽ
+        *cp = (char)(pItem->m_dwAttribute & 0x00000001);
         cp++;
         */
 
         if (iEraseReq == 1)
         {
-            //testcode
-            //wsprintf(G_cTxt, "AddItem: Delete (%s)", pItem->m_cName);
-            //log->info(G_cTxt);
             delete pItem;
             pItem = NULL;
         }
 
-        // Â¾Ã†Ã€ÃŒÃ…Ã› ÃÂ¤ÂºÂ¸ Ã€Ã¼Â¼Ã› 
         iRet = m_pClientList[iClientH]->iSendMsg(cData, 53);
 
         return TRUE;
     }
     else
     {
-        // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Ã€Ã¼Â´ÃžÂ¹ÃžÃ€Âº Ã„Â³Â¸Â¯Ã…ÃÂ°Â¡ Â´ÃµÃ€ÃŒÂ»Ã³ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» ÂºÂ¸Â°Ã¼Ã‡Ã’ Â¼Ã¶ Â¾Ã¸Â´Ã‚ Â»Ã³Ã…Ã‚Ã€ÃŒÂ´Ã™.
-        // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Â¼Â­Ã€Ã–Â´Ã‚ Ã€Â§Ã„Â¡Â¿Â¡ Â¹Ã¶Â¸Â°Â´Ã™. 
         m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->bSetItem(m_pClientList[iClientH]->m_sX,
             m_pClientList[iClientH]->m_sY,
             pItem);
 
-        // Â´Ã™Â¸Â¥ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¶Â³Â¾Ã®ÃÃ¸ Â°ÃÃ€Â» Â¾Ã‹Â¸Â°Â´Ã™. 
         SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_ITEMDROP, m_pClientList[iClientH]->m_cMapIndex,
             m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY,
-            pItem->m_sSprite, pItem->m_sSpriteFrame, pItem->m_cItemColor); //v1.4 color
+            pItem->m_sSprite, pItem->m_sSpriteFrame, pItem->m_cItemColor);
 
-        // Â´ÃµÃ€ÃŒÂ»Ã³ Â°Â¡ÃÃºÂ¼Ã¶ Â¾Ã¸Â´Ã™Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ ÂºÂ¸Â³Â½Â´Ã™.
         dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
         *dwp = MSGID_NOTIFY;
         wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
@@ -15928,11 +12522,10 @@ BOOL CGame::bAddItem(int iClientH, CItem * pItem, char cMode)
 
 int CGame::__iSearchForQuest(int iClientH, int iWho, int * pQuestType, int * pMode, int * pRewardType, int * pRewardAmount, int * pContribution, char * pTargetName, int * pTargetType, int * pTargetCount, int * pX, int * pY, int * pRange)
 {
-    int i, iQuestList[DEF_MAXQUESTTYPE], iIndex, iQuest, iReward, iQuestIndex;
+    int i, iQuestList[DEF_MAXQUESTTYPE]{}, iIndex, iQuest, iReward, iQuestIndex;
 
     if (m_pClientList[iClientH] == NULL) return -1;
 
-    // Ã€Ã»Ã‡Ã•Ã‡Ã‘ Â¹ÃŒÂ¼Ã‡ Â¹Ã¨Â¿Â­ ÃƒÃŠÂ±Ã¢ÃˆÂ­.
     iIndex = 0;
     for (i = 0; i < DEF_MAXQUESTTYPE; i++)
         iQuestList[i] = -1;
@@ -15949,37 +12542,31 @@ int CGame::__iSearchForQuest(int iClientH, int iWho, int * pQuestType, int * pMo
 
             if (m_pQuestConfigList[i]->m_iRequiredSkillNum != -1)
             {
-                // Â°Ã­Â·ÃÃ‡Ã˜Â¾ÃŸ Ã‡Ã’ Â½ÂºÃ…Â³Ã€ÃŒ Ã€Ã–Â´Ã™. 
                 if (m_pClientList[iClientH]->m_cSkillMastery[m_pQuestConfigList[i]->m_iRequiredSkillNum] <
                     m_pQuestConfigList[i]->m_iRequiredSkillLevel) goto SFQ_SKIP;
             }
 
-            // Ã…Â©Â·Ã§Â¼Â¼Ã€ÃŒÂµÃ¥ Â¸Ã°ÂµÃ¥Ã€ÃÂ¶Â§Â´Ã‚ Ã‡Ã’Â´Ã§ Ã…Â¸Ã€Ã”Ã€ÃŒ 1Ã€ÃŽ Ã„Ã¹Â½ÂºÃ†Â®Â¸Â¸ ÂºÃŽÂ¿Â©ÂµÃˆÂ´Ã™.
             if ((m_bIsCrusadeMode == TRUE) && (m_pQuestConfigList[i]->m_iAssignType != 1)) goto SFQ_SKIP;
-            // Ã…Â©Â·Ã§Â¼Â¼Ã€ÃŒÂµÃ¥ Â¸Ã°ÂµÃ¥Â°Â¡ Â¾Ã†Â´Ã’Â¶Â§Â´Ã‚ Ã‡Ã’Â´Ã§ Ã…Â¸Ã€Ã”Ã€ÃŒ 1Ã€Âº Â¼Â±Ã…ÃƒÂµÃ‡ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
             if ((m_bIsCrusadeMode == FALSE) && (m_pQuestConfigList[i]->m_iAssignType == 1)) goto SFQ_SKIP;
 
             if (m_pQuestConfigList[i]->m_iContributionLimit < m_pClientList[iClientH]->m_iContribution) goto SFQ_SKIP;
 
-            // Â¿Â©Â±Ã¢Â±Ã®ÃÃ¶ Â¿Ã€Â¸Ã© ÃÂ¶Â°Ã‡Â¿Â¡ Ã‡Ã•Â´Ã§Ã‡Ã‘ Ã„Ã¹Â½ÂºÃ†Â®Â´Ã™. ÂµÃ®Â·ÃÃ‡Ã‘Â´Ã™. 
             iQuestList[iIndex] = i;
             iIndex++;
 
             SFQ_SKIP:;
         }
 
-    // iIndexÂ°Â³ Â¸Â¸Ã…Â­Ã€Ã‡ ÃÂ¶Â°Ã‡Â¿Â¡ Â¸Â¸ÃÂ·Ã‡ÃÂ´Ã‚ Ã„Ã¹Â½ÂºÃ†Â®Â¸Â¦ ÃƒÂ£Â¾Ã’Â´Ã™. Â±Ã— ÃÃŸÂ¿Â¡Â¼Â­ Â·Â£Â´Ã½Ã‡ÃÂ°Ã” 1Â°Â³Â¸Â¦ Â¼Â±Ã…ÃƒÃ‡Ã‘Â´Ã™.
     if (iIndex == 0) return -1;
     iQuest = (iDice(1, iIndex)) - 1;
     iQuestIndex = iQuestList[iQuest];
-    // Ã„Ã¹Â½ÂºÃ†Â® Ã€ÃŽÂµÂ¦Â½Âº 
     iReward = iDice(1, 3);
-    *pMode = m_pQuestConfigList[iQuestIndex]->m_iResponseMode;					// Ã„Ã¹Â½ÂºÃ†Â® Ã€Ã€Â´Ã¤ Â¸Ã°ÂµÃ¥ 
-    *pRewardType = m_pQuestConfigList[iQuestIndex]->m_iRewardType[iReward];	// Ã„Ã¹Â½ÂºÃ†Â® Â»Ã³Ã‡Â° ÃÂ¾Â·Ã¹ 
-    *pRewardAmount = m_pQuestConfigList[iQuestIndex]->m_iRewardAmount[iReward];	// Ã„Ã¹Â½ÂºÃ†Â® Â»Ã³Ã‡Â° Â°Â¹Â¼Ã¶ 
-    *pContribution = m_pQuestConfigList[iQuestIndex]->m_iContribution;			// Ã„Ã¹Â½ÂºÃ†Â® Ã‡Ã˜Â°Ã¡Â½Ãƒ Â¿ÃƒÂ¶Ã³Â°Â¡Â´Ã‚ Â°Ã¸Ã‡Ã¥ÂµÂµ 
+    *pMode = m_pQuestConfigList[iQuestIndex]->m_iResponseMode;
+    *pRewardType = m_pQuestConfigList[iQuestIndex]->m_iRewardType[iReward];
+    *pRewardAmount = m_pQuestConfigList[iQuestIndex]->m_iRewardAmount[iReward];
+    *pContribution = m_pQuestConfigList[iQuestIndex]->m_iContribution;
 
-    strcpy(pTargetName, m_pQuestConfigList[iQuestIndex]->m_cTargetName);			// Ã„Ã¹Â½ÂºÃ†Â® Â¸ÃŠ Ã€ÃŒÂ¸Â§ Â¼Ã¶Â·Ã 
+    strcpy(pTargetName, m_pQuestConfigList[iQuestIndex]->m_cTargetName);
     *pX = m_pQuestConfigList[iQuestIndex]->m_sX;
     *pY = m_pQuestConfigList[iQuestIndex]->m_sY;
     *pRange = m_pQuestConfigList[iQuestIndex]->m_iRange;
@@ -16001,13 +12588,11 @@ void CGame::_SendQuestContents(int iClientH)
     iIndex = m_pClientList[iClientH]->m_iQuest;
     if (iIndex == NULL)
     {
-        // Ã‡Ã’Â´Ã§ÂµÃˆ QuestÂ°Â¡ Â¾Ã¸Â´Ã™. 
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_QUESTCONTENTS, NULL, NULL, NULL, NULL,
             NULL, NULL, NULL, NULL, NULL, NULL, NULL);
     }
     else
     {
-        // Ã‡Ã’Â´Ã§ÂµÃˆ Quest Â³Â»Â¿Ã«Ã€Â» ÂºÂ¸Â³Â»ÃÃ˜Â´Ã™.
         iWho = m_pQuestConfigList[iIndex]->m_iFrom;
         iQuestType = m_pQuestConfigList[iIndex]->m_iType;
         iContribution = m_pQuestConfigList[iIndex]->m_iContribution;
@@ -16048,7 +12633,6 @@ void CGame::_CheckQuestEnvironment(int iClientH)
 
     if (m_pQuestConfigList[iIndex]->m_iQuestID != m_pClientList[iClientH]->m_iQuestID)
     {
-        // Ã„Ã¹Â½ÂºÃ†Â® ID Â°ÂªÃ€ÃŒ Â´Ã™Â¸Â£Â´Ã™. Ã‡Ã’Â´Ã§Â¹ÃžÂ¾Ã’Â´Ã¸ Â±Ã— Ã„Ã¹Â½ÂºÃ†Â®Â°Â¡ Â¾Ã†Â´ÃÂ´Ã™. Ã„Ã¹Â½ÂºÃ†Â®Â´Ã‚ ÃƒÃ«Â¼Ã’ÂµÃˆÂ´Ã™.
         m_pClientList[iClientH]->m_iQuest = NULL;
         m_pClientList[iClientH]->m_iQuestID = NULL;
         m_pClientList[iClientH]->m_iQuestRewardAmount = NULL;
@@ -16062,7 +12646,6 @@ void CGame::_CheckQuestEnvironment(int iClientH)
     {
     case DEF_QUESTTYPE_MONSTERHUNT:
     case DEF_QUESTTYPE_GOPLACE:
-        // Â¸Ã³Â½ÂºÃ…Ã Â»Ã§Â³Ã‰Ã€Ã‡ Â°Ã¦Â¿Ã¬ Â¸Ã…Â¹Ã¸ Â¸Ã³Â½ÂºÃ…Ã Â»Ã§Â³Ã‰Â½Ãƒ Â¸ÃŠ Ã€ÃŒÂ¸Â§Ã€Â» ÂºÃ±Â±Â³Ã‡ÃÂ´Ã‚ Â°ÃÃ€Âº ÂºÃ±ÃˆÂ¿Ã€Â²Ã€Ã»Ã€ÃŒÂ¹Ã‡Â·ÃŽ Â¹ÃŒÂ¸Â® Â¸ÃŠ Ã€ÃŒÂ¸Â§Ã€Â» ÂºÃ±Â±Â³, Ã‡ÃƒÂ·Â¡Â±Ã—Â¸Â¦ Â¼Â³ÃÂ¤Ã‡Ã˜ Â³ÃµÂ´Ã‚Â´Ã™. 
         ZeroMemory(cTargetName, sizeof(cTargetName));
         memcpy(cTargetName, m_pQuestConfigList[iIndex]->m_cTargetName, 20);
         if (memcmp(m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_cName, cTargetName, 10) == 0)
@@ -16077,7 +12660,6 @@ BOOL CGame::_bCheckIsQuestCompleted(int iClientH)
 {
     int iQuestIndex;
 
-    // Ã„Ã¹Â½ÂºÃ†Â®Â°Â¡ ÃÂ¾Â·Ã¡ÂµÃ‡Â¾ÃºÂ´Ã‚ÃÃ¶ Ã†Ã‡Â´ÃœÃ‡Ã‘ ÃˆÃ„ Â¸ÃžÂ½ÃƒÃÃ¶ ÃƒÂ³Â¸Â®.
     if (m_pClientList[iClientH] == NULL) return FALSE;
     if (m_pClientList[iClientH]->m_bIsQuestCompleted == TRUE) return FALSE;
     iQuestIndex = m_pClientList[iClientH]->m_iQuest;
@@ -16091,7 +12673,6 @@ BOOL CGame::_bCheckIsQuestCompleted(int iClientH)
             if ((m_pClientList[iClientH]->m_bQuestMatchFlag_Loc == TRUE) &&
                 (m_pClientList[iClientH]->m_iCurQuestCount >= m_pQuestConfigList[iQuestIndex]->m_iMaxCount))
             {
-                // Â¸Ã³Â½ÂºÃ…Ã Â»Ã§Â³Ã‰ Ã„Ã¹Â½ÂºÃ†Â®Â°Â¡ Â¿ÃÂ·Ã¡ÂµÃ‡Â¾ÃºÂ´Ã™. Â¿ÃÂ·Ã¡ÂµÃ‡Â¾ÃºÃ€Â¸Â¸Ã© Ã€Ã‡Â·ÃšÃ€ÃŽÂ¿Â¡Â°Ã” ÂµÂ¹Â¾Ã†Â°Â¡ Â´Ã«ÃˆÂ­Â¸Â¦ Ã‡ÃÂ¸Ã© Ã†Ã·Â»Ã³Â¹ÃžÂ´Ã‚Â´Ã™. 
                 m_pClientList[iClientH]->m_bIsQuestCompleted = TRUE;
                 SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_QUESTCOMPLETED, NULL, NULL, NULL, NULL);
                 return TRUE;
@@ -16099,13 +12680,12 @@ BOOL CGame::_bCheckIsQuestCompleted(int iClientH)
             break;
 
         case DEF_QUESTTYPE_GOPLACE:
-            if ((m_pClientList[iClientH]->m_bQuestMatchFlag_Loc == TRUE) && // Â¸ÃŠÃ€Âº Â¸Ã‚Â°Ã­
-                (m_pClientList[iClientH]->m_sX >= m_pQuestConfigList[iQuestIndex]->m_sX - m_pQuestConfigList[iQuestIndex]->m_iRange) && // ÃÃ‚Ã‡Â¥ÂµÂµ Ã€ÃŒÂ³Â»Ã€ÃŒÂ¸Ã© 
+            if ((m_pClientList[iClientH]->m_bQuestMatchFlag_Loc == TRUE) &&
+                (m_pClientList[iClientH]->m_sX >= m_pQuestConfigList[iQuestIndex]->m_sX - m_pQuestConfigList[iQuestIndex]->m_iRange) &&
                 (m_pClientList[iClientH]->m_sX <= m_pQuestConfigList[iQuestIndex]->m_sX + m_pQuestConfigList[iQuestIndex]->m_iRange) &&
                 (m_pClientList[iClientH]->m_sY >= m_pQuestConfigList[iQuestIndex]->m_sY - m_pQuestConfigList[iQuestIndex]->m_iRange) &&
                 (m_pClientList[iClientH]->m_sY <= m_pQuestConfigList[iQuestIndex]->m_sY + m_pQuestConfigList[iQuestIndex]->m_iRange))
             {
-                // Ã†Â¯ÃÂ¤ Ã€Ã¥Â¼Ã’ ÃƒÂ£Â¾Ã†Â°Â¡Â±Ã¢ Ã„Ã¹Â½ÂºÃ†Â® Â¿ÃÂ·Ã¡.
                 m_pClientList[iClientH]->m_bIsQuestCompleted = TRUE;
                 SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_QUESTCOMPLETED, NULL, NULL, NULL, NULL);
                 return TRUE;
@@ -16119,7 +12699,7 @@ BOOL CGame::_bCheckIsQuestCompleted(int iClientH)
 
 void CGame::SendItemNotifyMsg(int iClientH, WORD wMsgType, CItem * pItem, int iV1)
 {
-    char * cp, cData[512];
+    char * cp, cData[512]{};
     DWORD * dwp;
     WORD * wp;
     short * sp;
@@ -16136,7 +12716,7 @@ void CGame::SendItemNotifyMsg(int iClientH, WORD wMsgType, CItem * pItem, int iV
     switch (wMsgType)
     {
     case DEF_NOTIFY_ITEMOBTAINED:
-        *cp = 1; // 1Â°Â³ ÃˆÂ¹ÂµÃ¦Ã‡ÃŸÂ´Ã™. <- Â¿Â©Â±Ã¢Â¼Â­ 1Â°Â³Â¶Ãµ Â¼Ã¶Â·Â® Ã„Â«Â¿Ã®Ã†Â®Â¸Â¦ Â¸Â»Ã‡ÃÂ´Ã‚ Â°ÃÃ€ÃŒ Â¾Ã†Â´ÃÂ´Ã™
+        *cp = 1;
         cp++;
 
         memcpy(cp, pItem->m_cName, 20);
@@ -16152,7 +12732,7 @@ void CGame::SendItemNotifyMsg(int iClientH, WORD wMsgType, CItem * pItem, int iV
         *cp = pItem->m_cEquipPos;
         cp++;
 
-        *cp = (char)0; // Â¾Ã²Ã€Âº Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒÂ¹Ã‡Â·ÃŽ Ã€Ã¥Ã‚Ã¸ÂµÃ‡ÃÃ¶ Â¾ÃŠÂ¾Ã’Â´Ã™.
+        *cp = (char)0;
         cp++;
 
         sp = (short *)cp;
@@ -16178,17 +12758,17 @@ void CGame::SendItemNotifyMsg(int iClientH, WORD wMsgType, CItem * pItem, int iV
         *sp = pItem->m_sSpriteFrame;
         cp += 2;
 
-        *cp = pItem->m_cItemColor; // v1.4
+        *cp = pItem->m_cItemColor;
         cp++;
 
-        *cp = (char)pItem->m_sItemSpecEffectValue2; // v1.41 
+        *cp = (char)pItem->m_sItemSpecEffectValue2;
         cp++;
 
         dwp = (DWORD *)cp;
         *dwp = pItem->m_dwAttribute;
         cp += 4;
         /*
-        *cp = (char)(pItem->m_dwAttribute & 0x00000001); // Custom-ItemÃ€ÃŽÃÃ¶Ã€Ã‡ Â¿Â©ÂºÃŽ
+        *cp = (char)(pItem->m_dwAttribute & 0x00000001);
         cp++;
         */
 
@@ -16212,7 +12792,7 @@ void CGame::SendItemNotifyMsg(int iClientH, WORD wMsgType, CItem * pItem, int iV
         *cp = pItem->m_cEquipPos;
         cp++;
 
-        *cp = (char)0; // Â¾Ã²Ã€Âº Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒÂ¹Ã‡Â·ÃŽ Ã€Ã¥Ã‚Ã¸ÂµÃ‡ÃÃ¶ Â¾ÃŠÂ¾Ã’Â´Ã™.
+        *cp = (char)0; 
         cp++;
 
         sp = (short *)cp;
@@ -16242,7 +12822,7 @@ void CGame::SendItemNotifyMsg(int iClientH, WORD wMsgType, CItem * pItem, int iV
         cp++;
 
         wp = (WORD *)cp;
-        *wp = iV1; // (iCost - iDiscountCost);
+        *wp = iV1;
 
         iRet = m_pClientList[iClientH]->iSendMsg(cData, 48);
         break;
@@ -16318,11 +12898,11 @@ int CGame::iGetMaxSP(int iClientH)
 void CGame::GetMapInitialPoint(int iMapIndex, short * pX, short * pY, char * pPlayerLocation)
 {
     int i, iTotalPoint;
-    POINT  pList[DEF_MAXINITIALPOINT];
+    POINT  pList[DEF_MAXINITIALPOINT]{};
 
     if (m_pMapList[iMapIndex] == NULL) return;
 
-    // Â¸Â®Â½ÂºÃ†Â®Â¸Â¦ Ã€Ã›Â¼ÂºÃ‡Ã‘Â´Ã™.
+    
     iTotalPoint = 0;
     for (i = 0; i < DEF_MAXINITIALPOINT; i++)
         if (m_pMapList[iMapIndex]->m_pInitialPoint[i].x != -1)
@@ -16334,7 +12914,7 @@ void CGame::GetMapInitialPoint(int iMapIndex, short * pX, short * pY, char * pPl
 
     if (iTotalPoint == 0) return;
 
-    // v1.42 Â¼Ã’Â¼Ã“Ã€ÃŒ ÃÃŸÂ¸Â³Ã€ÃŒÂ¸Ã© Â¹Â«ÃÂ¶Â°Ã‡ Initial PointÃ€Ã‡ ÃƒÂ³Ã€Â½Ã€Â¸Â·ÃŽ Â°Â£Â´Ã™.
+    
     if ((pPlayerLocation != NULL) && (memcmp(pPlayerLocation, "NONE", 4) == 0))
         i = 0;
     else i = iDice(1, iTotalPoint) - 1;
@@ -16361,7 +12941,7 @@ void CGame::_CheckStrategicPointOccupyStatus(char cMapIndex)
 
             pTile = (CTile *)(m_pMapList[cMapIndex]->m_pTile + iX + iY * m_pMapList[cMapIndex]->m_sSizeY);
 
-            // Ã€Ã¼Â·Â«Ã€Ã» ÃÃ¶ÃÂ¡Ã€Ã‡ Â°Â¡ÃÃŸÃ„Â¡Â¸Â¦ Â°Ã¶Ã‡Ã˜Â¼Â­ Â´ÃµÃ‡Ã‘Â´Ã™. 
+            
             m_iStrategicStatus += pTile->m_iOccupyStatus * iValue;
         }
 }
@@ -16476,11 +13056,11 @@ void CGame::CheckSpecialEvent(int iClientH)
 
     if (m_pClientList[iClientH] == NULL) return;
 
-    //v1.42 Ã€ÃŒÂºÂ¥Ã†Â® Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» ÃÃ˜Â´Ã™. 2000.8.1Ã€Ã 1ÃÃ–Â³Ã¢ Â¹ÃÃÃ¶ Â¼Ã¶Â¿Â© 
+    
     if (m_pClientList[iClientH]->m_iSpecialEventID == 200081)
     {
 
-        // Ã€ÃºÂ·Â¾Ã€Âº ÃÃ–ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
+        
         if (m_pClientList[iClientH]->m_iLevel < 11)
         {
             m_pClientList[iClientH]->m_iSpecialEventID = 0;
@@ -16493,28 +13073,28 @@ void CGame::CheckSpecialEvent(int iClientH)
         pItem = new CItem;
         if (_bInitItemAttr(pItem, cItemName) == FALSE)
         {
-            // Â±Â¸Ã€Ã”Ã‡ÃÂ°Ã­Ã€Ãš Ã‡ÃÂ´Ã‚ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¾Ã†Ã€ÃŒÃ…Ã› Â¸Â®Â½ÂºÃ†Â®Â»Ã³Â¿Â¡ Â¾Ã¸Â´Ã™. Â±Â¸Ã€Ã”Ã€ÃŒ ÂºÃ’Â°Â¡Â´Ã‰Ã‡ÃÂ´Ã™.
+            
             delete pItem;
         }
         else
         {
             if (_bAddClientItemList(iClientH, pItem, &iEraseReq) == TRUE)
             {
-                // Â¿Â¡Â·Â¯ Â¹Ã¦ÃÃ¶Â¿Ã« Ã„ÃšÂµÃ¥
+                
                 if (m_pClientList[iClientH]->m_iCurWeightLoad < 0) m_pClientList[iClientH]->m_iCurWeightLoad = 0;
 
-                //testcode Â·ÃŽÂ±Ã—Ã†Ã„Ã€ÃÂ¿Â¡ Â±Ã¢Â·ÃÃ‡Ã‘Â´Ã™.
+                
                 wsprintf(G_cTxt, "(*) Get MemorialRing  : Char(%s)", m_pClientList[iClientH]->m_cCharName);
                 log->info(G_cTxt);
 
-                // Â¾Ã†Ã€ÃŒÃ…Ã›Â¿Â¡ Â»Ã§Â¿Ã«Ã€Ãš Â°Ã­Ã€Â¯ Â¹Ã¸ÃˆÂ£Â¸Â¦ Ã€Ã”Â·Ã‚Ã‡Ã‘Â´Ã™. Â´Ã™Â¸Â¥ Ã„Â³Â¸Â¯Ã…ÃÂ´Ã‚ Ã€ÃŒ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Â»Ã§Â¿Ã«Ã‡Ã’ Â¼Ã¶Â°Â¡ Â¾Ã¸Â´Ã™.
+                
                 pItem->m_sTouchEffectType = DEF_ITET_UNIQUE_OWNER;
                 pItem->m_sTouchEffectValue1 = m_pClientList[iClientH]->m_sCharIDnum1;
                 pItem->m_sTouchEffectValue2 = m_pClientList[iClientH]->m_sCharIDnum2;
                 pItem->m_sTouchEffectValue3 = m_pClientList[iClientH]->m_sCharIDnum3;
                 pItem->m_cItemColor = 9;
 
-                // Â¾Ã†Ã€ÃŒÃ…Ã› Â¹ÃžÂ¾Ã’Ã€Â¸Â¹Ã‡Â·ÃŽ Ã…Â¬Â¸Â®Â¾Ã®.
+                
                 m_pClientList[iClientH]->m_iSpecialEventID = 0;
             }
         }
@@ -16533,7 +13113,7 @@ BOOL CGame::_bCheckDupItemID(CItem * pItem)
                 (pItem->m_sTouchEffectValue2 == m_pDupItemIDList[i]->m_sTouchEffectValue2) &&
                 (pItem->m_sTouchEffectValue3 == m_pDupItemIDList[i]->m_sTouchEffectValue3))
             {
-                // Â°Â¡Â°Ã ÃÂ¤ÂºÂ¸Â¸Â¦ Â°Â»Â½Ã…Ã‡ÃÂ°Ã­ Â¸Â®Ã…Ã.
+                
                 pItem->m_wPrice = m_pDupItemIDList[i]->m_wPrice;
                 return TRUE;
             }
@@ -16551,19 +13131,19 @@ void CGame::_AdjustRareItemValue(CItem * pItem)
     {
         dwSWEType = (pItem->m_dwAttribute & 0x00F00000) >> 20;
         dwSWEValue = (pItem->m_dwAttribute & 0x000F0000) >> 16;
-        // ÃˆÃ±Â±Ã Â¾Ã†Ã€ÃŒÃ…Ã› ÃˆÂ¿Â°Ãº ÃÂ¾Â·Ã¹: 
-        // 0-None 1-Ã‡ÃŠÂ»Ã¬Â±Ã¢Â´Ã«Â¹ÃŒÃÃ¶ÃƒÃŸÂ°Â¡ 2-ÃÃŸÂµÂ¶ÃˆÂ¿Â°Ãº 3-ÃÂ¤Ã€Ã‡Ã€Ã‡ 
-        // 5-Â¹ÃŽÃƒÂ¸Ã€Ã‡ 6-Â°Â¡ÂºÂ­Â¿Ã® 7-Â¿Â¹Â¸Â®Ã‡Ã‘ 8-Â°Â­ÃˆÂ­ÂµÃˆ 9-Â°Ã­Â´Ã«Â¹Â®Â¸Ã­Ã€Ã‡
+        
+        
+        
         switch (dwSWEType)
         {
         case 0: break;
 
-        case 5: // Â¹ÃŽÃƒÂ¸Ã€Ã‡ 
+        case 5: 
             pItem->m_cSpeed--;
             if (pItem->m_cSpeed < 0) pItem->m_cSpeed = 0;
             break;
 
-        case 6: // Â°Â¡ÂºÂ­Â¿Ã® 
+        case 6: 
             dV2 = (double)pItem->m_wWeight;
             dV3 = (double)(dwSWEValue * 4);
             dV1 = (dV3 / 100.0f) * dV2;
@@ -16572,8 +13152,8 @@ void CGame::_AdjustRareItemValue(CItem * pItem)
             if (pItem->m_wWeight < 1) pItem->m_wWeight = 1;
             break;
 
-        case 8: // Â°Â­ÃˆÂ­ÂµÃˆ 
-        case 9: // Â°Ã­Â´Ã«Â¹Â®Â¸Ã­Ã€Ã‡ 
+        case 8: 
+        case 9: 
             dV2 = (double)pItem->m_wMaxLifeSpan;
             dV3 = (double)(dwSWEValue * 7);
             dV1 = (dV3 / 100.0f) * dV2;
@@ -16594,7 +13174,7 @@ void CGame::_DeleteRandomOccupyFlag(int iMapIndex)
 
     dwTime = timeGetTime();
 
-    // ÃƒÃ‘ Â±ÃªÂ¹ÃŸ Â°Â¹Â¼Ã¶Â¸Â¦ Â±Â¸Ã‡Ã‘Â´Ã™.
+    
     iTotalFlags = 0;
     for (i = 1; i < DEF_MAXOCCUPYFLAG; i++)
         if (m_pMapList[iMapIndex]->m_pOccupyFlag[i] != NULL)
@@ -16602,7 +13182,7 @@ void CGame::_DeleteRandomOccupyFlag(int iMapIndex)
             iTotalFlags++;
         }
 
-    // Â·Â£Â´Ã½Ã‡ÃÂ°Ã” Ã‡ÃÂ³Âª ÃÂ¤Ã‡Ã‘Â´Ã™.
+    
     iTargetFlag = iDice(1, iTotalFlags);
 
     iCount = 0;
@@ -16612,9 +13192,6 @@ void CGame::_DeleteRandomOccupyFlag(int iMapIndex)
             iCount++;
             if ((iCount == iTotalFlags) && (m_pMapList[iMapIndex]->m_pOccupyFlag[i] != NULL))
             {
-                // m_pMapList[iMapIndex]->m_pOccupyFlag[i] : Ã€ÃŒ Â±ÃªÂ¹ÃŸÃ€Â» Â¾Ã¸Â¾Ã˜Â´Ã™.	
-
-                //testcode
                 wsprintf(G_cTxt, "(*)Delete OccupyFlag: Side(%d) XY(%d, %d)", m_pMapList[iMapIndex]->m_pOccupyFlag[i]->m_cSide, m_pMapList[iMapIndex]->m_pOccupyFlag[i]->m_sX, m_pMapList[iMapIndex]->m_pOccupyFlag[i]->m_sY);
                 log->info(G_cTxt);
 
@@ -16625,42 +13202,42 @@ void CGame::_DeleteRandomOccupyFlag(int iMapIndex)
 
                 pTile = (CTile *)(m_pMapList[iMapIndex]->m_pTile + m_pMapList[iMapIndex]->m_pOccupyFlag[i]->m_sX +
                     m_pMapList[iMapIndex]->m_pOccupyFlag[i]->m_sY * m_pMapList[iMapIndex]->m_sSizeY);
-                // Â±ÃªÂ¹ÃŸ Â°Â´ÃƒÂ¼ Â°Â¨Â¼Ã’ 
+                
                 m_pMapList[iMapIndex]->m_iTotalOccupyFlags--;
 
                 iDynamicObjectIndex = m_pMapList[iMapIndex]->m_pOccupyFlag[i]->m_iDynamicObjectIndex;
-                // Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â±ÃªÂ¹ÃŸÃ€ÃŒ Â»Ã§Â¶Ã³ÃÃ¼Ã€Â» Â¾Ã‹Â¸Â®Â°Ã­ 
+                
                 SendEventToNearClient_TypeB(MSGID_DYNAMICOBJECT, DEF_MSGTYPE_REJECT, m_pDynamicObjectList[iDynamicObjectIndex]->m_cMapIndex,
                     m_pDynamicObjectList[iDynamicObjectIndex]->m_sX, m_pDynamicObjectList[iDynamicObjectIndex]->m_sY,
                     m_pDynamicObjectList[iDynamicObjectIndex]->m_sType, iDynamicObjectIndex, NULL);
-                // Â¸ÃŠÂ¿Â¡Â¼Â­ Â±ÃªÂ¹ÃŸ ÂµÂ¿Ã€Ã» Â°Â´ÃƒÂ¼Â¸Â¦ Â»Ã¨ÃÂ¦Ã‡Ã‘Â´Ã™.
+                
                 m_pMapList[m_pDynamicObjectList[iDynamicObjectIndex]->m_cMapIndex]->SetDynamicObject(NULL, NULL, m_pDynamicObjectList[iDynamicObjectIndex]->m_sX, m_pDynamicObjectList[iDynamicObjectIndex]->m_sY, dwTime);
 
-                // Â±ÃªÂ¹ÃŸ Â°Â´ÃƒÂ¼Â¸Â¦ Â»Ã¨ÃÂ¦ 
+                
                 delete m_pMapList[iMapIndex]->m_pOccupyFlag[i];
                 m_pMapList[iMapIndex]->m_pOccupyFlag[i] = NULL;
 
-                // Ã…Â¸Ã€Ã Â»Ã³Ã€Ã‡ Â±ÃªÂ¹ÃŸ Ã€ÃŽÂµÂ¦Â½ÂºÂ¸Â¦ Â»Ã¨ÃÂ¦
+                
                 pTile->m_iOccupyFlagIndex = NULL;
 
-                // ÂµÂ¿Ã€Ã» Â°Â´ÃƒÂ¼ Â»Ã¨ÃÂ¦ 
+                
                 delete m_pDynamicObjectList[iDynamicObjectIndex];
                 m_pDynamicObjectList[iDynamicObjectIndex] = NULL;
 
-                // Ã€ÃŒ Â±ÃªÂ¹ÃŸÃ€Â» Â»Ã¨ÃÂ¦Ã‡ÃÂ¹Ã‡Â·ÃŽ Â¿ÂµÃ‡Ã¢Â±Ã‡ Â³Â»Ã€Ã‡ Â°ÂªÃ€Â» ÂºÂ¯Â°Ã¦Â½ÃƒÃ„Ã‘Â¾ÃŸ Ã‡Ã‘Â´Ã™. *** Â¸Ã‡ Â¸Â¶ÃÃ¶Â¸Â·Â¿Â¡ ÃƒÂ³Â¸Â®Ã‡Ã˜Â¾ÃŸ Ã‡Ã‘Â´Ã™.
+                
                 for (tx = fx - 10; tx <= fx + 10; tx++)
                     for (ty = fy - 8; ty <= fy + 8; ty++)
                     {
                         if ((tx < 0) || (tx >= m_pMapList[iMapIndex]->m_sSizeX) ||
                             (ty < 0) || (ty >= m_pMapList[iMapIndex]->m_sSizeY))
                         {
-                            // Â¹Â«Â½ÃƒÃ‡Ã˜Â¾ÃŸ Ã‡ÃÂ´Ã‚ ÃÃ‚Ã‡Â¥ 
+                            
                         }
                         else
                         {
                             pTile = (CTile *)(m_pMapList[iMapIndex]->m_pTile + tx + ty * m_pMapList[iMapIndex]->m_sSizeY);
                             iPrevStatus = pTile->m_iOccupyStatus;
-                            // Side: Â¾Ã†Â·Â¹Â½ÂºÂµÂ§(1)  Â¿Â¤Â¹Ã™Ã€ÃŽ(2)
+                            
                             switch (iLocalSide)
                             {
                             case 1:
@@ -16674,7 +13251,6 @@ void CGame::_DeleteRandomOccupyFlag(int iMapIndex)
                             }
                         }
                     }
-                //
                 return;
             }
         }
@@ -16690,7 +13266,7 @@ BOOL CGame::bCheckEnergySphereDestination(int iNpcH, short sAttackerH, char cAtt
 
     if (m_pNpcList[iNpcH]->m_cMapIndex != m_iMiddlelandMapIndex)
     {
-        // Â»Ã§Ã…ÃµÃ€Ã¥Ã€Ã‡ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®
+        
         iGoalMapIndex = m_pNpcList[iNpcH]->m_cMapIndex;
 
         sX = m_pNpcList[iNpcH]->m_sX;
@@ -16701,31 +13277,30 @@ BOOL CGame::bCheckEnergySphereDestination(int iNpcH, short sAttackerH, char cAtt
         dY = m_pMapList[iGoalMapIndex]->m_stEnergySphereGoalList[m_pMapList[iGoalMapIndex]->m_iCurEnergySphereGoalPointIndex].aresdenY;
         if ((sX >= dX - 2) && (sX <= dX + 2) && (sY >= dY - 2) && (sY <= dY + 2))
         {
-            // Â¾Ã†Â·Â¹Â½ÂºÂµÂ§ Â¸Ã±Ã‡Â¥ÃÃ¶ÃÂ¡Â¿Â¡ ÂµÂµÃ‚Ã¸Ã‡ÃŸÂ´Ã™.
-            // Ã‡Ã¶Ã€Ã§ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â°Ã± Ã€ÃŽÂµÂ¦Â½Âº Ã€ÃºÃ€Ã¥ 
+            
+            
             m_pMapList[iGoalMapIndex]->m_iCurEnergySphereGoalPointIndex = -1;
 
             if ((cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sAttackerH] != NULL))
             {
                 if (m_pClientList[sAttackerH]->m_cSide == 1)
-                { // Aresden (Side:1)
-// Ã€ÃšÂ½Ã…Ã€Ã‡ Â±Â¹Â°Â¡ Ã†Ã·Ã…Â»Â¿Â¡ Â°Ã±Ã€Â» Â³Ã–Ã€Âº Â°Ã¦Â¿Ã¬ Â°Ã¸Ã‡Ã¥ÂµÂµ +5
+                {
                     m_pClientList[sAttackerH]->m_iContribution += 5;
-                    // Â·ÃŽÂ±Ã— Ã€Ã›Â¼Âº
+                    
                     wsprintf(G_cTxt, "(!) EnergySphere Hit By Aresden Player (%s)", m_pClientList[sAttackerH]->m_cCharName);
                     log->info(G_cTxt);
                 }
                 else
                 {
-                    // Â´Ã™Â¸Â¥ Â±Â¹Â°Â¡Â¿Â¡ Â°Ã±Ã€Â» Â³Ã–Â¾ÃºÃ€Â» Â°Ã¦Â¿Ã¬ Â°Ã¸Ã‡Ã¥ÂµÂµÂ°Â¡ 10 Â¶Â³Â¾Ã®ÃÃ¸Â´Ã™.
+                    
                     m_pClientList[sAttackerH]->m_iContribution -= 10;
                 }
 
-                // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â°Â¡ Â°Ã±Ã€ÃŽ ÂµÃ†Ã€Â½Ã€Â» Â¸Ã°ÂµÃ§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã‹Â·ÃÃÃ˜Â´Ã™.
+                
                 for (i = 1; i < DEF_MAXCLIENTS; i++)
                     if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
                     {
-                        // Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿ÃÃ€Ã‡ Â¸ÃžÂ½ÃƒÃÃ¶ Ã‚Ã¸Â¿Ã€Â·ÃŽ 
+                        
                         SendNotifyMsg(NULL, i, DEF_NOTIFY_ENERGYSPHEREGOALIN, cResult, m_pClientList[sAttackerH]->m_cSide, 2, m_pClientList[sAttackerH]->m_cCharName);
                     }
             }
@@ -16736,31 +13311,29 @@ BOOL CGame::bCheckEnergySphereDestination(int iNpcH, short sAttackerH, char cAtt
         dY = m_pMapList[iGoalMapIndex]->m_stEnergySphereGoalList[m_pMapList[iGoalMapIndex]->m_iCurEnergySphereGoalPointIndex].elvineY;
         if ((sX >= dX - 2) && (sX <= dX + 2) && (sY >= dY - 2) && (sY <= dY + 2))
         {
-            // Â¿Â¤Â¹Ã™Ã€ÃŽ Â¸Ã±Ã‡Â¥ÃÃ¶ÃÂ¡Â¿Â¡ ÂµÂµÃ‚Ã¸Ã‡ÃŸÂ´Ã™.
-            // Ã‡Ã¶Ã€Ã§ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â°Ã± Ã€ÃŽÂµÂ¦Â½Âº Ã€ÃºÃ€Ã¥ 
+            
+            
             m_pMapList[iGoalMapIndex]->m_iCurEnergySphereGoalPointIndex = -1;
 
             if ((cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sAttackerH] != NULL))
             {
                 if (m_pClientList[sAttackerH]->m_cSide == 2)
-                { // Elvine (Side:2)
-// Ã€ÃšÂ½Ã…Ã€Ã‡ Â±Â¹Â°Â¡ Ã†Ã·Ã…Â»Â¿Â¡ Â°Ã±Ã€Â» Â³Ã–Ã€Âº Â°Ã¦Â¿Ã¬ Â°Ã¸Ã‡Ã¥ÂµÂµ +5
+                {
                     m_pClientList[sAttackerH]->m_iContribution += 5;
-                    // Â·ÃŽÂ±Ã— Ã€Ã›Â¼Âº
+                    
                     wsprintf(G_cTxt, "(!) EnergySphere Hit By Elvine Player (%s)", m_pClientList[sAttackerH]->m_cCharName);
                     log->info(G_cTxt);
                 }
                 else
                 {
-                    // Â´Ã™Â¸Â¥ Â±Â¹Â°Â¡Â¿Â¡ Â°Ã±Ã€Â» Â³Ã–Â¾ÃºÃ€Â» Â°Ã¦Â¿Ã¬ Â°Ã¸Ã‡Ã¥ÂµÂµÂ°Â¡ 10 Â¶Â³Â¾Ã®ÃÃ¸Â´Ã™.
+                    
                     m_pClientList[sAttackerH]->m_iContribution -= 10;
                 }
 
-                // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â°Â¡ Â°Ã±Ã€ÃŽ ÂµÃ†Ã€Â½Ã€Â» Â¸Ã°ÂµÃ§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã‹Â·ÃÃÃ˜Â´Ã™.
+                
                 for (i = 1; i < DEF_MAXCLIENTS; i++)
                     if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
                     {
-                        //
                         SendNotifyMsg(NULL, i, DEF_NOTIFY_ENERGYSPHEREGOALIN, cResult, m_pClientList[sAttackerH]->m_cSide, 1, m_pClientList[sAttackerH]->m_cCharName);
                     }
             }
@@ -16769,9 +13342,9 @@ BOOL CGame::bCheckEnergySphereDestination(int iNpcH, short sAttackerH, char cAtt
     }
     else
     {
-        // Â¹ÃŒÂµÃ©Â·Â£ÂµÃ¥ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®.
+        
 
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Ã€Ã‡ Ã‡Ã¶Ã€Ã§ Ã€Â§Ã„Â¡Â°Â¡ Â°Ã±Â°Ãº Â°Ã…Ã€Ã‡ Ã€Â¯Â»Ã§Ã‡ÃÂ¸Ã© 
+        
         sX = m_pNpcList[iNpcH]->m_sX;
         sY = m_pNpcList[iNpcH]->m_sY;
 
@@ -16780,31 +13353,30 @@ BOOL CGame::bCheckEnergySphereDestination(int iNpcH, short sAttackerH, char cAtt
         dY = m_pMapList[m_iMiddlelandMapIndex]->m_stEnergySphereGoalList[m_pMapList[m_iMiddlelandMapIndex]->m_iCurEnergySphereGoalPointIndex].aresdenY;
         if ((sX >= dX - 4) && (sX <= dX + 4) && (sY >= dY - 4) && (sY <= dY + 4))
         {
-            // Â¾Ã†Â·Â¹Â½ÂºÂµÂ§ Â¸Ã±Ã‡Â¥ÃÃ¶ÃÂ¡Â¿Â¡ ÂµÂµÃ‚Ã¸Ã‡ÃŸÂ´Ã™.
-            // Ã‡Ã¶Ã€Ã§ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â°Ã± Ã€ÃŽÂµÂ¦Â½Âº Ã€ÃºÃ€Ã¥ 
+            
+            
             m_pMapList[m_iMiddlelandMapIndex]->m_iCurEnergySphereGoalPointIndex = -1;
 
             if ((cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sAttackerH] != NULL))
             {
                 if (m_pClientList[sAttackerH]->m_cSide == 1)
-                { // Aresden (Side:1)
-// Ã€ÃšÂ½Ã…Ã€Ã‡ Â±Â¹Â°Â¡ Ã†Ã·Ã…Â»Â¿Â¡ Â°Ã±Ã€Â» Â³Ã–Ã€Âº Â°Ã¦Â¿Ã¬ Â°Ã¸Ã‡Ã¥ÂµÂµ +5
+                {
                     m_pClientList[sAttackerH]->m_iContribution += 5;
-                    // Â·ÃŽÂ±Ã— Ã€Ã›Â¼Âº
+                    
                     wsprintf(G_cTxt, "(!) EnergySphere Hit By Aresden Player (%s)", m_pClientList[sAttackerH]->m_cCharName);
                     log->info(G_cTxt);
                 }
                 else
                 {
-                    // Â´Ã™Â¸Â¥ Â±Â¹Â°Â¡Â¿Â¡ Â°Ã±Ã€Â» Â³Ã–Â¾ÃºÃ€Â» Â°Ã¦Â¿Ã¬ Â°Ã¸Ã‡Ã¥ÂµÂµÂ°Â¡ 10 Â¶Â³Â¾Ã®ÃÃ¸Â´Ã™.
+                    
                     m_pClientList[sAttackerH]->m_iContribution -= 10;
                 }
 
-                // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â°Â¡ Â°Ã±Ã€ÃŽ ÂµÃ†Ã€Â½Ã€Â» Â¸Ã°ÂµÃ§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã‹Â·ÃÃÃ˜Â´Ã™.
+                
                 for (i = 1; i < DEF_MAXCLIENTS; i++)
                     if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
                     {
-                        // Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿ÃÃ€Ã‡ Â¸ÃžÂ½ÃƒÃÃ¶ Ã‚Ã¸Â¿Ã€Â·ÃŽ 
+                        
                         SendNotifyMsg(NULL, i, DEF_NOTIFY_ENERGYSPHEREGOALIN, cResult, m_pClientList[sAttackerH]->m_cSide, 2, m_pClientList[sAttackerH]->m_cCharName);
                     }
             }
@@ -16815,31 +13387,29 @@ BOOL CGame::bCheckEnergySphereDestination(int iNpcH, short sAttackerH, char cAtt
         dY = m_pMapList[m_iMiddlelandMapIndex]->m_stEnergySphereGoalList[m_pMapList[m_iMiddlelandMapIndex]->m_iCurEnergySphereGoalPointIndex].elvineY;
         if ((sX >= dX - 4) && (sX <= dX + 4) && (sY >= dY - 4) && (sY <= dY + 4))
         {
-            // Â¿Â¤Â¹Ã™Ã€ÃŽ Â¸Ã±Ã‡Â¥ÃÃ¶ÃÂ¡Â¿Â¡ ÂµÂµÃ‚Ã¸Ã‡ÃŸÂ´Ã™.
-            // Ã‡Ã¶Ã€Ã§ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â°Ã± Ã€ÃŽÂµÂ¦Â½Âº Ã€ÃºÃ€Ã¥ 
+            
+            
             m_pMapList[m_iMiddlelandMapIndex]->m_iCurEnergySphereGoalPointIndex = -1;
 
             if ((cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sAttackerH] != NULL))
             {
                 if (m_pClientList[sAttackerH]->m_cSide == 2)
-                { // Elvine (Side:2)
-// Ã€ÃšÂ½Ã…Ã€Ã‡ Â±Â¹Â°Â¡ Ã†Ã·Ã…Â»Â¿Â¡ Â°Ã±Ã€Â» Â³Ã–Ã€Âº Â°Ã¦Â¿Ã¬ Â°Ã¸Ã‡Ã¥ÂµÂµ +5
+                {
                     m_pClientList[sAttackerH]->m_iContribution += 5;
-                    // Â·ÃŽÂ±Ã— Ã€Ã›Â¼Âº
+                    
                     wsprintf(G_cTxt, "(!) EnergySphere Hit By Aresden Player (%s)", m_pClientList[sAttackerH]->m_cCharName);
                     log->info(G_cTxt);
                 }
                 else
                 {
-                    // Â´Ã™Â¸Â¥ Â±Â¹Â°Â¡Â¿Â¡ Â°Ã±Ã€Â» Â³Ã–Â¾ÃºÃ€Â» Â°Ã¦Â¿Ã¬ Â°Ã¸Ã‡Ã¥ÂµÂµÂ°Â¡ 10 Â¶Â³Â¾Ã®ÃÃ¸Â´Ã™.
+                    
                     m_pClientList[sAttackerH]->m_iContribution -= 10;
                 }
 
-                // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â°Â¡ Â°Ã±Ã€ÃŽ ÂµÃ†Ã€Â½Ã€Â» Â¸Ã°ÂµÃ§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã‹Â·ÃÃÃ˜Â´Ã™.
+                
                 for (i = 1; i < DEF_MAXCLIENTS; i++)
                     if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
                     {
-                        //
                         SendNotifyMsg(NULL, i, DEF_NOTIFY_ENERGYSPHEREGOALIN, cResult, m_pClientList[sAttackerH]->m_cSide, 1, m_pClientList[sAttackerH]->m_cCharName);
                     }
             }
@@ -16859,21 +13429,21 @@ void CGame::EnergySphereProcessor(BOOL bIsAdminCreate, int iClientH)
 
         if (m_iMiddlelandMapIndex < 0) return;
         if (m_pMapList[m_iMiddlelandMapIndex] == NULL) return;
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â°Â¡ Â¸Â¸ÂµÃ©Â¾Ã®ÃÃº ÃˆÂ®Â·Ã¼Ã€Âº 3ÃƒÃŠÂ¸Â¶Â´Ã™ 2000ÂºÃÃ€Ã‡ 1
+        
         if (iDice(1, 2000) != 123) return;
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â´Ã‚ ÃƒÃ‘ Â»Ã§Â¿Ã«Ã€Ãš 500Â¸Ã­ Ã€ÃŒÂ»Ã³Ã€ÃÂ¶Â§Â¸Â¸ Â¸Â¸ÂµÃ©Â¾Ã® ÃÃ¸Â´Ã™.
+        
         if (m_iTotalGameServerClients < 500) return;
 
-        // Â¸Â¸Â¾Ã  Ã€ÃŒÂ¹ÃŒ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Ã€Ã‡ Â°Ã±Ã€ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã® Ã€Ã–Ã€Â¸Â¸Ã© Â¸Â¸ÂµÃ©Â¸Ã© Â¾ÃˆÂµÃˆÂ´Ã™.
+        
         if (m_pMapList[m_iMiddlelandMapIndex]->m_iCurEnergySphereGoalPointIndex >= 0) return;
 
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â¸Â¦ Â¸Â¸ÂµÃ© Ã€Â§Ã„Â¡Â¸Â¦ Â°Ã¡ÃÂ¤ 
+        
         iCIndex = iDice(1, m_pMapList[m_iMiddlelandMapIndex]->m_iTotalEnergySphereCreationPoint);
 
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â½ÃƒÃ€Ã› Ã€Â§Ã„Â¡Â°Â¡ ÃƒÃŠÂ±Ã¢ÃˆÂ­Â°Â¡ Â¾ÃˆÂµÃˆ Â»Ã³Ã…Ã‚Â¶Ã³Â¸Ã© 
+        
         if (m_pMapList[m_iMiddlelandMapIndex]->m_stEnergySphereCreationList[iCIndex].cType == NULL) return;
 
-        // Â¿Â©Â±Ã¢Â¼Â­ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â»Ã½Â¼Âº 
+        
         cSA = 0;
         pX = m_pMapList[m_iMiddlelandMapIndex]->m_stEnergySphereCreationList[iCIndex].sX;
         pY = m_pMapList[m_iMiddlelandMapIndex]->m_stEnergySphereCreationList[iCIndex].sY;
@@ -16882,7 +13452,6 @@ void CGame::EnergySphereProcessor(BOOL bIsAdminCreate, int iClientH)
         iNamingValue = m_pMapList[m_iMiddlelandMapIndex]->iGetEmptyNamingValue();
         if (iNamingValue != -1)
         {
-            // 
             ZeroMemory(cName_Internal, sizeof(cName_Internal));
             wsprintf(cName_Internal, "XX%d", iNamingValue);
             cName_Internal[0] = '_';
@@ -16895,37 +13464,35 @@ void CGame::EnergySphereProcessor(BOOL bIsAdminCreate, int iClientH)
             }
         }
 
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â°Ã± Â»Ã½Â¼Âº 
+        
         iTemp = iDice(1, m_pMapList[m_iMiddlelandMapIndex]->m_iTotalEnergySphereGoalPoint);
         if (m_pMapList[m_iMiddlelandMapIndex]->m_stEnergySphereGoalList[iTemp].cResult == NULL) return;
 
-        // Ã‡Ã¶Ã€Ã§ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â°Ã± Ã€ÃŽÂµÂ¦Â½Âº Ã€ÃºÃ€Ã¥ 
+        
         m_pMapList[m_iMiddlelandMapIndex]->m_iCurEnergySphereGoalPointIndex = iTemp;
 
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â°Â¡ Â¸Â¸ÂµÃ©Â¾Ã® ÃÂ³Ã€Â½Ã€Â» Â¸Ã°ÂµÃ§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã‹Â·ÃÃÃ˜Â´Ã™.
+        
         for (i = 1; i < DEF_MAXCLIENTS; i++)
             if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
             {
                 SendNotifyMsg(NULL, i, DEF_NOTIFY_ENERGYSPHERECREATED, pX, pY, NULL, NULL);
             }
 
-        //testcode
         wsprintf(G_cTxt, "(!) Energy Sphere Created! (%d, %d)", pX, pY);
-        log->info(G_cTxt);
         log->info(G_cTxt);
     }
     else
     {
-        // Â¸Â¸Â¾Ã  Ã€ÃŒÂ¹ÃŒ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Ã€Ã‡ Â°Ã±Ã€ÃŒ Ã‡Ã’Â´Ã§ÂµÃ‡Â¾Ã® Ã€Ã–Ã€Â¸Â¸Ã© Â¸Â¸ÂµÃ©Â¸Ã© Â¾ÃˆÂµÃˆÂ´Ã™.
+        
         if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_iCurEnergySphereGoalPointIndex >= 0) return;
 
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â¸Â¦ Â¸Â¸ÂµÃ© Ã€Â§Ã„Â¡Â¸Â¦ Â°Ã¡ÃÂ¤ 
+        
         iCIndex = iDice(1, m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_iTotalEnergySphereCreationPoint);
 
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â½ÃƒÃ€Ã› Ã€Â§Ã„Â¡Â°Â¡ ÃƒÃŠÂ±Ã¢ÃˆÂ­Â°Â¡ Â¾ÃˆÂµÃˆ Â»Ã³Ã…Ã‚Â¶Ã³Â¸Ã© 
+        
         if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_stEnergySphereCreationList[iCIndex].cType == NULL) return;
 
-        // Â¿Â©Â±Ã¢Â¼Â­ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â»Ã½Â¼Âº 
+        
         cSA = 0;
         pX = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_stEnergySphereCreationList[iCIndex].sX;
         pY = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_stEnergySphereCreationList[iCIndex].sY;
@@ -16934,7 +13501,6 @@ void CGame::EnergySphereProcessor(BOOL bIsAdminCreate, int iClientH)
         iNamingValue = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->iGetEmptyNamingValue();
         if (iNamingValue != -1)
         {
-            // 
             ZeroMemory(cName_Internal, sizeof(cName_Internal));
             wsprintf(cName_Internal, "XX%d", iNamingValue);
             cName_Internal[0] = '_';
@@ -16942,29 +13508,27 @@ void CGame::EnergySphereProcessor(BOOL bIsAdminCreate, int iClientH)
 
             if ((bCreateNewNpc("Energy-Sphere", cName_Internal, m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_cName, (rand() % 5), cSA, DEF_MOVETYPE_RANDOM, &pX, &pY, cWaypoint, NULL, NULL, -1, FALSE, FALSE, FALSE)) == FALSE)
             {
-                // Â½Ã‡Ã†ÃÃ‡ÃŸÃ€Â¸Â¹Ã‡Â·ÃŽ Â¿Â¹Â¾Ã ÂµÃˆ NameValueÂ¸Â¦ Ã‡Ã˜ÃÂ¦Â½ÃƒÃ…Â²Â´Ã™.
+                
                 m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->SetNamingValueEmpty(iNamingValue);
                 return;
             }
         }
 
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â°Ã± Â»Ã½Â¼Âº 
+        
         iTemp = iDice(1, m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_iTotalEnergySphereGoalPoint);
         if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_stEnergySphereGoalList[iTemp].cResult == NULL) return;
 
-        // Ã‡Ã¶Ã€Ã§ Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã® Â°Ã± Ã€ÃŽÂµÂ¦Â½Âº Ã€ÃºÃ€Ã¥ 
+        
         m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_iCurEnergySphereGoalPointIndex = iTemp;
 
-        // Â¿Â¡Â³ÃŠÃÃ¶ Â½ÂºÃ‡Ã‡Â¾Ã®Â°Â¡ Â¸Â¸ÂµÃ©Â¾Ã® ÃÂ³Ã€Â½Ã€Â» Â¸Ã°ÂµÃ§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Â¾Ã‹Â·ÃÃÃ˜Â´Ã™.
+        
         for (i = 1; i < DEF_MAXCLIENTS; i++)
             if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
             {
                 SendNotifyMsg(NULL, i, DEF_NOTIFY_ENERGYSPHERECREATED, pX, pY, NULL, NULL);
             }
 
-        //testcode
         wsprintf(G_cTxt, "(!) Admin Energy Sphere Created! (%d, %d)", pX, pY);
-        log->info(G_cTxt);
         log->info(G_cTxt);
     }
 }
@@ -16973,7 +13537,7 @@ int CGame::iGetItemWeight(CItem * pItem, int iCount)
 {
     int iWeight;
 
-    // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Ã‡ Â¼Ã¶Â·Â®Â¿Â¡ ÂµÃ»Â¸Â¥ Â¹Â«Â°Ã”Â¸Â¦ Â°Ã¨Â»ÃªÃ‡Ã‘Â´Ã™. GoldÃ€ÃŽ Â°Ã¦Â¿Ã¬ Â¹Â«Â°Ã”Â¸Â¦ 20ÂºÃÃ€Ã‡ 1Â·ÃŽ ÂºÂ¯Â°Ã¦ 
+    
     iWeight = (pItem->m_wWeight);
     if (iCount < 0) iCount = 1;
     iWeight = iWeight * iCount;
@@ -16997,7 +13561,7 @@ void CGame::UpdateMapSectorInfo()
             m_pMapList[i]->m_iMaxEx = m_pMapList[i]->m_iMaxEy = m_pMapList[i]->m_iMaxMx = m_pMapList[i]->m_iMaxMy = 0;
             m_pMapList[i]->m_iMaxPx = m_pMapList[i]->m_iMaxPy = 0;
 
-            // Â±Ã—ÂµÂ¿Â¾Ãˆ Ã€ÃºÃ€Ã¥Ã‡ÃŸÂ´Ã¸ TempSectorInfoÂ¿Â¡Â¼Â­ ÃÂ¤ÂºÂ¸Â¸Â¦ Â¾Ã²Â¾Ã® SectorInfoÂ¿Â¡ Ã€ÃºÃ€Ã¥Ã‡Ã‘ Â´Ã™Ã€Â½ TempSectorInfoÂ´Ã‚ ÃÃ¶Â¿Ã®Â´Ã™.
+            
             for (ix = 0; ix < DEF_MAXSECTORS; ix++)
                 for (iy = 0; iy < DEF_MAXSECTORS; iy++)
                 {
@@ -17037,10 +13601,10 @@ void CGame::UpdateMapSectorInfo()
                     }
                 }
 
-            // TempSectorInfo Â³Â¯Â¸Â°Â´Ã™.
+            
             m_pMapList[i]->ClearTempSectorInfo();
 
-            // Sector InfoÂ¿Â¡ Ã€ÃºÃ€Ã¥
+            
             if (m_pMapList[i]->m_iMaxNx > 0) m_pMapList[i]->m_stSectorInfo[m_pMapList[i]->m_iMaxNx][m_pMapList[i]->m_iMaxNy].iNeutralActivity++;
             if (m_pMapList[i]->m_iMaxAx > 0) m_pMapList[i]->m_stSectorInfo[m_pMapList[i]->m_iMaxAx][m_pMapList[i]->m_iMaxAy].iAresdenActivity++;
             if (m_pMapList[i]->m_iMaxEx > 0) m_pMapList[i]->m_stSectorInfo[m_pMapList[i]->m_iMaxEx][m_pMapList[i]->m_iMaxEy].iElvineActivity++;
@@ -17115,13 +13679,13 @@ void CGame::_SendMapStatus(int iClientH)
     *sp = (short)m_pClientList[iClientH]->m_iCSIsendPoint;
     cp += 2;
 
-    // ÃƒÃ‘ Â¸Ã®Â°Â³Ã€Ã‡ ÂµÂ¥Ã€ÃŒÃ…ÃÂ°Â¡ Ã€Ã–Â´Ã‚ÃÃ¶ Â¾Ã‹Â¸Â®Â´Ã‚ Â°Ã· Â¶Ã§Â¿Ã².
+    
     cp++;
 
     if (m_pClientList[iClientH]->m_iCSIsendPoint == NULL)
         m_pClientList[iClientH]->m_bIsSendingMapStatus = TRUE;
 
-    // 100Â°Â³Â¾Â¿ ÃÂ¤ÂºÂ¸Â¸Â¦ ÂºÂ¸Â³Â½Â´Ã™.
+    
     iDataSize = 0;
     for (i = 0; i < 100; i++)
     {
@@ -17143,7 +13707,7 @@ void CGame::_SendMapStatus(int iClientH)
         m_pClientList[iClientH]->m_iCSIsendPoint++;
     }
 
-    // Â¿Â©Â±Ã¢Â±Ã®ÃÃ¶ Â¿Ã”Â´Ã™Â¸Ã© Â´Ãµ ÂºÂ¸Â³Â¾ Â¸ÃžÂ½ÃƒÃÃ¶Â°Â¡ Ã€Ã–Â´Ã™Â´Ã‚ Ã€Ã‡Â¹ÃŒ.
+    
     cp = (char *)(cData + 12);
     *cp = (iDataSize / 6);
     SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MAPSTATUSNEXT, iDataSize + 13, NULL, NULL, cData);
@@ -17151,7 +13715,7 @@ void CGame::_SendMapStatus(int iClientH)
 
     SMS_ENDOFDATA:;
 
-    // ÂµÂ¥Ã€ÃŒÃ…ÃÂ°Â¡ Â´Ã™ Ã€Ã¼Â¼Ã› ÂµÃ‡Â¾ÃºÃ€Â½Ã€Â» Ã€Ã‡Â¹ÃŒ.
+    
     cp = (char *)(cData + 12);
     *cp = (iDataSize / 6);
     SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MAPSTATUSLAST, iDataSize + 13, NULL, NULL, cData);
@@ -17163,10 +13727,6 @@ void CGame::_SendMapStatus(int iClientH)
 BOOL CGame::bStockMsgToGateServer(char * pData, DWORD dwSize)
 {
     char * cp;
-
-    //testcode
-    //wsprintf(G_cTxt, "StockMsg(%d) Size(%d)", *pData, dwSize);
-    //log->info(G_cTxt);
 
     if ((m_iIndexGSS + dwSize) >= DEF_MAXGATESERVERSTOCKMSGSIZE - 10) return FALSE;
 
@@ -17184,18 +13744,13 @@ void CGame::SendStockMsgToGateServer()
     WORD * wp;
     char * cp;
 
-    // Â±Ã—ÂµÂ¿Â¾Ãˆ Â¸Ã°Â¾Ã†Â³ÃµÂ¾Ã’Â´Ã¸ Â¸ÃžÂ½ÃƒÃÃ¶Â¸Â¦ Â°Ã”Ã€ÃŒÃ†Â® Â¼Â­Â¹Ã¶Â·ÃŽ Ã€Ã¼Â¼Ã›.
+    
     if (m_iIndexGSS > 6)
     {
-        //testcode
-        //wsprintf(G_cTxt, "(!) Sending Gate Server Stock Msg(%d)", m_iIndexGSS);
-        //log->info(G_cTxt);
-
         //SendMsgToGateServer(MSGID_SERVERSTOCKMSG, NULL, m_cGateServerStockMsg);
-
-        // Â¹Ã¶Ã†Ã› Ã…Â¬Â¸Â®Â¾Ã®
+        
         ZeroMemory(m_cGateServerStockMsg, sizeof(m_cGateServerStockMsg));
-        // Â¸Ã‡ Â¾Ã•ÂºÃŽÂºÃÂ¿Â¡ Â¸ÃžÂ½ÃƒÃÃ¶ Â»Ã°Ã€Ã”
+        
         cp = (char *)m_cGateServerStockMsg;
         dwp = (DWORD *)cp;
         *dwp = MSGID_SERVERSTOCKMSG;
@@ -17217,7 +13772,7 @@ void CGame::GSM_RequestFindCharacter(WORD wReqServerID, WORD wReqClientH, char *
     for (i = 1; i < DEF_MAXCLIENTS; i++)
         if ((m_pClientList[i] != NULL) && (strcmp(m_pClientList[i]->m_cCharName, pName) == 0))
         {
-            // ÃƒÂ£Â¾Ã’Â´Ã™.
+            
             ZeroMemory(cTemp, sizeof(cTemp));
             cp = (char *)(cTemp);
             *cp = GSM_RESPONSE_FINDCHARACTER;
@@ -17259,10 +13814,10 @@ void CGame::SyncMiddlelandMapInfo()
     char * cp;
     short * sp;
 
-    // ¹Ìµé·£µåÀÇ Á¤º¸¸¦ ¸ðµç ¼­¹ö¿¡°Ô ½ÌÅ©½ÃÅ²´Ù. ¹Ìµé·£µå¸¦ ´ã´çÇÑ ¼­¹ö¶ó¸é ¹Ù·Î ±¸Á¶Ã¼¸¦ ¾÷µ¥ÀÌÆ® ÇÏ°í ³ª¸ÓÁö ¼­¹öµé¿¡°Ô Á¤º¸ Àü¼Û.
+    
     if (m_iMiddlelandMapIndex != -1)
     {
-        // ±¸Á¶Ã¼ Å¬¸®¾î
+        
         for (i = 0; i < DEF_MAXCRUSADESTRUCTURES; i++)
         {
             m_stMiddleCrusadeStructureInfo[i].cType = NULL;
@@ -17270,7 +13825,7 @@ void CGame::SyncMiddlelandMapInfo()
             m_stMiddleCrusadeStructureInfo[i].sX = NULL;
             m_stMiddleCrusadeStructureInfo[i].sY = NULL;
         }
-        // ±¸Á¶Ã¼ º¹»ç ¹× Àü¼Û ¸Þ½ÃÁö ÀÛ¼º 
+        
         m_iTotalMiddleCrusadeStructures = m_pMapList[m_iMiddlelandMapIndex]->m_iTotalCrusadeStructures;
         ZeroMemory(G_cData50000, sizeof(G_cData50000));
         cp = (char *)G_cData50000;
@@ -17300,13 +13855,10 @@ void CGame::SyncMiddlelandMapInfo()
             cp += 2;
         }
 
-        // ¸Þ½ÃÁö ½ºÅå.
+        
         if (m_iTotalMiddleCrusadeStructures != 0)
         {
-            //testcode
-            //wsprintf(G_cTxt, "m_iTotalMiddleCrusadeStructures: %d", m_iTotalMiddleCrusadeStructures);
-            //log->info(G_cTxt);
-            bStockMsgToGateServer(G_cData50000, 3 + m_iTotalMiddleCrusadeStructures * 6);
+            //bStockMsgToGateServer(G_cData50000, 3 + m_iTotalMiddleCrusadeStructures * 6);
         }
     }
 }
@@ -17316,28 +13868,25 @@ void CGame::GSM_SetGuildConstructLoc(int iGuildGUID, int dX, int dY, char * pMap
     int i, iIndex;
     DWORD dwTemp, dwTime;
 
-    // Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â·ÃŽÂºÃŽÃ…ÃÃ€Ã‡ Â¿Ã¤ÃƒÂ»Ã€ÃŒ Â¾Ã†Â´ÃÂ¶Ã³ Â´Ã™Â¸Â¥ Â¼Â­Â¹Ã¶Â·ÃŽÂºÃŽÃ…ÃÃ€Ã‡ Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® ÃÃ‚Ã‡Â¥ Â¼Â³ÃÂ¤ Â¿Ã¤ÃƒÂ»Ã€Ã“. Ã€Ã€Â´Ã¤Ã‡Ã’ Ã‡ÃŠÂ¿Ã¤ Â¾Ã¸Ã€Â½.
-
-    //testcode
     wsprintf(G_cTxt, "SetGuildConstructLoc: %d %s %d %d", iGuildGUID, pMapName, dX, dY);
     log->info(G_cTxt);
 
     dwTime = timeGetTime();
 
-    // Â¸Ã•Ã€Ãº Â°Â°Ã€Âº GUIDÂ¸Â¦ Â°Â¡ÃÃ¸ Â±Ã¦ÂµÃ¥ Ã…ÃšÂ·Â¹Ã†Ã·Ã†Â® ÃÃ‚Ã‡Â¥Â°Â¡ Â¼Â³ÃÂ¤ÂµÃ‡Â¾Ã® Ã€Ã–Â´Ã‚ÃÃ¶ ÃƒÂ£Â´Ã‚Â´Ã™.
+    
     for (i = 0; i < DEF_MAXGUILDS; i++)
         if (m_pGuildTeleportLoc[i].m_iV1 == iGuildGUID)
         {
-            // Ã€ÃŒÂ¹ÃŒ Â±Ã¦ÂµÃ¥Â°Â¡ Ã€Ã–Â´Ã™.
+            
             if ((m_pGuildTeleportLoc[i].m_sDestX2 == dX) && (m_pGuildTeleportLoc[i].m_sDestY2 == dY) && (strcmp(m_pGuildTeleportLoc[i].m_cDestMapName2, pMapName) == 0))
             {
-                // Â³Â»Â¿Ã«Ã€ÃŒ Ã€ÃÃ„Â¡Ã‡Ã‘Â´Ã™. Ã…Â¸Ã€Ã“ Ã€Ã”Â·Ã‚ÃˆÃ„ Â½ÂºÃ…Âµ.
+                
                 m_pGuildTeleportLoc[i].m_dwTime2 = dwTime;
                 return;
             }
             else
             {
-                // Â³Â»Â¿Ã« Â°Â»Â½Ã…
+                
                 m_pGuildTeleportLoc[i].m_sDestX2 = dX;
                 m_pGuildTeleportLoc[i].m_sDestY2 = dY;
                 ZeroMemory(m_pGuildTeleportLoc[i].m_cDestMapName2, sizeof(m_pGuildTeleportLoc[i].m_cDestMapName2));
@@ -17347,7 +13896,7 @@ void CGame::GSM_SetGuildConstructLoc(int iGuildGUID, int dX, int dY, char * pMap
             }
         }
 
-    // Â¼Â³ÃÂ¤ÂµÃˆ Â³Â»Â¿Ã«Ã€ÃŒ Â¾Ã¸Â´Ã™. Â»ÃµÂ·ÃŽ Â¼Â³ÃÂ¤Ã‡Ã‘Â´Ã™.
+    
     dwTemp = 0;
     iIndex = -1;
     for (i = 0; i < DEF_MAXGUILDS; i++)
@@ -17365,7 +13914,7 @@ void CGame::GSM_SetGuildConstructLoc(int iGuildGUID, int dX, int dY, char * pMap
         }
         else
         {
-            // Â°Â¡Ã€Ã¥ Â¿Ã€Â·Â§ÂµÂ¿Â¾Ãˆ Ã‚Ã¼ÃÂ¶ÂµÃ‡ÃÃ¶ Â¾ÃŠÃ€Âº Â¸Â®Â½ÂºÃ†Â®Ã€Ã‡ Ã€ÃŽÂµÂ¦Â½ÂºÂ¸Â¦ ÃƒÂ£Â´Ã‚Â´Ã™.
+            
             if (dwTemp < (dwTime - m_pGuildTeleportLoc[i].m_dwTime2))
             {
                 dwTemp = (dwTime - m_pGuildTeleportLoc[i].m_dwTime2);
@@ -17374,10 +13923,9 @@ void CGame::GSM_SetGuildConstructLoc(int iGuildGUID, int dX, int dY, char * pMap
         }
     }
 
-    // Ã„Â³Â½Ãƒ Â°Ã¸Â°Â£Ã€ÃŒ Â´Ã™ ÃƒÂ¡Â´Ã™. Ã€ÃŒÂ·Â± Â°Ã¦Â¿Ã¬ Â¸Â®Â½ÂºÃ†Â® ÃÃŸ Â°Â¡Ã€Ã¥ Â¿Ã€Â·Â§ÂµÂ¿Â¾Ãˆ Â»Ã§Â¿Ã«Ã‡ÃÃÃ¶ Â¾ÃŠÃ€Âº Â¸Â®Â½ÂºÃ†Â®(iIndex)Â¸Â¦ Â»Ã¨ÃÂ¦Ã‡ÃÂ°Ã­ Â¾Ã·ÂµÂ¥Ã€ÃŒÃ†Â® Ã‡Ã‘Â´Ã™.
+    
     if (iIndex == -1) return;
 
-    //testcode
     log->info("(X) No more GuildConstLocuct Space! Replaced.");
 
     m_pGuildTeleportLoc[i].m_iV1 = iGuildGUID;
@@ -17396,7 +13944,7 @@ void CGame::GSM_ConstructionPoint(int iGuildGUID, int iPoint)
         if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_iCrusadeDuty == 3) &&
             (m_pClientList[i]->m_iGuildGUID == iGuildGUID))
         {
-            // Ã‡Ã˜Â´Ã§ Â±Ã¦ÂµÃ¥Â¸Â¶Â½ÂºÃ…Ã ÃÃ¶ÃˆÃ–Â°Ã¼Ã€Â» ÃƒÂ£Â¾Ã’Â´Ã™.
+            
             m_pClientList[i]->m_iConstructionPoint += iPoint;
             m_pClientList[i]->m_iWarContribution += iPoint / 10;
 
@@ -17407,7 +13955,6 @@ void CGame::GSM_ConstructionPoint(int iGuildGUID, int iPoint)
                 m_pClientList[i]->m_iWarContribution = DEF_MAXWARCONTRIBUTION;
 
             SendNotifyMsg(NULL, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, NULL, NULL);
-            //testcode
             wsprintf(G_cTxt, "GSM_ConstructionPoint: %d %d", iGuildGUID, iPoint);
             log->info(G_cTxt);
             return;
@@ -17418,7 +13965,7 @@ BOOL CGame::bAddClientShortCut(int iClientH)
 {
     int i;
 
-    // Â¸Ã•Ã€Ãº ÂµÂ¿Ã€ÃÃ‡Ã‘ Â¹Ã¸ÃˆÂ£Â°Â¡ ÃÂ¸Ã€Ã§Ã‡ÃÂ´Ã‚ÃÃ¶ Â°Ã‹Â»Ã¶
+    
 
     for (i = 0; i < DEF_MAXCLIENTS; i++)
         if (m_iClientShortCut[i] == iClientH) return FALSE;
@@ -17446,7 +13993,7 @@ void CGame::RemoveClientShortCut(int iClientH)
 
     RCSC_LOOPBREAK:;
 
-    // ÂºÃ³ Â¿Â©Â¹Ã©Ã€Â» Â¸ÃžÂ²Ã›Â´Ã™.
+    
     //m_iClientShortCut[i] = m_iClientShortCut[m_iTotalClients+1];
     //m_iClientShortCut[m_iTotalClients+1] = 0;
     for (i = 0; i < DEF_MAXCLIENTS; i++)
@@ -17494,7 +14041,7 @@ BOOL CGame::bCopyItemContents(CItem * pCopy, CItem * pOriginal)
     if (pOriginal == NULL) return FALSE;
     if (pCopy == NULL) return FALSE;
 
-    pCopy->m_sIDnum = pOriginal->m_sIDnum;					// Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Ã‡ Â°Ã­Ã€Â¯ Â¹Ã¸ÃˆÂ£ 
+    pCopy->m_sIDnum = pOriginal->m_sIDnum;					
     pCopy->m_cItemType = pOriginal->m_cItemType;
     pCopy->m_cEquipPos = pOriginal->m_cEquipPos;
     pCopy->m_sItemEffectType = pOriginal->m_sItemEffectType;
@@ -17508,7 +14055,7 @@ BOOL CGame::bCopyItemContents(CItem * pCopy, CItem * pOriginal)
     pCopy->m_sSpecialEffect = pOriginal->m_sSpecialEffect;
 
     //short m_sSM_HitRatio, m_sL_HitRatio;
-    //v1.432 Â¸Ã­ÃÃŸÂ·Ã¼ Â°Â¡Â°Â¨ Â»Ã§Â¿Ã« Â¾ÃˆÃ‡Ã‘Â´Ã™. Â´Ã«Â½Ã… Ã†Â¯Â¼Ã¶ Â´Ã‰Â·Ã‚ Â¼Ã¶Ã„Â¡Â°Â¡ ÂµÃ©Â¾Ã®Â°Â£Â´Ã™.
+    
     pCopy->m_sSpecialEffectValue1 = pOriginal->m_sSpecialEffectValue1;
     pCopy->m_sSpecialEffectValue2 = pOriginal->m_sSpecialEffectValue2;
 
@@ -17527,7 +14074,6 @@ BOOL CGame::bCopyItemContents(CItem * pCopy, CItem * pOriginal)
 
     pCopy->m_cCategory = pOriginal->m_cCategory;
     pCopy->m_bIsForSale = pOriginal->m_bIsForSale;
-    // 
 
     pCopy->m_dwCount = pOriginal->m_dwCount;
     pCopy->m_sTouchEffectType = pOriginal->m_sTouchEffectType;
@@ -17550,7 +14096,6 @@ void CGame::SendMsg(short sOwnerH, char cOwnerType, BOOL bStatus, long lPass)
     //SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_LEVELUP, NULL, NULL, NULL, NULL);
 
     SendNotifyMsg(NULL, sOwnerH, lPass, NULL, NULL, NULL, NULL);
-
 }
 
 void CGame::RequestChangePlayMode(int iClientH)
@@ -17819,18 +14364,18 @@ BOOL CGame::_bItemLog(int iAction, int iGiveH, int iRecvH, CItem * pItem, BOOL b
     int iItemCount;
     if (pItem == NULL) return FALSE;
 
-    // !!ÃÃ–Ã€Ã‡ Ã‡Ã‘Â±Â¹Â¿Â¡ Ã€Ã»Â¿Ã«Ã‡Ã’Â¶Â§  New Item Ã€ÃŒ Â»Ã½Â±Ã¦Â¶Â§Â´Ã‚  iGiveÂ°Â¡ Â³ÃŽÃ€ÃÂ¼Ã¶ Ã€Ã–Â´Ã™.
+    
     if (m_pClientList[iGiveH]->m_cCharName == NULL) return FALSE;
 
     if (iAction == DEF_ITEMLOG_DUPITEMID)
     {
-        // ÂºÂ¹Â»Ã§ÂµÃˆ Â¾Ã†Ã€ÃŒÃ…Ã› Ã€ÃºÃ€Ã¥ Â¿Ã¤ÃƒÂ»Ã€ÃŒÂ´Ã™. 
+        
         if (m_pClientList[iGiveH] == NULL) return FALSE;
         if (m_pClientList[iGiveH]->m_cCharName == NULL) return FALSE;
         wsprintf(G_cTxt, "(!) Delete-DupItem(%s %d %d %d %d) Owner(%s)", pItem->m_cName, pItem->m_dwCount, pItem->m_sTouchEffectValue1,
             pItem->m_sTouchEffectValue2, pItem->m_sTouchEffectValue3,
             m_pClientList[iGiveH]->m_cCharName);
-        //	log->info(iGiveH,G_cTxt);
+        log->info(G_cTxt);
         //bSendMsgToLS(MSGID_GAMEITEMLOG, iGiveH, NULL, G_cTxt);
         return TRUE;
     }
@@ -17944,7 +14489,7 @@ BOOL CGame::_bItemLog(int iAction, int iClientH, char * cName, CItem * pItem)
         if (m_pClientList[iClientH] == NULL) return FALSE;
     }
     char  cTxt[200], cTemp1[120];
-    //  Â·ÃŽÂ±Ã— Â³Â²Â±Ã¤Â´Ã™. 
+    
     ZeroMemory(cTxt, sizeof(cTxt));
     ZeroMemory(cTemp1, sizeof(cTemp1));
     //if (m_pClientList[iClientH] != NULL) m_pClientList[iClientH]->iGetPeerAddress(cTemp1);
@@ -17998,12 +14543,12 @@ BOOL CGame::_bCheckGoodItem(CItem * pItem)
 
     if (pItem->m_sIDnum == 90)
     {
-        if (pItem->m_dwCount > 10000) return TRUE;  //GoldÂ¿Â¡ Ã‡Ã‘Ã‡Ã˜ 10000Â¿Ã¸ Ã€ÃŒÂ»Ã³Â¸Â¸ Â·ÃŽÂ±Ã—Â¿Â¡ Â³Â²Â±Ã¤Â´Ã™.
+        if (pItem->m_dwCount > 10000) return TRUE;  
         else return FALSE;
     }
     switch (pItem->m_sIDnum)
     {
-        //	case 90: // Gold ÃƒÃŸÂ°Â¡ 
+        
     case 259:
     case 290:
     case 291:
@@ -18032,8 +14577,8 @@ BOOL CGame::_bCheckGoodItem(CItem * pItem)
     case 612:
     case 613:
     case 614:
-    case 616:  // ÂµÂ¥Â¸Ã³-Â½Â½Â·Â¹Ã€ÃŒÂ¾Ã®
-    case 618:  // Â´Ã™Ã…Â©Â¿Â¤Ã‡Ã-ÂºÂ¸Â¿Ã¬
+    case 616:  
+    case 618:  
 
     case 620:
     case 621:
@@ -18068,7 +14613,7 @@ BOOL CGame::_bCheckGoodItem(CItem * pItem)
     case 656:
     case 657:
 
-    case 700: 	// v2.03 Â»Ã³Â¾Ã® Â¾Ã†Ã€ÃŒÃ…Ã› 
+    case 700: 	
     case 701:
     case 702:
     case 703:
@@ -18104,18 +14649,18 @@ BOOL CGame::_bCheckGoodItem(CItem * pItem)
     case 734:
     case 735:
 
-    case 736:  // Â»ÃµÂ·ÃŽÂ¿Ã® Â»Ã³Â¾Ã®Ã€Ã‡ Ã€ÃšÃ€ÃŒÂ¾Ã°Ã†Â® Â¼Ã’ÂµÃ¥
-    case 737:  // Â»ÃµÂ·ÃŽÂ¿Ã® ÃˆÃ¦Â±Ã¢Â»Ã§Ã€Ã‡ Ã€ÃšÃ€ÃŒÂ¾Ã°Ã†Â® Â¼Ã’ÂµÃ¥
-    case 738:  // Â»ÃµÂ·ÃŽÂ¿Ã® ÃˆÃ¦Â¸Â¶Â¹Ã½Â»Ã§Ã€Ã‡Â¸Ã…ÃÃ·Â¿Ã¸ÂµÃ¥
+    case 736:  
+    case 737:  
+    case 738:  
     case 924:
 
-        return TRUE;  //Ã†Â¯ÂºÂ°Ã‡Ã‘ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒÂ±Ã¢ Â¶Â«Â½Ãƒ Â±Ã¢Â·Ã...
+        return TRUE;  
         break;
     default:
-        // v2.17 2002-7-31 ÃÂ¦Ã€Ã› Â¾Ã†Ã€ÃŒÃ…Ã›ÂµÂµ Â·ÃŽÂ±Ã—Â¿Â¡ Â³Â²Â°Ã” Ã‡Ã‘Â´Ã™.
-        if ((pItem->m_dwAttribute & 0xF0F0F001) == NULL) return FALSE;  //Ã†Â¯ÂºÂ°Ã‡Ã‘ Â¾Ã†Ã€ÃŒÃ…Ã›ÂµÃŽ Â¾Ã†Â´ÃÂ±Â¸ Ã†Â¯Â¼ÂºÃ„Â¡ÂµÂµ Â¾Ã¸Â´Ã™Â¸Ã© ÂºÂ°Â·Ã§..
-        else if (pItem->m_sIDnum > 30) return TRUE;  //Ã†Â¯ÂºÂ°Ã‡Ã‘ Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Âº Â¾Ã†Â´ÃÃÃ¶Â¸Â¸ Ã†Â¯Â¼ÂºÃ„Â¡Â°Â¡ Ã€Ã–Â°Ã­ Â´ÃœÂ°Ã‹Â·Ã¹Â°Â¡ Â¾Ã†Â´ÃÂ¶Ã³Â¸Ã© ÃÃÃ€Âº Â¾Ã†Ã…Ã›..
-        else return FALSE;  //Ã†Â¯ÂºÂ°Ã‡Ã‘ Â¾Ã†Ã€ÃŒÃ…Ã›ÂµÃŽ Â¾Ã†Â´ÃÂ±Â¸ Ã†Â¯Â¼ÂºÃ„Â¡Â´Ã‚ Ã€Ã–ÃÃ¶Â¸Â¸ Â´ÃœÂ°Ã‹Â·Ã¹Â¶Ã³Â¸Ã© ÂºÂ°Â·Ã§...
+        
+        if ((pItem->m_dwAttribute & 0xF0F0F001) == NULL) return FALSE;  
+        else if (pItem->m_sIDnum > 30) return TRUE;  
+        else return FALSE;  
     }
 }
 
@@ -18138,7 +14683,8 @@ void CGame::GetExp(int iClientH, int iExp, BOOL bIsAttackerOwn)
         iExp = (int)dV1;
     }
     else
-    { //Lower exp
+    {
+         //Lower exp
         if ((m_pClientList[iClientH]->m_iLevel >= 80) && ((strcmp(m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_cName, "aresdend1") == 0)
             || (strcmp(m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_cName, "elvined1") == 0)))
         {
@@ -18225,7 +14771,8 @@ void CGame::GetExp(int iClientH, int iExp, BOOL bIsAttackerOwn)
                 iUnitValue = (int)dV3;
                 iH = m_stPartyInfo[m_pClientList[iClientH]->m_iPartyID].iIndex[i];
                 if ((m_pClientList[iH] != NULL) && (m_pClientList[iH]->m_bSkillUsingStatus[19] != 1) && (m_pClientList[iH]->m_iHP > 0))
-                { // Is player alive ??
+                {
+                    // Is player alive ??
                     if (m_pClientList[iH]->m_iLevel < 81)   iUnitValue *= 2;
                     else if (m_pClientList[iH]->m_iLevel < 101)   iUnitValue *= 2;
                     else if (m_pClientList[iH]->m_iLevel < 151)  iUnitValue *= 2;
@@ -18239,7 +14786,8 @@ void CGame::GetExp(int iClientH, int iExp, BOOL bIsAttackerOwn)
     else
     {
         if ((m_pClientList[iClientH] != NULL) && (m_pClientList[iClientH]->m_bSkillUsingStatus[19] != 1) && (m_pClientList[iClientH]->m_iHP > 0))
-        { // Is player alive ??
+        {
+            // Is player alive ??
             if (m_pClientList[iClientH]->m_iLevel < 81)   iExp *= 1.5;
             else if (m_pClientList[iClientH]->m_iLevel < 101)   iExp *= 1.5;
             else if (m_pClientList[iClientH]->m_iLevel < 151)  iExp *= 1.5;
@@ -18308,7 +14856,7 @@ void CGame::ArmorLifeDecrement(int iAttackerH, int iTargetH, char cOwnerType, in
     int iTemp;
 
     if (m_pClientList[iAttackerH] == NULL) return;
-    // v1.3 Ã‡Ã‡Â°ÃÂ´Ã§Ã‡ÃŸÃ€Â¸Â¹Ã‡Â·ÃŽ Ã€Ã¥Ã‚Ã¸Ã‡ÃÂ°Ã­ Ã€Ã–Â´Ã‚ Â¸Ã¶Ã…Ã« Â¹Ã¦Â¾Ã®Â±Â¸Ã€Ã‡ Â¼Ã¶Â¸Ã­Ã€Â» ÃÃ™Ã€ÃŽÂ´Ã™. 
+    
     switch (cOwnerType)
     {
     case DEF_OWNERTYPE_PLAYER:
@@ -18319,45 +14867,45 @@ void CGame::ArmorLifeDecrement(int iAttackerH, int iTargetH, char cOwnerType, in
     default: return;
     }
 
-    // v2.16 Â°Â°Ã€Âº Ã†Ã­Ã€ÃŒÂ¸Ã© Â¼Ã¶Â¸Ã­ Â´ÃžÃÃ¶ Â¾ÃŠÂ°Ã” 
+    
     if (m_pClientList[iAttackerH]->m_cSide == m_pClientList[iTargetH]->m_cSide) return;
 
-    // Â¸Ã¶Ã…Ã« Â°Â©Â¿ÃŠ 
+    
     iTemp = m_pClientList[iTargetH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_BODY];
     if ((iTemp != -1) && (m_pClientList[iTargetH]->m_pItemList[iTemp] != NULL))
     {
-        // v1.432 ÃÃŸÂ¸Â³Ã€ÃŽ Â°Ã¦Â¿Ã¬ Â¼Ã¶Â¸Ã­ ÃÃ™ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™.
+        
         if ((m_pClientList[iTargetH]->m_cSide != 0) && (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 0))
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan -= iValue;
 
         if ((m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan <= 0) || (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 64000))
         {
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan = 0;
-            // Â¼Ã¶Â¸Ã­Ã€ÃŒ Â´Ã™ ÂµÃ‡Â¾ÃºÃ€Â¸Â¹Ã‡Â·ÃŽ Ã€Ã¥Ã‚Ã¸Ã€Â» Ã‡Ã˜ÃÂ¦Ã‡Ã‘Â´Ã™.
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¸ÃÂ°Â¡ÃÂ³Â´Ã™Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶ <- Ã€ÃŒÂ°Ã‰ Â¹ÃžÃ€Â¸Â¸Ã© Ã€Ã¥Ã‚Ã¸ÃˆÂ­Â¸Ã©Â¿Â¡Â¼Â­ Ã‡Ã˜ÃÂ¦Â½ÃƒÃ„Ã‘Â¾ÃŸ Ã‡Ã‘Â´Ã™.
+            
+            
             SendNotifyMsg(NULL, iTargetH, DEF_NOTIFY_ITEMLIFESPANEND, m_pClientList[iTargetH]->m_pItemList[iTemp]->m_cEquipPos, iTemp, NULL, NULL);
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Ã€Ã¥Ã‚Ã¸ Ã‡Ã˜ÃÂ¦ Â½ÃƒÃ…Â²Â´Ã™.
-            ReleaseItemHandler(iTargetH, iTemp, TRUE);  // <- Ã€ÃŒ Ã‡Ã”Â¼Ã¶Â´Ã‚ Â¼Â­Â¹Ã¶Â¿Â¡Â¼Â­Ã€Ã‡ ÃˆÂ¿Â°ÃºÂ¸Â¸ ÃƒÂ³Â¸Â® 
+            
+            ReleaseItemHandler(iTargetH, iTemp, TRUE);  
         }
     }
 
-    // Â¹Ã™ÃÃ¶ ÃˆÂ¤Ã€Âº Â½Ã…Â¹ÃŸÂ·Ã¹ Â¹Ã¦Â¾Ã®Â±Â¸
+    
     iTemp = m_pClientList[iTargetH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_PANTS];
     if ((iTemp != -1) && (m_pClientList[iTargetH]->m_pItemList[iTemp] != NULL))
     {
 
-        // v1.432 ÃÃŸÂ¸Â³Ã€ÃŽ Â°Ã¦Â¿Ã¬ Â¼Ã¶Â¸Ã­Ã€ÃŒ ÃÃ™ÃÃ¶ Â¾ÃŠÃ€Â½
+        
         if ((m_pClientList[iTargetH]->m_cSide != 0) && (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 0))
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan -= iValue;
 
         if ((m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan <= 0) || (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 64000))
         {
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan = 0;
-            // Â¼Ã¶Â¸Ã­Ã€ÃŒ Â´Ã™ ÂµÃ‡Â¾ÃºÃ€Â¸Â¹Ã‡Â·ÃŽ Ã€Ã¥Ã‚Ã¸Ã€Â» Ã‡Ã˜ÃÂ¦Ã‡Ã‘Â´Ã™.
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¸ÃÂ°Â¡ÃÂ³Â´Ã™Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶ <- Ã€ÃŒÂ°Ã‰ Â¹ÃžÃ€Â¸Â¸Ã© Ã€Ã¥Ã‚Ã¸ÃˆÂ­Â¸Ã©Â¿Â¡Â¼Â­ Ã‡Ã˜ÃÂ¦Â½ÃƒÃ„Ã‘Â¾ÃŸ Ã‡Ã‘Â´Ã™.
+            
+            
             SendNotifyMsg(NULL, iTargetH, DEF_NOTIFY_ITEMLIFESPANEND, m_pClientList[iTargetH]->m_pItemList[iTemp]->m_cEquipPos, iTemp, NULL, NULL);
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Ã€Ã¥Ã‚Ã¸ Ã‡Ã˜ÃÂ¦ Â½ÃƒÃ…Â²Â´Ã™.
-            ReleaseItemHandler(iTargetH, iTemp, TRUE);  // <- Ã€ÃŒ Ã‡Ã”Â¼Ã¶Â´Ã‚ Â¼Â­Â¹Ã¶Â¿Â¡Â¼Â­Ã€Ã‡ ÃˆÂ¿Â°ÃºÂ¸Â¸ ÃƒÂ³Â¸Â® 
+            
+            ReleaseItemHandler(iTargetH, iTemp, TRUE);  
         }
     }
 
@@ -18365,58 +14913,58 @@ void CGame::ArmorLifeDecrement(int iAttackerH, int iTargetH, char cOwnerType, in
     if ((iTemp != -1) && (m_pClientList[iTargetH]->m_pItemList[iTemp] != NULL))
     {
 
-        // v1.432 ÃÃŸÂ¸Â³Ã€ÃŽ Â°Ã¦Â¿Ã¬ Â¼Ã¶Â¸Ã­Ã€ÃŒ ÃÃ™ÃÃ¶ Â¾ÃŠÃ€Â½
+        
         if ((m_pClientList[iTargetH]->m_cSide != 0) && (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 0))
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan -= iValue;
 
         if ((m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan <= 0) || (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 64000))
         {
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan = 0;
-            // Â¼Ã¶Â¸Ã­Ã€ÃŒ Â´Ã™ ÂµÃ‡Â¾ÃºÃ€Â¸Â¹Ã‡Â·ÃŽ Ã€Ã¥Ã‚Ã¸Ã€Â» Ã‡Ã˜ÃÂ¦Ã‡Ã‘Â´Ã™.
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¸ÃÂ°Â¡ÃÂ³Â´Ã™Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶ <- Ã€ÃŒÂ°Ã‰ Â¹ÃžÃ€Â¸Â¸Ã© Ã€Ã¥Ã‚Ã¸ÃˆÂ­Â¸Ã©Â¿Â¡Â¼Â­ Ã‡Ã˜ÃÂ¦Â½ÃƒÃ„Ã‘Â¾ÃŸ Ã‡Ã‘Â´Ã™.
+            
+            
             SendNotifyMsg(NULL, iTargetH, DEF_NOTIFY_ITEMLIFESPANEND, m_pClientList[iTargetH]->m_pItemList[iTemp]->m_cEquipPos, iTemp, NULL, NULL);
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Ã€Ã¥Ã‚Ã¸ Ã‡Ã˜ÃÂ¦ Â½ÃƒÃ…Â²Â´Ã™.
-            ReleaseItemHandler(iTargetH, iTemp, TRUE);  // <- Ã€ÃŒ Ã‡Ã”Â¼Ã¶Â´Ã‚ Â¼Â­Â¹Ã¶Â¿Â¡Â¼Â­Ã€Ã‡ ÃˆÂ¿Â°ÃºÂ¸Â¸ ÃƒÂ³Â¸Â® 
+            
+            ReleaseItemHandler(iTargetH, iTemp, TRUE);  
         }
     }
 
-    // Ã†ÃˆÂ°Â©Â¿ÃŠ 
+    
     iTemp = m_pClientList[iTargetH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_ARMS];
     if ((iTemp != -1) && (m_pClientList[iTargetH]->m_pItemList[iTemp] != NULL))
     {
 
-        // v1.432 ÃÃŸÂ¸Â³Ã€ÃŽ Â°Ã¦Â¿Ã¬ Â¼Ã¶Â¸Ã­Ã€ÃŒ ÃÃ™ÃÃ¶ Â¾ÃŠÃ€Â½
+        
         if ((m_pClientList[iTargetH]->m_cSide != 0) && (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 0))
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan -= iValue;
 
         if ((m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan <= 0) || (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 64000))
         {
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan = 0;
-            // Â¼Ã¶Â¸Ã­Ã€ÃŒ Â´Ã™ ÂµÃ‡Â¾ÃºÃ€Â¸Â¹Ã‡Â·ÃŽ Ã€Ã¥Ã‚Ã¸Ã€Â» Ã‡Ã˜ÃÂ¦Ã‡Ã‘Â´Ã™.
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¸ÃÂ°Â¡ÃÂ³Â´Ã™Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶ <- Ã€ÃŒÂ°Ã‰ Â¹ÃžÃ€Â¸Â¸Ã© Ã€Ã¥Ã‚Ã¸ÃˆÂ­Â¸Ã©Â¿Â¡Â¼Â­ Ã‡Ã˜ÃÂ¦Â½ÃƒÃ„Ã‘Â¾ÃŸ Ã‡Ã‘Â´Ã™.
+            
+            
             SendNotifyMsg(NULL, iTargetH, DEF_NOTIFY_ITEMLIFESPANEND, m_pClientList[iTargetH]->m_pItemList[iTemp]->m_cEquipPos, iTemp, NULL, NULL);
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Ã€Ã¥Ã‚Ã¸ Ã‡Ã˜ÃÂ¦ Â½ÃƒÃ…Â²Â´Ã™.
-            ReleaseItemHandler(iTargetH, iTemp, TRUE);  // <- Ã€ÃŒ Ã‡Ã”Â¼Ã¶Â´Ã‚ Â¼Â­Â¹Ã¶Â¿Â¡Â¼Â­Ã€Ã‡ ÃˆÂ¿Â°ÃºÂ¸Â¸ ÃƒÂ³Â¸Â® 
+            
+            ReleaseItemHandler(iTargetH, iTemp, TRUE);  
         }
     }
 
-    // Ã…ÃµÂ±Â¸ 
+    
     iTemp = m_pClientList[iTargetH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_HEAD];
     if ((iTemp != -1) && (m_pClientList[iTargetH]->m_pItemList[iTemp] != NULL))
     {
 
-        // v1.432 ÃÃŸÂ¸Â³Ã€ÃŽ Â°Ã¦Â¿Ã¬ Â¼Ã¶Â¸Ã­Ã€ÃŒ ÃÃ™ÃÃ¶ Â¾ÃŠÃ€Â½
+        
         if ((m_pClientList[iTargetH]->m_cSide != 0) && (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 0))
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan -= iValue;
 
         if ((m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan <= 0) || (m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan > 64000))
         {
             m_pClientList[iTargetH]->m_pItemList[iTemp]->m_wCurLifeSpan = 0;
-            // Â¼Ã¶Â¸Ã­Ã€ÃŒ Â´Ã™ ÂµÃ‡Â¾ÃºÃ€Â¸Â¹Ã‡Â·ÃŽ Ã€Ã¥Ã‚Ã¸Ã€Â» Ã‡Ã˜ÃÂ¦Ã‡Ã‘Â´Ã™.
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€ÃŒ Â¸ÃÂ°Â¡ÃÂ³Â´Ã™Â´Ã‚ Â¸ÃžÂ½ÃƒÃÃ¶ <- Ã€ÃŒÂ°Ã‰ Â¹ÃžÃ€Â¸Â¸Ã© Ã€Ã¥Ã‚Ã¸ÃˆÂ­Â¸Ã©Â¿Â¡Â¼Â­ Ã‡Ã˜ÃÂ¦Â½ÃƒÃ„Ã‘Â¾ÃŸ Ã‡Ã‘Â´Ã™.
+            
+            
             SendNotifyMsg(NULL, iTargetH, DEF_NOTIFY_ITEMLIFESPANEND, m_pClientList[iTargetH]->m_pItemList[iTemp]->m_cEquipPos, iTemp, NULL, NULL);
-            // Â¾Ã†Ã€ÃŒÃ…Ã›Ã€Â» Ã€Ã¥Ã‚Ã¸ Ã‡Ã˜ÃÂ¦ Â½ÃƒÃ…Â²Â´Ã™.
-            ReleaseItemHandler(iTargetH, iTemp, TRUE);  // <- Ã€ÃŒ Ã‡Ã”Â¼Ã¶Â´Ã‚ Â¼Â­Â¹Ã¶Â¿Â¡Â¼Â­Ã€Ã‡ ÃˆÂ¿Â°ÃºÂ¸Â¸ ÃƒÂ³Â¸Â® 
+            
+            ReleaseItemHandler(iTargetH, iTemp, TRUE);  
         }
     }
 }
@@ -18425,7 +14973,7 @@ BOOL CGame::_bCrusadeLog(int iAction, int iClientH, int iData, char * cName)
 {
     char  cTxt[200];
 
-    //  Â·ÃŽÂ±Ã— Â³Â²Â±Ã¤Â´Ã™. 
+    
     ZeroMemory(cTxt, sizeof(cTxt));
 
     switch (iAction)
@@ -18497,7 +15045,7 @@ BOOL CGame::_bInitItemAttr(CItem * pItem, int iItemID)
         {
             if (m_pItemConfigList[i]->m_sIDnum == iItemID)
             {
-                // Â°Â°Ã€Âº Ã€ÃŒÂ¸Â§Ã€Â» Â°Â¡ÃÃ¸ Â¾Ã†Ã€ÃŒÃ…Ã› Â¼Â³ÃÂ¤Ã€Â» ÃƒÂ£Â¾Ã’Â´Ã™. Â¼Â³ÃÂ¤Â°ÂªÃ€Â» ÂºÂ¹Â»Ã§Ã‡Ã‘Â´Ã™.
+                
                 ZeroMemory(pItem->m_cName, sizeof(pItem->m_cName));
                 strcpy(pItem->m_cName, m_pItemConfigList[i]->m_cName);
                 pItem->m_cItemType = m_pItemConfigList[i]->m_cItemType;
@@ -18553,15 +15101,18 @@ void CGame::SetSlateFlag(int iClientH, short sType, bool bFlag)
     if (bFlag == TRUE)
     {
         if (sType == 1)
-        { // Invincible slate
+        {
+            // Invincible slate
             m_pClientList[iClientH]->m_iStatus |= 0x400000;
         }
         else if (sType == 3)
-        { // Mana slate
+        {
+            // Mana slate
             m_pClientList[iClientH]->m_iStatus |= 0x800000;
         }
         else if (sType == 4)
-        { // Exp slate
+        {
+            // Exp slate
             m_pClientList[iClientH]->m_iStatus |= 0x10000;
         }
     }
@@ -18685,7 +15236,7 @@ void CGame::GSM_RequestShutupPlayer(char * pGMName, WORD wReqServerID, WORD wReq
     for (i = 1; i < DEF_MAXCLIENTS; i++)
         if ((m_pClientList[i] != NULL) && (strcmp(m_pClientList[i]->m_cCharName, pPlayer) == 0))
         {
-            // ÃƒÂ£Â¾Ã’Â´Ã™.
+            
             ZeroMemory(cTemp, sizeof(cTemp));
             cp = (char *)(cTemp);
             *cp = GSM_RESPONSE_SHUTUPPLAYER;
@@ -18709,8 +15260,8 @@ void CGame::GSM_RequestShutupPlayer(char * pGMName, WORD wReqServerID, WORD wReq
             memcpy(cp, pPlayer, 10);
             cp += 10;
 
-            // v2.14 Â¼Ã‹Â¾Ã·Â½ÃƒÂ°Â£Ã€Â» ÂºÃÃ€Â¸Â·ÃŽ Â¼Ã¶ÃÂ¤
-            m_pClientList[i]->m_iTimeLeft_ShutUp = wTime * 20; // 1Ã€ÃŒ 3ÃƒÃŠÂ´Ã™. 20Ã€ÃŒÂ¸Ã© 1ÂºÃ 
+            
+            m_pClientList[i]->m_iTimeLeft_ShutUp = wTime * 20; 
 
             SendNotifyMsg(NULL, i, DEF_NOTIFY_PLAYERSHUTUP, wTime, NULL, NULL, pPlayer);
 
@@ -18723,7 +15274,7 @@ BOOL CGame::_bPKLog(int iAction, int iAttackerH, int iVictumH, char * pNPC)
 {
     char  cTxt[1024], cTemp1[120], cTemp2[120];
 
-    //  Â·ÃŽÂ±Ã— Â³Â²Â±Ã¤Â´Ã™. 
+    
     ZeroMemory(cTxt, sizeof(cTxt));
     ZeroMemory(cTemp1, sizeof(cTemp1));
     ZeroMemory(cTemp2, sizeof(cTemp2));
@@ -18815,7 +15366,7 @@ void CGame::RequestResurrectPlayer(int iClientH, bool bResurrect)
 
     m_pClientList[iClientH]->m_bIsBeingResurrected = FALSE;
 
-    // !!! RequestTeleportHandlerÂ³Â»Â¿Â¡Â¼Â­ m_cMapNameÃ€Â» Â¾Â²Â±Ã¢ Â¶Â§Â¹Â®Â¿Â¡ Â±Ã—Â´Ã«Â·ÃŽ Ã†Ã„Â¶Ã³Â¹ÃŒÃ…ÃÂ·ÃŽ Â³Ã‘Â°ÃœÃÃ–Â¸Ã© Â¿Ã€ÂµÂ¿Ã€Ã›
+    
     RequestTeleportHandler(iClientH, "2   ", m_pClientList[iClientH]->m_cMapName, m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY);
 }
 
@@ -18847,10 +15398,6 @@ BOOL CGame::bCheckClientAttackFrequency(int iClientH, DWORD dwClientTime)
 
             return FALSE;
         }
-
-        //testcode
-        //wsprintf(G_cTxt, "Attack: %d", dwTimeGap);
-        //log->info(G_cTxt);
     }
 
     return FALSE;
@@ -18886,10 +15433,6 @@ BOOL CGame::bCheckClientMagicFrequency(int iClientH, DWORD dwClientTime)
         m_pClientList[iClientH]->m_iSpellCount--;
         m_pClientList[iClientH]->m_bMagicConfirm = FALSE;
         m_pClientList[iClientH]->m_bMagicPauseTime = FALSE;
-
-        //testcode
-        //wsprintf(G_cTxt, "Magic: %d", dwTimeGap);
-        //log->info(G_cTxt);
     }
 
     return FALSE;
@@ -18936,10 +15479,6 @@ BOOL CGame::bCheckClientMoveFrequency(int iClientH, DWORD dwClientTime)
             }
             return FALSE;
         }
-
-        // testcode
-        // wsprintf(G_cTxt, "Move: %d", dwTimeGap);
-        // log->info(G_cTxt);
     }
 
     return FALSE;
@@ -18953,7 +15492,6 @@ void CGame::CrusadeWarStarter()
     if (m_bIsCrusadeMode == TRUE) return;
     if (m_bIsCrusadeWarStarter == FALSE) return;
 
-    // °ÔÀÓ ¼­¹ö 1¹ø¿¡¼­¸¸ 
     GetLocalTime(&SysTime);
 
     for (i = 0; i < DEF_MAXSCHEDULE; i++)
@@ -18973,10 +15511,10 @@ void CGame::OnTimer()
 
     dwTime = timeGetTime();
 
-    //if ((dwTime - m_dwGameTime1) > 200) {
-    GameProcess();
-    // m_dwGameTime1 = dwTime;
-    //}
+    if ((dwTime - m_dwGameTime1) > 200) {
+        GameProcess();
+        m_dwGameTime1 = dwTime;
+    }
 
 
     if ((dwTime - m_dwGameTime2) > 3000)
@@ -18985,18 +15523,14 @@ void CGame::OnTimer()
         //SendMsgToGateServer(MSGID_GAMESERVERALIVE, NULL);
         CheckDayOrNightMode();
         m_dwGameTime2 = dwTime;
-        // v1.41 
-        //_CheckGateSockConnection();
 
-        // v1.41
         if ((m_bIsGameStarted == FALSE) && (m_bIsItemAvailable == TRUE) &&
             (m_bIsNpcAvailable == TRUE) && (m_bIsMagicAvailable == TRUE) &&
             (m_bIsSkillAvailable == TRUE) && (m_bIsPortionAvailable == TRUE) &&
             (m_bIsQuestAvailable == TRUE) && (m_bIsBuildItemAvailable == TRUE))
         {
-            // °ÔÀÓÀ» ½ÃÀÛÇÒ ÁØºñ°¡ µÇ¾ú´Ù. ¸Þ½ÃÁö¸¦ º¸³½´Ù.
-            log->info("Sending start message...");
-            SendMessage(m_hWnd, WM_USER_STARTGAMESIGNAL, NULL, NULL);
+            
+            log->info("Starting server.");
             m_bIsGameStarted = TRUE;
         }
     }
@@ -19006,7 +15540,6 @@ void CGame::OnTimer()
         SendStockMsgToGateServer();
         m_dwGameTime6 = dwTime;
 
-        // v2.05
         if (m_iFinalShutdownCount != 0)
         {
             m_iFinalShutdownCount--;
@@ -19014,7 +15547,7 @@ void CGame::OnTimer()
             log->info(G_cTxt);
             if (m_iFinalShutdownCount <= 1)
             {
-                // 2.14 ¼ºÈÄ´Ï ¼Ë´Ù¿î½Ã ¹«Á¶°Ç ·Î±× ÀúÀå 
+                
                 SendMessage(m_hWnd, WM_CLOSE, NULL, NULL);
                 return;
 
@@ -19047,14 +15580,13 @@ void CGame::OnTimer()
 
         if (m_iMiddlelandMapIndex >= 0)
         {
-            // Crusade
             SaveOccupyFlagData();
             //bSendMsgToLS(MSGID_REQUEST_SAVEARESDENOCCUPYFLAGDATA, NULL, NULL);
             //bSendMsgToLS(MSGID_REQUEST_SAVEELVINEOCCUPYFLAGDATA, NULL, NULL);
         }
         m_dwGameTime5 = dwTime;
 
-        // v1.41 ·£´ý ½Ãµå°ª ÃÊ±âÈ­.
+        
         srand((unsigned)time(NULL));
     }
 
@@ -19079,7 +15611,7 @@ void CGame::OnTimer()
     {
         SetHeldenianMode();
     }
-    // v1.4311-3 Ãß°¡  µÎ½Ã°£¸¶´Ù »çÅõÀå ¿¹¾àÀ» ÃÊ±âÈ­ÇÏ°í ¿¹¾àÇÑ À¯Àú¿¡°Ô »ç½ÇÀ» ¾Ë·ÁÁØ´Ù. 1000*60*60*2 = 7200000
+    
     if ((dwTime - m_dwCanFightzoneReserveTime) > 7200000)
     {
         FightzoneReserveProcessor();
@@ -19093,7 +15625,7 @@ void CGame::OnTimer()
             log->info("(!) GAME SERVER SHUTDOWN PROCESS COMPLETED! All players are disconnected.");
             m_bIsServerShutdowned = TRUE;
 
-            // v1.41 ¸¸¾à ¼ÒÄÏÀÌ ²÷¾îÁ®¼­ ÀÚµ¿ ¼Ë´Ù¿î µÈ °ÍÀÌ¶ó¸é ´Ù½Ã ¼­¹ö¸¦ ±âµ¿½ÃÅ²´Ù. 
+            
             if ((m_cShutDownCode == 3) || (m_cShutDownCode == 4))
             {
                 log->info("(!!!) AUTO-SERVER-REBOOTING!");
@@ -19101,26 +15633,25 @@ void CGame::OnTimer()
             }
             else
             {
-                // v1.432 ¼­¹ö ¼Ë´Ù¿îÀÌ ³¡³ª¸é ÃÖÁ¾ Á¾·á Ä«¿îÆ® ´Ù¿î¿¡ µé¾î°£´Ù. ¾ÆÁ÷ Àü´ÞµÇÁö ¾ÊÀº ¸Þ½ÃÁö¸¦ Àü¼ÛÇÏ±â À§ÇÑ ¿©À¯½Ã°£À» µÎ´Â°ÍÀÌ ¸ñÀû. v2.05
+                
                 if (m_iFinalShutdownCount == 0)	m_iFinalShutdownCount = 20;
             }
         }
         m_dwExitProcessTime = dwTime;
     }
 
-    // v1.432-2 10ÃÊ¸¶´Ù ¼½ÅÍ Á¤º¸ ºÐ¼® 
+    
     if ((dwTime - m_dwMapSectorInfoTime) > 1000 * 10)
     {
         m_dwMapSectorInfoTime = dwTime;
         UpdateMapSectorInfo();
 
-        // v2.03 ±¤¹°ÀÌ ³ª¿À´Â ºóµµ¼ö¸¦ ÁÙÀÓ 
         MineralGenerator();
 
         m_iMapSectorInfoUpdateCount++;
         if (m_iMapSectorInfoUpdateCount >= 5)
         {
-            // ½Ã°£ÀÌ Áö³²¿¡ µû¶ó È°µ¿ ºóµµ Ä«¿îÆ®¸¦ °¨¼Ò½ÃÅ´.
+            
             AgingMapSectorInfo();
             m_iMapSectorInfoUpdateCount = 0;
         }
@@ -19153,28 +15684,22 @@ void CGame::GSM_SetGuildTeleportLoc(int iGuildGUID, int dX, int dY, char * pMapN
     int i, iIndex;
     DWORD dwTemp, dwTime;
 
-    // Å¬¶óÀÌ¾ðÆ®·ÎºÎÅÍÀÇ ¿äÃ»ÀÌ ¾Æ´Ï¶ó ´Ù¸¥ ¼­¹ö·ÎºÎÅÍÀÇ ÅÚ·¹Æ÷Æ® ÁÂÇ¥ ¼³Á¤ ¿äÃ»ÀÓ. ÀÀ´äÇÒ ÇÊ¿ä ¾øÀ½.
-
-    //testcode
     wsprintf(G_cTxt, "SetGuildTeleportLoc: %d %s %d %d", iGuildGUID, pMapName, dX, dY);
     log->info(G_cTxt);
 
     dwTime = timeGetTime();
 
-    // ¸ÕÀú °°Àº GUID¸¦ °¡Áø ±æµå ÅÚ·¹Æ÷Æ® ÁÂÇ¥°¡ ¼³Á¤µÇ¾î ÀÖ´ÂÁö Ã£´Â´Ù.
+    
     for (i = 0; i < DEF_MAXGUILDS; i++)
         if (m_pGuildTeleportLoc[i].m_iV1 == iGuildGUID)
         {
-            // ÀÌ¹Ì ±æµå°¡ ÀÖ´Ù.
             if ((m_pGuildTeleportLoc[i].m_sDestX == dX) && (m_pGuildTeleportLoc[i].m_sDestY == dY) && (strcmp(m_pGuildTeleportLoc[i].m_cDestMapName, pMapName) == 0))
             {
-                // ³»¿ëÀÌ ÀÏÄ¡ÇÑ´Ù. Å¸ÀÓ ÀÔ·ÂÈÄ ½ºÅµ.
                 m_pGuildTeleportLoc[i].m_dwTime = dwTime;
                 return;
             }
             else
             {
-                // ³»¿ë °»½Å
                 m_pGuildTeleportLoc[i].m_sDestX = dX;
                 m_pGuildTeleportLoc[i].m_sDestY = dY;
                 ZeroMemory(m_pGuildTeleportLoc[i].m_cDestMapName, sizeof(m_pGuildTeleportLoc[i].m_cDestMapName));
@@ -19184,7 +15709,6 @@ void CGame::GSM_SetGuildTeleportLoc(int iGuildGUID, int dX, int dY, char * pMapN
             }
         }
 
-    // ¼³Á¤µÈ ³»¿ëÀÌ ¾ø´Ù. »õ·Î ¼³Á¤ÇÑ´Ù.
     dwTemp = 0;
     iIndex = -1;
     for (i = 0; i < DEF_MAXGUILDS; i++)
@@ -19202,7 +15726,7 @@ void CGame::GSM_SetGuildTeleportLoc(int iGuildGUID, int dX, int dY, char * pMapN
         }
         else
         {
-            // °¡Àå ¿À·§µ¿¾È ÂüÁ¶µÇÁö ¾ÊÀº ¸®½ºÆ®ÀÇ ÀÎµ¦½º¸¦ Ã£´Â´Ù.
+            
             if (dwTemp < (dwTime - m_pGuildTeleportLoc[i].m_dwTime))
             {
                 dwTemp = (dwTime - m_pGuildTeleportLoc[i].m_dwTime);
@@ -19211,10 +15735,9 @@ void CGame::GSM_SetGuildTeleportLoc(int iGuildGUID, int dX, int dY, char * pMapN
         }
     }
 
-    // Ä³½Ã °ø°£ÀÌ ´Ù Ã¡´Ù. ÀÌ·± °æ¿ì ¸®½ºÆ® Áß °¡Àå ¿À·§µ¿¾È »ç¿ëÇÏÁö ¾ÊÀº ¸®½ºÆ®(iIndex)¸¦ »èÁ¦ÇÏ°í ¾÷µ¥ÀÌÆ® ÇÑ´Ù.
+    
     if (iIndex == -1) return;
 
-    //testcode
     log->info("(X) No more GuildTeleportLoc Space! Replaced.");
 
     m_pGuildTeleportLoc[i].m_iV1 = iGuildGUID;
@@ -19237,7 +15760,7 @@ void CGame::_ClearExchangeStatus(int iToH)
     // m_pClientList[iToH]->m_cExchangeName    = FALSE;
     m_pClientList[iToH]->m_dwInitCCTime = FALSE;
     m_pClientList[iToH]->m_iAlterItemDropIndex = 0;
-    //m_pClientList[iToH]->m_cExchangeItemIndex = -1;
+    // m_pClientList[iToH]->m_cExchangeItemIndex = -1;
     m_pClientList[iToH]->m_iExchangeH = NULL;
 
     m_pClientList[iToH]->m_bIsExchangeMode = FALSE;
@@ -19250,7 +15773,7 @@ void CGame::CancelExchangeItem(int iClientH)
 {
     int iExH;
 
-    // Ã‡Ã¶Ã€Ã§ Â±Â³ÃˆÂ¯Ã€Â» ÃƒÃ«Â¼Ã’Ã‡Ã‘Â´Ã™. Â»Ã³Â´Ã«Â¹Ã¦ÂµÂµ Ã€ÃšÂµÂ¿Ã€Â¸Â·ÃŽ ÃƒÃ«Â¼Ã’ÂµÃˆÂ´Ã™. 
+    
     iExH = m_pClientList[iClientH]->m_iExchangeH;
     _ClearExchangeStatus(iExH);
     _ClearExchangeStatus(iClientH);
@@ -19331,10 +15854,10 @@ void CGame::SetForceRecallTime(int iClientH)
 
     if (m_pClientList[iClientH]->m_iTimeLeft_ForceRecall == 0)
     {
-        // ³²¾ÆÀÖÀ» ¼ö ÀÖ´Â ÀÜÁ¸ ½Ã°£À» ¼³Á¤ÇØ ÁØ´Ù. 
-        // ½Ã°£À» ±¸ÇÑ´ÙÀ½ iWarPeriod¸¦ ±¸ÇÑ´Ù.
+        
+        
 
-        // ¼­¹ö¿¡ °­ÄÝ ½Ã°£ÀÌ ¼³Á¤µÇ¾î ÀÖÀ¸¸é ¼­¹ö °­ÄÝ ½Ã°£À» °­ÄÝ ½Ã°£À¸·Î ÇÑ´Ù.
+        
 
         if (m_sForceRecallTime > 0)
         {
@@ -19345,18 +15868,19 @@ void CGame::SetForceRecallTime(int iClientH)
             GetLocalTime(&SysTime);
             switch (SysTime.wDayOfWeek)
             {
-            case 1:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeMonday; break;  //¿ù¿äÀÏ  3ºÐ 2002-09-10 #1
-            case 2:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeTuesday; break;  //È­¿äÀÏ  3ºÐ 
-            case 3:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeWednesday; break;  //¼ö¿äÀÏ  3ºÐ 
-            case 4:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeThursday; break;  //¸ñ¿äÀÏ  3ºÐ 
-            case 5:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeFriday; break; //±Ý¿äÀÏ 15ºÐ
-            case 6:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeSaturday; break; //Åä¿äÀÏ 45ºÐ 
-            case 0:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeSunday; break; //ÀÏ¿äÀÏ 60ºÐ
+            case 1:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeMonday; break;
+            case 2:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeTuesday; break;
+            case 3:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeWednesday; break;
+            case 4:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeThursday; break;
+            case 5:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeFriday; break;
+            case 6:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeSaturday; break;
+            case 0:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeSunday; break;
             }
         }
     }
     else
-    { // if (m_pClientList[iClientH]->m_iTimeLeft_ForceRecall == 0) 
+    {
+        // if (m_pClientList[iClientH]->m_iTimeLeft_ForceRecall == 0) 
         if (m_sForceRecallTime > 0)
         {
             iTL_ = 20 * m_sForceRecallTime;
@@ -19364,17 +15888,17 @@ void CGame::SetForceRecallTime(int iClientH)
         else
         {
 
-            // ÀÜÁ¸½Ã°£ÀÌ ÀÖ´Ù. ¿äÀÏº° ÀÜÁ¸½Ã°£º¸´Ù Å©¸é 1·Î ÃÊ±âÈ­ 
+            
             GetLocalTime(&SysTime);
             switch (SysTime.wDayOfWeek)
             {
-            case 1:	iTL_ = 20 * m_sRaidTimeMonday; break;  //¿ù¿äÀÏ  3ºÐ 2002-09-10 #1
-            case 2:	iTL_ = 20 * m_sRaidTimeTuesday; break;  //È­¿äÀÏ  3ºÐ
-            case 3:	iTL_ = 20 * m_sRaidTimeWednesday; break;  //¼ö¿äÀÏ  3ºÐ
-            case 4:	iTL_ = 20 * m_sRaidTimeThursday; break;  //¸ñ¿äÀÏ  3ºÐ
-            case 5:	iTL_ = 20 * m_sRaidTimeFriday; break; //±Ý¿äÀÏ 15ºÐ
-            case 6:	iTL_ = 20 * m_sRaidTimeSaturday; break; //Åä¿äÀÏ 45ºÐ 
-            case 0:	iTL_ = 20 * m_sRaidTimeSunday; break; //ÀÏ¿äÀÏ 60ºÐ
+                case 1:	iTL_ = 20 * m_sRaidTimeMonday; break;
+                case 2:	iTL_ = 20 * m_sRaidTimeTuesday; break;
+                case 3:	iTL_ = 20 * m_sRaidTimeWednesday; break;
+                case 4:	iTL_ = 20 * m_sRaidTimeThursday; break;
+                case 5:	iTL_ = 20 * m_sRaidTimeFriday; break;
+                case 6:	iTL_ = 20 * m_sRaidTimeSaturday; break;
+                case 0:	iTL_ = 20 * m_sRaidTimeSunday; break;
             }
         }
 
@@ -19408,13 +15932,13 @@ void CGame::CheckForceRecallTime(int iClientH)
             GetLocalTime(&SysTime);
             switch (SysTime.wDayOfWeek)
             {
-            case 1:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeMonday; break;  //¿ù¿äÀÏ  3ºÐ 2002-09-10 #1
-            case 2:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeTuesday; break;  //È­¿äÀÏ  3ºÐ 
-            case 3:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeWednesday; break;  //¼ö¿äÀÏ  3ºÐ 
-            case 4:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeThursday; break;  //¸ñ¿äÀÏ  3ºÐ 
-            case 5:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeFriday; break; //±Ý¿äÀÏ 15ºÐ
-            case 6:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeSaturday; break; //Åä¿äÀÏ 45ºÐ 
-            case 0:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeSunday; break; //ÀÏ¿äÀÏ 60ºÐ
+            case 1:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeMonday; break;
+            case 2:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeTuesday; break;
+            case 3:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeWednesday; break;
+            case 4:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeThursday; break;
+            case 5:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeFriday; break;
+            case 6:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeSaturday; break;
+            case 0:	m_pClientList[iClientH]->m_iTimeLeft_ForceRecall = 20 * m_sRaidTimeSunday; break;
             }
         }
     }
@@ -19431,13 +15955,13 @@ void CGame::CheckForceRecallTime(int iClientH)
             GetLocalTime(&SysTime);
             switch (SysTime.wDayOfWeek)
             {
-            case 1:	iTL_ = 20 * m_sRaidTimeMonday; break;  //¿ù¿äÀÏ  3ºÐ 2002-09-10 #1
-            case 2:	iTL_ = 20 * m_sRaidTimeTuesday; break;  //È­¿äÀÏ  3ºÐ 
-            case 3:	iTL_ = 20 * m_sRaidTimeWednesday; break;  //¼ö¿äÀÏ  3ºÐ 
-            case 4:	iTL_ = 20 * m_sRaidTimeThursday; break;  //¸ñ¿äÀÏ  3ºÐ 
-            case 5:	iTL_ = 20 * m_sRaidTimeFriday; break; //±Ý¿äÀÏ 15ºÐ
-            case 6:	iTL_ = 20 * m_sRaidTimeSaturday; break; //Åä¿äÀÏ 45ºÐ 
-            case 0:	iTL_ = 20 * m_sRaidTimeSunday; break; //ÀÏ¿äÀÏ 60ºÐ
+                case 1:	iTL_ = 20 * m_sRaidTimeMonday; break;
+                case 2:	iTL_ = 20 * m_sRaidTimeTuesday; break;
+                case 3:	iTL_ = 20 * m_sRaidTimeWednesday; break;
+                case 4:	iTL_ = 20 * m_sRaidTimeThursday; break;
+                case 5:	iTL_ = 20 * m_sRaidTimeFriday; break;
+                case 6:	iTL_ = 20 * m_sRaidTimeSaturday; break;
+                case 0:	iTL_ = 20 * m_sRaidTimeSunday; break;
             }
         }
         if (m_pClientList[iClientH]->m_iTimeLeft_ForceRecall > iTL_)
@@ -19449,7 +15973,7 @@ void CGame::CheckForceRecallTime(int iClientH)
 
 }
 
-int ITEMSPREAD_FIEXD_COORD[25][2] =
+int ITEMSPREAD_FIXED_COORD[25][2] =
 {
     { 0,  0},	//1
     { 1,  0},	//2
@@ -19491,7 +16015,7 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
     {
         if (i > iMin) iProb = iProbability;
 
-        fProb = (float)(100 - iProb) / 10.0;	//WyvernÃ€Ã‡ Ã†Ã²Â±Ã• 50
+        fProb = (float)(100 - iProb) / 10.0;	
         if (fProb < 1.0) fProb = 1.0;
 
         fProbA = fProbB = fProbC = fProb;
@@ -19504,8 +16028,8 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
 
         switch (sNpcType)
         {
-        case 69: // Wyvern...stupid koreans
-            // ÃÖ»ó±Þ
+        case 69: // Wyvern
+            
             switch (iDice(1, 4))
             {
             case 1: if (iDice(1, (6000 * fProbA)) == 3) iItemID = 634; break; // RingofWizard
@@ -19514,7 +16038,6 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
             case 4: if (iDice(1, (4500 * fProbA)) == 3) iItemID = 380; break; // IceStormManual
             }
 
-            // »ó±Þ
             if (iItemID == 0)
             {
                 switch (iDice(1, 6))
@@ -19530,7 +16053,7 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
             break;
 
         case 73: // Fire-Wyvern
-            // ÃÖ»ó±Þ
+            
             switch (iDice(1, 7))
             {
             case  1: if (iDice(1, (5000 * fProbA)) == 3) iItemID = 860; break; // NecklaceOfXelima
@@ -19542,7 +16065,6 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
             case  7: if (iDice(1, (3000 * fProbA)) == 3) iItemID = 381; break; // MassFireStrikeManual
             }
 
-            // »ó±Þ
             if (iItemID == 0)
             {
                 switch (iDice(1, 9))
@@ -19562,8 +16084,6 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
             break;
 
         case 81: // Abaddon
-
-            // ÃÖ»ó±Þ
             switch (iDice(1, 6))
             {
             case 1: if (iDice(1, (100 * fProbA)) == 3) iItemID = 20;  break; // Excaliber
@@ -19574,7 +16094,6 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
             case 6: if (iDice(1, (100 * fProbA)) == 2) iItemID = 937; break; // MerienHelm
             }
 
-            // »ó±Þ
             if (iItemID == 0)
             {
                 switch (iDice(1, 15))
@@ -19595,9 +16114,8 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
                 }
             }
             break;
-        } // switch
+        }
 
-        // ÀÏ¹Ý ¾ÆÀÌÅÛ ....dumb korean idiots
         if (iItemID == 0)
         {
             switch (iDice(1, 24))
@@ -19629,16 +16147,12 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
             }
         }
 
-        // È®·üÀÌ 100 ÀÎµ¥ ¾Æ¹« °Íµµ ³ª¿ÀÁö ¾Ê¾Ò´Ù.
-        // Gold ÁØ´Ù. retarded koreans -_-
         if (iItemID == 0 && iProb == 100) iItemID = 90; // Gold
 
         if (iItemID != 0)
         {
-            // item id
             iItemIDs[iNum] = iItemID;
 
-            // item position
             switch (iItemSpreadType)
             {
             case DEF_ITEMSPREAD_RANDOM:
@@ -19647,32 +16161,27 @@ BOOL CGame::bGetMultipleItemNamesWhenDeleteNpc(short sNpcType, int iProbability,
                 break;
 
             case DEF_ITEMSPREAD_FIXED:
-                BasePos[iNum].x = sBaseX + ITEMSPREAD_FIEXD_COORD[iNum][0];
-                BasePos[iNum].y = sBaseY + ITEMSPREAD_FIEXD_COORD[iNum][1];
+                BasePos[iNum].x = sBaseX + ITEMSPREAD_FIXED_COORD[iNum][0];
+                BasePos[iNum].y = sBaseY + ITEMSPREAD_FIXED_COORD[iNum][1];
                 break;
             }
             iNum++;
         }
 
-    } // for
+    }
 
     *iNumItem = iNum;
 
     return TRUE;
-
-} // bGetMultipleItemNamesWhenDeleteNpc... duh...korean morons
+}
 
 void CGame::SendCollectedMana()
 {
     char * cp, cData[120];
     WORD * wp;
 
-    //SendMsgToGateServer(MSGID_COLLECTEDMANA, NULL);
-
-    // ¸ðÀÎ ¸¶³ª°¡ ¾ø´Ù¸é ¸Þ½ÃÁö Àü¼ÛÇÏÁö ¾Ê´Â´Ù. ¸¶³ª ½ºÅæÀÌ ¾ø´Â ¸Ê¿¡¼­ ¸Þ½ÃÁö¸¦ Àü¼ÛÇÏ¸é ¾ÈµÈ´Ù.
     if ((m_iCollectedMana[1] == 0) && (m_iCollectedMana[2] == 0)) return;
 
-    //testcode
     wsprintf(G_cTxt, "Sending Collected Mana: %d %d", m_iCollectedMana[1], m_iCollectedMana[2]);
     log->info(G_cTxt);
 
@@ -19691,9 +16200,8 @@ void CGame::SendCollectedMana()
 
     CollectedManaHandler(m_iCollectedMana[1], m_iCollectedMana[2]);
 
-    bStockMsgToGateServer(cData, 5);
+    //bStockMsgToGateServer(cData, 5);
 
-    // ±×µ¿¾È ¸ðÀº ¸¶³ª·® º¸³»°í Å¬¸®¾î.
     m_iCollectedMana[0] = 0;
     m_iCollectedMana[1] = 0;
     m_iCollectedMana[2] = 0;
@@ -19703,20 +16211,16 @@ void CGame::_LinkStrikePointMapIndex()
 {
     int i, z, x;
 
-    // ¸¶À»°ú °Ç¹° ³»ºÎ¸¦ ´Ù¸¥ ¼­¹ö¿¡ ¶ç¿ì¸é ¸µÅ©°¡ ºÒ°¡´ÉÇÏ¹Ç·Î ´Ù¿îµÈ´Ù!
     for (i = 0; i < DEF_MAXMAPS; i++)
         if ((m_pMapList[i] != NULL) && (m_pMapList[i]->m_iTotalStrikePoints != 0))
         {
-            // ½ºÆ®¶óÀÌÅ© Æ÷ÀÎÆ®°¡ Á¤ÀÇµÈ ¸ÊÀÌ´Ù. °¢°¢ÀÇ ½ºÆ®¶óÀÌÅ© Æ÷ÀÎÆ®¿Í ¿¬°èµÈ ¸ÊÀÇ ÀÎµ¦½º¸¦ ±¸ÇØ ÀúÀåÇÑ´Ù.
             for (z = 0; z < DEF_MAXSTRIKEPOINTS; z++)
                 if (strlen(m_pMapList[i]->m_stStrikePoint[z].cRelatedMapName) != 0)
                 {
                     for (x = 0; x < DEF_MAXMAPS; x++)
                         if ((m_pMapList[x] != NULL) && (strcmp(m_pMapList[x]->m_cName, m_pMapList[i]->m_stStrikePoint[z].cRelatedMapName) == 0))
                         {
-                            // ÀÎµ¦½º¸¦ ±¸Çß´Ù. ÀúÀåÇÑ´Ù.
                             m_pMapList[i]->m_stStrikePoint[z].iMapIndex = x;
-                            //testcode
                             wsprintf(G_cTxt, "(!) Map(%s) Strike Point(%d) Related Map(%s) Index(%d)", m_pMapList[i]->m_cName, z, m_pMapList[i]->m_stStrikePoint[z].cRelatedMapName, x);
                             log->info(G_cTxt);
 
@@ -19854,10 +16358,10 @@ void CGame::ShowClientMsg(int iClientH, char * pMsg)
     *sp = NULL;
     cp += 2;
 
-    memcpy(cp, "HGServer", 8); // Player name :P
+    memcpy(cp, "HGServer", 8);
     cp += 10;
 
-    *cp = 10; // chat type
+    *cp = 10;
     cp++;
 
     dwMsgSize = strlen(pMsg);
@@ -19886,7 +16390,7 @@ void CGame::Command_YellowBall(int iClientH, char * pData, DWORD dwMsgSize)
         {
             switch (m_pClientList[iClientH]->m_pItemList[i]->m_sIDnum)
             {
-            case 653: iSoX++; iSoxH = i; break; // ½ºÅæ ¿Àºê Á¦¸®¸¶ 
+            case 653: iSoX++; iSoxH = i; break;
             }
         }
     if (iSoX > 0)
@@ -19979,7 +16483,7 @@ void CGame::Command_RedBall(int iClientH, char * pData, DWORD dwMsgSize)
         {
             switch (m_pClientList[iClientH]->m_pItemList[i]->m_sIDnum)
             {
-            case 652: iSoX++; iSoxH = i; break; // ½ºÅæ ¿Àºê Á¦¸®¸¶ 
+            case 652: iSoX++; iSoxH = i; break;
             }
         }
     if (iSoX > 0)
@@ -20054,7 +16558,7 @@ void CGame::Command_BlueBall(int iClientH, char * pData, DWORD dwMsgSize)
         {
             switch (m_pClientList[iClientH]->m_pItemList[i]->m_sIDnum)
             {
-            case 654: iSoX++; iSoxH = i; break; // ½ºÅæ ¿Àºê Á¦¸®¸¶ 
+            case 654: iSoX++; iSoxH = i; break;
             }
         }
     if (iSoX > 0)
@@ -20159,9 +16663,6 @@ void CGame::Command_BlueBall(int iClientH, char * pData, DWORD dwMsgSize)
                     }
                 }
             }
-
-            //delete pStrTok;
-
         }
     }
 
@@ -20558,20 +17059,20 @@ BOOL CGame::bCalculateEnduranceDecrement(short sTargetH, short sAttackerH, char 
                 iItemIndex = m_pClientList[sAttackerH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND];
                 if ((iItemIndex != -1) && (m_pClientList[sAttackerH]->m_pItemList[iItemIndex] != NULL))
                 {
-                    if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 761)
-                    { // BattleHammer 
+                    if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 761) // BattleHammer 
+                    {
                         iDownValue = 30;
                     }
-                    if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 762)
-                    { // GiantBattleHammer
+                    if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 762) // GiantBattleHammer
+                    {
                         iDownValue = 35;
                     }
-                    if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 843)
-                    { // BarbarianHammer
+                    if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 843) // BarbarianHammer
+                    {
                         iDownValue = 30;
                     }
-                    if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 745)
-                    { // MasterBattleHammer
+                    if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 745) // MasterBattleHammer
+                    {
                         iDownValue = 30;
                     }
                     break;
@@ -20622,20 +17123,20 @@ BOOL CGame::bCalculateEnduranceDecrement(short sTargetH, short sAttackerH, char 
             iItemIndex = m_pClientList[sAttackerH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND];
             if ((iItemIndex != -1) && (m_pClientList[sAttackerH]->m_pItemList[iItemIndex] != NULL))
             {
-                if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 761)
-                { // BattleHammer 
+                if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 761) // BattleHammer 
+                {
                     iHammerChance -= iHammerChance >> 1;
                 }
-                if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 762)
-                { // GiantBattleHammer
+                if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 762) // GiantBattleHammer
+                {
                     iHammerChance = (((iHammerChance * 5) + 7) >> 3);
                 }
-                if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 843)
-                { // BarbarianHammer
+                if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 843) // BarbarianHammer
+                {
                     iHammerChance = (((iHammerChance * 5) + 7) >> 3);
                 }
-                if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 745)
-                { // MasterBattleHammer
+                if (m_pClientList[sAttackerH]->m_pItemList[iItemIndex]->m_sIDnum == 745) // MasterBattleHammer
+                {
                     iHammerChance = (((iHammerChance * 5) + 7) >> 3);
                 }
             }
@@ -20661,7 +17162,7 @@ BOOL CGame::bCalculateEnduranceDecrement(short sTargetH, short sAttackerH, char 
 
 int CGame::iCalculateAttackEffect(short sTargetH, char cTargetType, short sAttackerH, char cAttackerType, int tdX, int tdY, int iAttackMode, BOOL bNearAttack, BOOL bIsDash, BOOL bArrowUse)
 {
-    int    iAP_SM, iAP_L, iAttackerHitRatio, iTargetDefenseRatio, iDestHitRatio, iResult, iAP_Abs_Armor, iAP_Abs_Shield;
+    int    iAP_SM, iAP_L, iAttackerHitRatio{}, iTargetDefenseRatio, iDestHitRatio, iResult, iAP_Abs_Armor, iAP_Abs_Shield;
     char   cAttackerName[30], cAttackerDir, cAttackerSide, cTargetDir, cProtect, cCropSkill, cFarmingSkill;
     short  sWeaponIndex, sAttackerWeapon, dX, dY, sX, sY, sAtkX, sAtkY, sTgtX, sTgtY;
     DWORD  dwTime;
@@ -20673,7 +17174,7 @@ int CGame::iCalculateAttackEffect(short sTargetH, char cTargetType, short sAttac
     int    iKilledDice, iDamage, iExp, iWepLifeOff, iSideCondition, iMaxSuperAttack, iWeaponSkill, iComboBonus, iTemp;
     int    iAttackerHP, iMoveDamage, iRepDamage;
     char   cAttackerSA;
-    int    iAttackerSAvalue, iHitPoint;
+    int    iAttackerSAvalue, iHitPoint{};
     char   cDamageMoveDir;
     int    iPartyID, iConstructionPoint, iWarContribution, tX, tY, iDst1, iDst2;
     short sItemIndex;
@@ -20782,6 +17283,10 @@ int CGame::iCalculateAttackEffect(short sTargetH, char cTargetType, short sAttac
             iAP_SM += iDice(1, (m_pClientList[sAttackerH]->m_iStr / 20));
             iAP_L += iDice(1, (m_pClientList[sAttackerH]->m_iStr / 20));
         }
+        else
+        {
+            iAttackerHitRatio = 0;
+        }
 
         iAttackerHitRatio += 50;
         if (iAP_SM <= 0) iAP_SM = 1;
@@ -20819,8 +17324,8 @@ int CGame::iCalculateAttackEffect(short sTargetH, char cTargetType, short sAttac
         {
             if ((m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 851) || // KlonessEsterk 
                 (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 863) || // KlonessWand(MS.20)
-                (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 864))
-            { // KlonessWand(MS.10) 
+                (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 864)) // KlonessWand(MS.10) 
+            {
                 if (m_pClientList[sAttackerH]->m_iRating > 0)
                 {
                     iRepDamage = m_pClientList[sAttackerH]->m_iRating / 100;
@@ -20842,8 +17347,8 @@ int CGame::iCalculateAttackEffect(short sTargetH, char cTargetType, short sAttac
                 }
             }
             if ((m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 732) || // BerserkWand(MS.20)
-                (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 738))
-            { // BerserkWand(MS.10)
+                (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 738)) // BerserkWand(MS.10)
+            {
                 iAP_SM += 1;
                 iAP_L += 1;
             }
@@ -20865,8 +17370,8 @@ int CGame::iCalculateAttackEffect(short sTargetH, char cTargetType, short sAttac
                 iAP_L += 4;
             }
             if ((m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 849) || // KlonessBlade 
-                (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 850))
-            { // KlonessAxe
+                (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 850)) // KlonessAxe
+            {
                 if (m_pClientList[sAttackerH]->m_iRating > 0)
                 {
                     iRepDamage = m_pClientList[sAttackerH]->m_iRating / 100;
@@ -20892,8 +17397,8 @@ int CGame::iCalculateAttackEffect(short sTargetH, char cTargetType, short sAttac
         sItemIndex = m_pClientList[sAttackerH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_NECK];
         if ((sItemIndex != -1) && (m_pClientList[sAttackerH]->m_pItemList[sItemIndex] != NULL))
         {
-            if (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 859)
-            { // NecklaceOfKloness  
+            if (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 859) // NecklaceOfKloness  
+            {
                 if (cTargetType == DEF_OWNERTYPE_PLAYER)
                 {
                     if (m_pClientList[sTargetH] == NULL) return 0;
@@ -21090,7 +17595,6 @@ int CGame::iCalculateAttackEffect(short sTargetH, char cTargetType, short sAttac
                 case 37:
                 case 38:
                 case 39:
-                    // administrators instantly build crusade structures
                     if (m_pClientList[sAttackerH]->m_iAdminUserLevel > 0)
                     {
                         m_pNpcList[sTargetH]->m_sAppr2 = 0;
@@ -21150,7 +17654,6 @@ int CGame::iCalculateAttackEffect(short sTargetH, char cTargetType, short sAttac
                     case 1:
                         m_pNpcList[sTargetH]->m_sAppr2 = 3;
                         SendEventToNearClient_TypeA(sTargetH, DEF_OWNERTYPE_NPC, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
-                        //sub_4B67E0
                         CalculateSSN_SkillIndex(sAttackerH, 2, cFarmingSkill <= cCropSkill + 10);
                         _CheckFarmingAction(sAttackerH, sTargetH, 1);
                         DeleteNpc(sTargetH);
@@ -22258,7 +18761,7 @@ BOOL CGame::bGetItemNameWhenDeleteNpc(int & iItemID, short sNpcType)
         case 32: if (iDice(1, 170) != 11) return FALSE; break;	  // Unicorn 5 * 100	
         case 33: if (iDice(1, 255) != 11) return FALSE; break;	  // WereWolf 7 * 100
         case 48: if (iDice(1, 80) != 11) return FALSE; break;	  // Stalker 
-        case 52: if (iDice(1, 255) != 11) return FALSE; break;     // Gagoyle
+        case 52: if (iDice(1, 255) != 11) return FALSE; break;    // Gagoyle
         case 53: if (iDice(1, 425) != 11) return FALSE; break;	  // Beholder
         case 54: if (iDice(1, 200) != 11) return FALSE; break;	  // Dark-Elf
         case 57: if (iDice(1, 400) != 11) return FALSE; break;	  // Giant-Frog
@@ -22276,7 +18779,6 @@ BOOL CGame::bGetItemNameWhenDeleteNpc(int & iItemID, short sNpcType)
         }
     }
     else return FALSE;
-    //http://www.helbreath.com/down/d_patch_v2.htm
 
     switch (sNpcType)
     {
@@ -22473,100 +18975,6 @@ BOOL CGame::bGetItemNameWhenDeleteNpc(int & iItemID, short sNpcType)
     else return TRUE;
 }
 
-/*
-void CGame::StormBringer(int iClientH, short dX, short dY)
-{
-    char cOwnerType;
-    short sOwner, sAppr2, sAttackerWeapon;
-    int  iDamage, iTemp, iV1, iV2, iV3;
-
-    //ArchAngel Fix
-
-    if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND] != -1) {
-        m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->GetOwner(&sOwner, &cOwnerType, dX, dY);
-
-        iTemp = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND];
-        sAppr2 = (short)((m_pClientList[iClientH]->m_sAppr2 & 0xF000) >> 12);
-
-        if (memcmp(m_pClientList[iClientH]->m_pItemList[iTemp]->m_cName, "StormBringer", 12) == 0){
-
-            switch (cOwnerType) {
-            case DEF_OWNERTYPE_PLAYER:
-                if (m_pClientList[sOwner]->m_iAdminUserLevel < 3) {
-                    if (sAppr2 != 0) {
-                        iV1 = m_pClientList[iClientH]->m_cAttackDiceThrow_L;
-                        iV2 = m_pClientList[iClientH]->m_cAttackDiceRange_L;
-                        iV3 = m_pClientList[iClientH]->m_cAttackBonus_L;
-
-                        if (m_pClientList[iClientH]->m_cMagicEffectStatus[ DEF_MAGICTYPE_BERSERK ] != 0){
-                            iDamage = iDice(iV1*2,iV2*2)+iV3;
-                        }
-                        else{
-                            iDamage = iDice(iV1,iV2)+iV3;
-                        }
-
-                        m_pClientList[sOwner]->m_iHP -= iDamage;
-                        if (m_pClientList[sOwner]->m_iHP <= 0){
-                            sAttackerWeapon = 1;
-                            m_pClientList[sOwner]->m_iHP = 0;
-
-                            m_pClientList[sOwner]->m_bIsKilled = TRUE;
-                            m_pClientList[sOwner]->m_iLastDamage = iDamage;
-                            SendNotifyMsg(NULL, sOwner, DEF_NOTIFY_HP, NULL, NULL, NULL, NULL);
-                            SendEventToNearClient_TypeA(sOwner, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTDYING, iDamage, sAttackerWeapon, NULL);
-                            m_pMapList[m_pClientList[sOwner]->m_cMapIndex]->ClearOwner(14, sOwner, DEF_OWNERTYPE_PLAYER, m_pClientList[sOwner]->m_sX, m_pClientList[sOwner]->m_sY);
-                            m_pMapList[m_pClientList[sOwner]->m_cMapIndex]->SetDeadOwner(sOwner, DEF_OWNERTYPE_PLAYER, m_pClientList[sOwner]->m_sX, m_pClientList[sOwner]->m_sY);
-                        }
-                        else{
-                            SendNotifyMsg(NULL, sOwner, DEF_NOTIFY_HP, NULL, NULL, NULL, NULL);
-                            SendEventToNearClient_TypeA(sOwner, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, NULL, NULL);
-                        }
-                    }
-                }
-                break;
-
-            case DEF_OWNERTYPE_NPC:
-                if (sAppr2 != 0) {
-                    if (m_pNpcList[sOwner]->m_cSize == 0){
-                        iV1 = m_pClientList[iClientH]->m_cAttackDiceThrow_SM;
-                        iV2 = m_pClientList[iClientH]->m_cAttackDiceRange_SM;
-                        iV3 = m_pClientList[iClientH]->m_cAttackBonus_SM;
-                    }
-                    else if (m_pNpcList[sOwner]->m_cSize == 1){
-                        iV1 = m_pClientList[iClientH]->m_cAttackDiceThrow_L;
-                        iV2 = m_pClientList[iClientH]->m_cAttackDiceRange_L;
-                        iV3 = m_pClientList[iClientH]->m_cAttackBonus_L;
-                    }
-
-                    if (m_pClientList[iClientH]->m_cMagicEffectStatus[ DEF_MAGICTYPE_BERSERK ] != 0){
-                        iDamage = iDice(iV1*2,iV2*2)+iV3;
-                    }
-                    else{
-                        iDamage = iDice(iV1,iV2)+iV3;
-                    }
-
-                    m_pNpcList[sOwner]->m_iHP -= iDamage;
-                    if (m_pNpcList[sOwner]->m_iHP <= 0){
-                        sAttackerWeapon = 1;
-                        m_pNpcList[sOwner]->m_iHP = 0;
-
-                        m_pNpcList[sOwner]->m_sBehaviorTurnCount = 0;
-                        m_pNpcList[sOwner]->m_cBehavior = DEF_BEHAVIOR_DEAD;
-                        m_pNpcList[sOwner]->m_dwDeadTime = timeGetTime();
-                        SendEventToNearClient_TypeA(sOwner, DEF_OWNERTYPE_NPC, MSGID_EVENT_MOTION, DEF_OBJECTDYING, iDamage, sAttackerWeapon, NULL);
-                        m_pMapList[m_pNpcList[sOwner]->m_cMapIndex]->ClearOwner(10, sOwner, DEF_OWNERTYPE_NPC, m_pNpcList[sOwner]->m_sX, m_pNpcList[sOwner]->m_sY);
-                        m_pMapList[m_pNpcList[sOwner]->m_cMapIndex]->SetDeadOwner(sOwner, DEF_OWNERTYPE_NPC, m_pNpcList[sOwner]->m_sX, m_pNpcList[sOwner]->m_sY);
-                    }
-                    else{
-                        SendEventToNearClient_TypeA(sOwner, DEF_OWNERTYPE_NPC, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, NULL, NULL);
-                    }
-                }
-                break;
-            }
-        }
-    }
-}*/
-
 BOOL CGame::_bCheckCharacterData(int iClientH)
 {
     int i;
@@ -22683,7 +19091,7 @@ BOOL CGame::_bCheckCharacterData(int iClientH)
     {
         for (i = 0; i < DEF_MAXBANNED; i++)
         {
-            if (strlen(m_stBannedList[i].m_cBannedIPaddress) == 0) break; //No more GM's on list
+            if (strlen(m_stBannedList[i].m_cBannedIPaddress) == 0) break;
             if ((strlen(m_stBannedList[i].m_cBannedIPaddress)) == (strlen(m_pClientList[iClientH]->m_cIPaddress)))
             {
                 if (memcmp(m_stBannedList[i].m_cBannedIPaddress, m_pClientList[iClientH]->m_cIPaddress, strlen(m_pClientList[iClientH]->m_cIPaddress)) == 0)
@@ -22778,7 +19186,7 @@ void CGame::ForceRecallProcess()
     int i;
     int iMapSide = 0;
 
-    DWORD * dwp, dwTime;
+    DWORD * dwp{}, dwTime;
 
     dwTime = timeGetTime();
 
@@ -22945,7 +19353,6 @@ BOOL CGame::IsEnemyZone(int i)
 }
 
 void CGame::SetSkillAll(int iClientH, char * pData, DWORD dwMsgSize)
-//SetSkillAll Acidx Command,  Added July 04, 2005 INDEPENDENCE BABY Fuck YEA
 {
     if (m_pClientList[iClientH] == NULL) return;
     //Magic
@@ -23200,201 +19607,3 @@ void CGame::SetSkillAll(int iClientH, char * pData, DWORD dwMsgSize)
 
     }
 }
-
-/*void CGame::GetAngelMantleHandler(int iClientH,int iItemID,char * pString)
-{
- int   i, iNum, iRet, iEraseReq;
- char  * cp, cData[256], cItemName[21];
- CItem * pItem;
- DWORD * dwp;
- short * sp;
- WORD  * wp;
-
-    if (m_pClientList[iClientH] == NULL) return;
-    if (m_pClientList[iClientH]->m_iGizonItemUpgradeLeft < 5) return;
-    if (m_pClientList[iClientH]->m_cSide == 0) return;
-    if (_iGetItemSpaceLeft(iClientH) == 0) {
-        SendItemNotifyMsg(iClientH,	DEF_NOTIFY_CANNOTCARRYMOREITEM, NULL, NULL);
-        return;
-    }
-
-    //Prevents a crash if item dosent exist
-    if (m_pItemConfigList[iItemID] == NULL)  return;
-
-    switch(iItemID) {
-    //Angels
-    case 908: //AngelicPandent(STR)
-    case 909: //AngelicPandent(DEX)
-        case 910: //AngelicPandent(INT)
-        case 911: //AngelicPandent(MAG)
-        if(m_pClientList[iClientH]->m_iGizonItemUpgradeLeft<5) return;
-        m_pClientList[iClientH]->m_iGizonItemUpgradeLeft -= 5;
-        break;
-
-
-  default:
-     return;
-     break;
-  }
-
-  ZeroMemory(cItemName, sizeof(cItemName));
-  memcpy(cItemName,m_pItemConfigList[iItemID]->m_cName,20);
-
-  iNum = 1;
-  for (i = 1; i <= iNum; i++)
-  {
-     pItem = new CItem;
-     if (_bInitItemAttr(pItem, cItemName) == FALSE)
-     {
-        delete pItem;
-     }
-     else {
-
-        if (_bAddClientItemList(iClientH, pItem, &iEraseReq) == TRUE) {
-           if (m_pClientList[iClientH]->m_iCurWeightLoad < 0) m_pClientList[iClientH]->m_iCurWeightLoad = 0;
-
-           wsprintf(G_cTxt, "(*) Get Angel : Char(%s) Player-Majestic-Points(%d) Angel Obtained(%s)", m_pClientList[iClientH]->m_cCharName, m_pClientList[iClientH]->m_iGizonItemUpgradeLeft, cItemName);
-           log->info(G_cTxt);
-
-           pItem->m_sTouchEffectType = DEF_ITET_UNIQUE_OWNER;
-           pItem->m_sTouchEffectValue1 = m_pClientList[iClientH]->m_sCharIDnum1;
-           pItem->m_sTouchEffectValue2 = m_pClientList[iClientH]->m_sCharIDnum2;
-           pItem->m_sTouchEffectValue3 = m_pClientList[iClientH]->m_sCharIDnum3;
-
-           dwp  = (DWORD *)(cData + DEF_INDEX4_MSGID);
-           *dwp = MSGID_NOTIFY;
-           wp   = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
-           *wp  = DEF_NOTIFY_ITEMOBTAINED;
-           cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
-
-           *cp = 1;
-           cp++;
-
-           memcpy(cp, pItem->m_cName, 20);
-           cp += 20;
-
-           dwp  = (DWORD *)cp;
-           *dwp = pItem->m_dwCount;
-           cp += 4;
-
-           *cp = pItem->m_cItemType;
-           cp++;
-
-           *cp = pItem->m_cEquipPos;
-           cp++;
-
-           *cp = (char)0;
-           cp++;
-
-           sp  = (short *)cp;
-           *sp = pItem->m_sLevelLimit;
-           cp += 2;
-
-           *cp = pItem->m_cGenderLimit;
-           cp++;
-
-           wp = (WORD *)cp;
-           *wp = pItem->m_wCurLifeSpan;
-           cp += 2;
-
-           wp = (WORD *)cp;
-           *wp = pItem->m_wWeight;
-           cp += 2;
-
-           sp  = (short *)cp;
-           *sp = pItem->m_sSprite;
-           cp += 2;
-
-           sp  = (short *)cp;
-           *sp = pItem->m_sSpriteFrame;
-           cp += 2;
-
-           *cp = pItem->m_cItemColor;
-           cp++;
-
-           *cp = (char)pItem->m_sItemSpecEffectValue2; // v1.41
-           cp++;
-
-           dwp = (DWORD *)cp;
-           *dwp = pItem->m_dwAttribute;
-           cp += 4;
-           //*cp = (char)(pItem->m_dwAttribute & 0x00000001); // Custom-Item??? ??
-           //cp++;
-
-           if (iEraseReq == 1) delete pItem;
-
-           iRet = m_pClientList[iClientH]->iSendMsg(cData, 53);
-
-           iCalcTotalWeight(iClientH);
-
-           switch (iRet) {
-           case DEF_XSOCKEVENT_QUENEFULL:
-           case DEF_XSOCKEVENT_SOCKETERROR:
-           case DEF_XSOCKEVENT_CRITICALERROR:
-           case DEF_XSOCKEVENT_SOCKETCLOSED:
-              DeleteClient(iClientH, TRUE, TRUE);
-              return;
-           }
-
-           SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_GIZONITEMUPGRADELEFT, m_pClientList[iClientH]->m_iGizonItemUpgradeLeft, NULL, NULL, NULL);
-        }
-        else
-        {
-           delete pItem;
-
-           iCalcTotalWeight(iClientH);
-
-           dwp  = (DWORD *)(cData + DEF_INDEX4_MSGID);
-           *dwp = MSGID_NOTIFY;
-           wp   = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
-           *wp  = DEF_NOTIFY_CANNOTCARRYMOREITEM;
-
-           iRet = m_pClientList[iClientH]->iSendMsg(cData, 6);
-           switch (iRet) {
-           case DEF_XSOCKEVENT_QUENEFULL:
-           case DEF_XSOCKEVENT_SOCKETERROR:
-           case DEF_XSOCKEVENT_CRITICALERROR:
-           case DEF_XSOCKEVENT_SOCKETCLOSED:
-
-              DeleteClient(iClientH, TRUE, TRUE);
-              return;
-           }
-        }
-     }
-   }
-}*/
-
-/*int CGame::iAngelEquip(int iClientH)
-{
- int iTemp;
- CItem * cAngelTemp;
-    iTemp = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LFINGER];
-    cAngelTemp = m_pClientList[iClientH]->m_pItemList[iTemp];
-    if ((iTemp != -1) && (cAngelTemp != NULL)) {
-        if(cAngelTemp->m_sIDnum >= 908){ //AngelicPandent(STR)
-                if(cAngelTemp->m_sIDnum >= 909){ //AngelicPandent(DEX)
-                if(cAngelTemp->m_sIDnum >= 910){ //AngelicPandent(INT)
-                if(cAngelTemp->m_sIDnum >= 911){ //AngelicPandent(MAG)
-
-                return cAngelTemp->m_sIDnum;
-            } else {
-                return 0;
-                }
-                }
-                }
-        }
-    }
-}*/
-
-/*void CGame::CheckAngelUnequip(int iClientH,int iAngelID)
-{
- int iTemp;
- CItem * cAngelTemp;
-
-    iTemp = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LFINGER];
-    cAngelTemp = m_pClientList[iClientH]->m_pItemList[iTemp];
-    if ((iTemp != -1) && (cAngelTemp->m_sIDnum != iAngelID)) {
-        cAngelTemp->m_sIDnum = iAngelID;
-    }
-
-}*/

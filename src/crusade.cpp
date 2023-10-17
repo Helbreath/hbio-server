@@ -97,7 +97,6 @@ void CGame::GlobalStartCrusadeMode()
     DWORD * dwp, dwCrusadeGUID;
     SYSTEMTIME SysTime;
 
-    // ¿À·ù·Î ÀÎÇØ ÇÏ·ç¿¡ µÎ¹ø Àü¸éÀüÀÌ ¹ß»ýÇÏ´Â °ÍÀ» ¸·´Â ÄÚµå 
     GetLocalTime(&SysTime);
     if (m_iLatestCrusadeDayOfWeek != -1)
     {
@@ -166,7 +165,6 @@ void CGame::_CreateCrusadeGUID(DWORD dwCrusadeGUID, int iWinnerSide)
     pFile = fopen(cFn, "wt");
     if (pFile == NULL)
     {
-        // Ã†Ã„Ã€ÃÃ€Â» Â¸Â¸ÂµÃ© Â¼Ã¶ Â¾Ã¸Â°Ã…Â³Âª Â»Ã§Ã€ÃŒÃÃ®Â°Â¡ ÃÃ¶Â³ÂªÃ„Â¡Â°Ã” Ã€Ã›Ã€Âº Â°Ã¦Â¿Ã¬Â´Ã‚ . 
         wsprintf(cTxt, "(!) Cannot create CrusadeGUID(%d) file", dwCrusadeGUID);
         log->info(cTxt);
     }
@@ -196,12 +194,10 @@ void CGame::ManualEndCrusadeMode(int iWinnerSide)
     char * cp, cData[256];
     WORD * wp;
 
-    // Â¸Ã…Â´ÂºÂ¾Ã³Â·ÃŽ Ã…Â©Â·Ã§Â¼Â¼Ã€ÃŒÂµÃ¥ Â¸Ã°ÂµÃ¥Â¸Â¦ ÃÂ¾Â·Ã¡Â½ÃƒÃ…Â²Â´Ã™. ÂºÃ±Â±Ã¤ Â»Ã³Ã…Ã‚Â·ÃŽ ÃÂ¾Â·Ã¡Â½ÃƒÃ…Â²Â´Ã™.
     if (m_bIsCrusadeMode == FALSE) return;
 
     LocalEndCrusadeMode(iWinnerSide);
 
-    // Â´Ã™Â¸Â¥ Â¼Â­Â¹Ã¶Â¿Â¡ Ã…Â©Â·Ã§Â¼Â¼Ã€ÃŒÂµÃ¥ ÃÂ¾Â·Ã¡Â¸Â¦ Â¾Ã‹Â¸Â².
     ZeroMemory(cData, sizeof(cData));
     cp = (char *)(cData);
     *cp = GSM_ENDCRUSADE;
@@ -260,13 +256,12 @@ void CGame::CheckCommanderConstructionPoint(int iClientH)
 
     switch (m_pClientList[iClientH]->m_iCrusadeDuty)
     {
-        case 1: // Ã†Ã„Ã€ÃŒÃ…Ã
-        case 2: // Â°Ã‡Â¼Â³Ã€Ãš: Â¸Ã°Â¾Ã† Â³ÃµÃ€Âº Ã†Ã·Ã€ÃŽÃ†Â®Â¸Â¦ Â±Ã¦ÂµÃ¥Â¸Â¶Â½ÂºÃ…Ã ÃÃ¶ÃˆÃ–Â°Ã¼Â¿Â¡Â°Ã” Ã€Ã¼Â´ÃžÃ‡Ã‘Â´Ã™.
+        case 1:
+        case 2:
             for (i = 0; i < DEF_MAXCLIENTS; i++)
                 if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_iCrusadeDuty == 3) &&
                     (m_pClientList[i]->m_iGuildGUID == m_pClientList[iClientH]->m_iGuildGUID))
                 {
-                    // Ã‡Ã¶Ã€Ã§ Â¼Â­Â¹Ã¶ Â³Â»Â¿Â¡ Â±Ã¦ÂµÃ¥Â¸Â¶Â½ÂºÃ…Ã ÃÃ¶ÃˆÃ–Â°Ã¼Ã€ÃŒ Ã€Ã–Â´Ã™. ÃÃ¶ÃˆÃ–Â°Ã¼Ã€Ã‡ Ã†Ã·Ã€ÃŽÃ†Â®Â¸Â¦ Â³Ã´Ã€ÃŽ ÃˆÃ„ 
                     m_pClientList[i]->m_iConstructionPoint += m_pClientList[iClientH]->m_iConstructionPoint;
                     m_pClientList[i]->m_iWarContribution += (m_pClientList[iClientH]->m_iConstructionPoint / 10);
 
@@ -277,11 +272,10 @@ void CGame::CheckCommanderConstructionPoint(int iClientH)
                         m_pClientList[i]->m_iWarContribution = DEF_MAXWARCONTRIBUTION;
 
                     SendNotifyMsg(NULL, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, NULL, NULL);
-                    m_pClientList[iClientH]->m_iConstructionPoint = 0; // Â°Âª ÃƒÃŠÂ±Ã¢ÃˆÂ­ 
+                    m_pClientList[iClientH]->m_iConstructionPoint = 0;
                     return;
                 }
 
-            // Â´Ã™Â¸Â¥ Â¼Â­Â¹Ã¶Ã€Ã‡ ÃÃ¶ÃˆÃ–Â°Ã¼Â¿Â¡Â°Ã” Â¾Ã‹Â·ÃÂ¾ÃŸ Ã‡Ã‘Â´Ã™.
             ZeroMemory(cData, sizeof(cData));
             cp = (char *)cData;
             *cp = GSM_CONSTRUCTIONPOINT;
@@ -294,10 +288,10 @@ void CGame::CheckCommanderConstructionPoint(int iClientH)
             cp += 4;
             bStockMsgToGateServer(cData, 9);
 
-            m_pClientList[iClientH]->m_iConstructionPoint = 0; // Â°Âª ÃƒÃŠÂ±Ã¢ÃˆÂ­ 
+            m_pClientList[iClientH]->m_iConstructionPoint = 0;
             break;
 
-        case 3: // ÃÃ¶ÃˆÃ–Â°Ã¼: ÂºÂ¸Â³Â¾ Ã‡ÃŠÂ¿Ã¤ Â¾Ã¸Ã€Â½ 
+        case 3:
 
             break;
     }
@@ -309,25 +303,20 @@ BOOL CGame::__bSetConstructionKit(int iMapIndex, int dX, int dY, int iType, int 
     char cNpcName[30], cName[30], cNpcWaypoint[11], cOwnerType;
     short sOwnerH;
 
-    // Ã…Â©Â·Ã§Â¼Â¼Ã€ÃŒÂµÃ¥ Â¸Ã°ÂµÃ¥Â°Â¡ Â¾Ã†Â´ÃÂ°Ã…Â³Âª Â°Ã‡Â¼Â³Ã‡Ã‘ Â»Ã§Â¶Ã·Ã€ÃŒ Â°Ã¸ÂºÂ´Ã€ÃŒ Â¾Ã†Â´ÃÂ¸Ã© Â¹Â«Â½Ãƒ.
     if ((m_bIsCrusadeMode == FALSE) || (m_pClientList[iClientH]->m_iCrusadeDuty != 2)) return FALSE;
     if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_iTotalCrusadeStructures >= DEF_MAXCRUSADESTRUCTURES)
     {
-        // Ã‡Ã˜Â´Ã§ Â¸ÃŠÂ¿Â¡ Ã…Â©Â·Ã§Â¼Â¼Ã€ÃŒÂµÃ¥ Â°Ã‡Â¹Â° Â°Â³Â¼Ã¶ ÃÂ¦Ã‡Ã‘Â¿Â¡ Â°Ã‰Â¸Â®ÃÃ¶ Â¾ÃŠÂ´Ã‚Â´Ã™Â¸Ã©
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NOMORECRUSADESTRUCTURE, NULL, NULL, NULL, NULL);
         return FALSE;
     }
 
-    // Ã‡Ã˜Â´Ã§ Ã€Â§Ã„Â¡Â¿Â¡ Â°Ã‡ÃƒÃ Â¹Â° NPCÂ¸Â¦ Â»Ã½Â¼Âº.
     iNamingValue = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->iGetEmptyNamingValue();
     if (iNamingValue == -1)
     {
-        // Â´ÃµÃ€ÃŒÂ»Ã³ Ã€ÃŒ Â¸ÃŠÂ¿Â¡ NPCÂ¸Â¦ Â¸Â¸ÂµÃ©Â¼Ã¶ Â¾Ã¸Â´Ã™. Ã€ÃŒÂ¸Â§Ã€Â» Ã‡Ã’Â´Ã§Ã‡Ã’ Â¼Ã¶ Â¾Ã¸Â±Ã¢ Â¶Â§Â¹Â®.
     }
     else
     {
 
-        // Â¸Ã•Ã€Ãº Â¼Â³Ã„Â¡Ã‡ÃÂ°Ã­Ã€Ãš Ã‡ÃÂ´Ã‚ Â±Ã™ÃƒÂ³Â¿Â¡ Â±Â¸ÃÂ¶Â¹Â°Ã€ÃŒ Â¾Ã¸Â³Âª ÃˆÂ®Ã€ÃŽÃ‡Ã‘Â´Ã™.
         for (ix = dX - 3; ix <= dX + 5; ix++)
             for (iy = dY - 3; iy <= dX + 5; iy++)
             {
@@ -335,7 +324,6 @@ BOOL CGame::__bSetConstructionKit(int iMapIndex, int dX, int dY, int iType, int 
                 if ((sOwnerH != NULL) && (cOwnerType == DEF_OWNERTYPE_NPC) && (m_pNpcList[sOwnerH]->m_cActionLimit == 5)) return FALSE;
             }
 
-        // NPCÂ¸Â¦ Â»Ã½Â¼ÂºÃ‡Ã‘Â´Ã™.
         ZeroMemory(cNpcName, sizeof(cNpcName));
         if (m_pClientList[iClientH]->m_cSide == 1)
         {
@@ -371,12 +359,10 @@ BOOL CGame::__bSetConstructionKit(int iMapIndex, int dX, int dY, int iType, int 
         if (bCreateNewNpc(cNpcName, cName, m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_cName, 0, (rand() % 9),
             DEF_MOVETYPE_RANDOM, &tX, &tY, cNpcWaypoint, NULL, NULL, -1, FALSE, FALSE) == FALSE)
         {
-            // Â½Ã‡Ã†ÃÃ‡ÃŸÃ€Â¸Â¹Ã‡Â·ÃŽ Â¿Â¹Â¾Ã ÂµÃˆ NameValueÂ¸Â¦ Ã‡Ã˜ÃÂ¦Â½ÃƒÃ…Â²Â´Ã™.
             m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->SetNamingValueEmpty(iNamingValue);
         }
         else
         {
-            // Â¼ÂºÂ°Ã¸
             wsprintf(G_cTxt, "Structure(%s) construction begin(%d,%d)!", cNpcName, tX, tY);
             log->info(G_cTxt);
             return TRUE;
@@ -396,7 +382,6 @@ void CGame::LocalStartCrusadeMode(DWORD dwCrusadeGUID)
 
     if (dwCrusadeGUID != NULL)
     {
-        // Ã…Â©Â·Ã§Â¼Â¼Ã€ÃŒÂµÃ¥ GUID Ã†Ã„Ã€ÃÃ€Â» Â¸Â¸ÂµÃ§Â´Ã™.
         _CreateCrusadeGUID(dwCrusadeGUID, NULL);
         m_dwCrusadeGUID = dwCrusadeGUID;
     }
@@ -404,18 +389,15 @@ void CGame::LocalStartCrusadeMode(DWORD dwCrusadeGUID)
     for (i = 1; i < DEF_MAXCLIENTS; i++)
         if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
         {
-            // Â¸Ã°ÂµÃ§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Ã€Ã¼Â¸Ã©Ã€Ã¼ Â¸Ã°ÂµÃ¥Â°Â¡ Â½ÃƒÃ€Ã›ÂµÃ‡Â¾ÃºÃ€Â½Ã€Â» Â¾Ã‹Â·ÃÃÃ˜Â´Ã™. Â¸ÃƒÃ€Âº Ã€Ã“Â¹Â« Ã…Â¬Â¸Â®Â¾Ã® ÃˆÃ„ Ã…Ã«ÂºÂ¸Ã‡Ã”.
             m_pClientList[i]->m_iCrusadeDuty = 0;
             m_pClientList[i]->m_iConstructionPoint = 0;
             m_pClientList[i]->m_dwCrusadeGUID = m_dwCrusadeGUID;
             SendNotifyMsg(NULL, i, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, m_pClientList[i]->m_iCrusadeDuty, NULL, NULL);
         }
 
-    // Â½ÂºÃ†Â®Â¶Ã³Ã€ÃŒÃ…Â© Ã†Ã·Ã€ÃŽÃ†Â® HP ÃƒÃŠÂ±Ã¢ÃˆÂ­.
     for (i = 0; i < DEF_MAXMAPS; i++)
         if (m_pMapList[i] != NULL) m_pMapList[i]->RestoreStrikePoints();
 
-    // Â°Â¢Â°Â¢Ã€Ã‡ Â¸ÃŠÂ¿Â¡ ÃƒÃŠÂ±Ã¢ Â°Ã‡Â¹Â° Â¼Â³Ã„Â¡. (Â¸Â¶Â³Âª Â½ÂºÃ…Ã¦, Â¿Â¡Â³ÃŠÃÃ¶ Â½Ã‡ÂµÃ¥ ÃÂ¦Â³Ã—Â·Â¹Ã€ÃŒÃ…Ã, Â±Ã—Â·Â¹Ã€ÃŒÃ†Â® Â¸Ã…ÃÃ· ÃÂ¦Â³Ã—Â·Â¹Ã€ÃŒÃ…Ã, Â°Â¡ÂµÃ¥Ã…Â¸Â¿Ã¶ÂµÃ®ÂµÃ®)
     CreateCrusadeStructures();
 
     log->info("(!)Crusade Mode ON.");
@@ -426,7 +408,6 @@ void CGame::LocalEndCrusadeMode(int iWinnerSide)
 {
     int i;
 
-    //testcode
     wsprintf(G_cTxt, "LocalEndCrusadeMode(%d)", iWinnerSide);
     log->info(G_cTxt);
 
@@ -435,12 +416,10 @@ void CGame::LocalEndCrusadeMode(int iWinnerSide)
 
     log->info("(!)Crusade Mode OFF.");
 
-    // Â¼Â³Ã„Â¡ÂµÃ‡Â¾ÃºÂ´Ã¸ Ã…Â©Â·Ã§Â¼Â¼Ã€ÃŒÂµÃ¥ Â°Ã‡ÃƒÃ Â¹Â° ÃÂ¦Â°Ã….
     RemoveCrusadeStructures();
 
     RemoveCrusadeNpcs();
 
-    // Ã€ÃŒÂ±Ã¤Ã‚ÃŠ Â»Ã§Ã€ÃŒÂµÃ¥Â¸Â¦ Ã€Ã”Â·Ã‚.
     _CreateCrusadeGUID(m_dwCrusadeGUID, iWinnerSide);
     m_iCrusadeWinnerSide = iWinnerSide;
     m_iLastCrusadeWinner = iWinnerSide;
@@ -448,7 +427,6 @@ void CGame::LocalEndCrusadeMode(int iWinnerSide)
     for (i = 1; i < DEF_MAXCLIENTS; i++)
         if ((m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
         {
-            // Â¸Ã°ÂµÃ§ Ã…Â¬Â¶Ã³Ã€ÃŒÂ¾Ã°Ã†Â®Â¿Â¡Â°Ã” Ã€Ã¼Â¸Ã©Ã€Ã¼ Â¸Ã°ÂµÃ¥Â°Â¡ Â³Â¡Â³ÂµÃ€Â½Ã€Â» Â¾Ã‹Â·ÃÃÃ˜Â´Ã™. Â¸ÃƒÃ€Âº Ã€Ã“Â¹Â« Ã…Â¬Â¸Â®Â¾Ã® ÃˆÃ„ Ã…Ã«ÂºÂ¸Ã‡Ã”.
             m_pClientList[i]->m_iCrusadeDuty = 0;
             m_pClientList[i]->m_iConstructionPoint = 0;
             SendNotifyMsg(NULL, i, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, NULL, NULL, NULL, m_iCrusadeWinnerSide);
@@ -470,7 +448,6 @@ void CGame::LocalEndCrusadeMode(int iWinnerSide)
 
     if (m_iMiddlelandMapIndex != -1)
     {
-        //bSendMsgToLS(0x3D00123C, 0, TRUE, NULL);
     }
 }
 
@@ -489,16 +466,12 @@ void CGame::CreateCrusadeStructures()
             for (z = 0; z < DEF_MAXMAPS; z++)
                 if ((m_pMapList[z] != NULL) && (strcmp(m_pMapList[z]->m_cName, m_stCrusadeStructures[i].cMapName) == 0))
                 {
-                    // Ã€Â§Ã„Â¡Â°Â¡ Ã€ÃÃ„Â¡Ã‡ÃÂ´Ã‚ Â¸ÃŠÂ¿Â¡ Â°Ã‡ÃƒÃ Â¹Â°Ã€Â» Ã€Â§Ã„Â¡Â½ÃƒÃ…Â²Â´Ã™.
                     iNamingValue = m_pMapList[z]->iGetEmptyNamingValue();
                     if (iNamingValue == -1)
                     {
-                        // Â´ÃµÃ€ÃŒÂ»Ã³ Ã€ÃŒ Â¸ÃŠÂ¿Â¡ NPCÂ¸Â¦ Â¸Â¸ÂµÃ©Â¼Ã¶ Â¾Ã¸Â´Ã™. Ã€ÃŒÂ¸Â§Ã€Â» Ã‡Ã’Â´Ã§Ã‡Ã’ Â¼Ã¶ Â¾Ã¸Â±Ã¢ Â¶Â§Â¹Â®.
-                        // Ã€ÃŒÂ·Â± Ã€ÃÃ€ÃŒ?
                     }
                     else
                     {
-                        // NPCÂ¸Â¦ Â»Ã½Â¼ÂºÃ‡Ã‘Â´Ã™.
                         wsprintf(cName, "XX%d", iNamingValue);
                         cName[0] = '_';
                         cName[1] = z + 65;
@@ -547,7 +520,6 @@ void CGame::CreateCrusadeStructures()
                         if (bCreateNewNpc(cNpcName, cName, m_pMapList[z]->m_cName, 0, 0, DEF_MOVETYPE_RANDOM,
                             &tX, &tY, cNpcWayPoint, NULL, NULL, -1, FALSE) == FALSE)
                         {
-                            // Â½Ã‡Ã†ÃÃ‡ÃŸÃ€Â¸Â¹Ã‡Â·ÃŽ Â¿Â¹Â¾Ã ÂµÃˆ NameValueÂ¸Â¦ Ã‡Ã˜ÃÂ¦Â½ÃƒÃ…Â²Â´Ã™.
                             m_pMapList[z]->SetNamingValueEmpty(iNamingValue);
                         }
                         else

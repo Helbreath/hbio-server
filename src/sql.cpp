@@ -9,7 +9,7 @@
 int64_t CGame::create_db_character(pqxx::transaction_base & t, character_db & character)
 {
     pqxx::row r{
-        t.exec_prepared1("create_db_character", character.account_id, pq_game->quote(character.world_name), pq_game->quote(character.name),
+        t.exec_prepared1("create_db_character", character.account_id, character.world_name, character.name,
             character.strength, character.vitality, character.dexterity, character.intelligence, character.magic, character.charisma,
             character.appr1, character.gender, character.skin, character.hairstyle, character.haircolor, character.underwear,
             character.hp, character.mp, character.sp)
@@ -19,20 +19,20 @@ int64_t CGame::create_db_character(pqxx::transaction_base & t, character_db & ch
 
 void CGame::update_db_character(pqxx::transaction_base & t, character_db & character)
 {
-    t.exec_prepared("update_db_character", pq_game->quote(character.name), character.id1, character.id2, character.id3, character.level,
+    t.exec_prepared("update_db_character", character.name, character.id1, character.id2, character.id3, character.level,
         character.strength, character.vitality, character.dexterity, character.intelligence, character.magic, character.charisma,
         character.experience, character.gender, character.skin, character.hairstyle, character.haircolor, character.underwear,
-        character.apprcolor, character.appr1, character.appr2, character.appr3, character.appr4, pq_game->quote(character.nation),
-        pq_game->quote(character.maploc), character.locx, character.locy, pq_game->quote(character.profile), character.adminlevel,
-        character.contribution, character.leftspectime, pq_game->quote(character.lockmapname), character.lockmaptime, character.lastsavedate,
+        character.apprcolor, character.appr1, character.appr2, character.appr3, character.appr4, character.nation,
+        character.maploc, character.locx, character.locy, character.profile, character.adminlevel,
+        character.contribution, character.leftspectime, character.lockmapname, character.lockmaptime, character.lastsavedate,
         character.blockdate, character.guild_id, character.fightnum, character.fightdate, character.fightticket, character.questnum,
         character.questid, character.questcount, character.questrewardtype, character.questrewardamount, character.questcompleted,
         character.eventid, character.warcon, character.crusadejob, character.crusadeid, character.crusadeconstructpoint, character.reputation,
         character.hp, character.mp, character.sp, character.ek, character.pk, character.rewardgold, character.downskillid, character.hunger,
         character.leftsac, character.leftshutuptime, character.leftreptime, character.leftforcerecalltime, character.leftfirmstaminatime,
-        character.leftdeadpenaltytime, pq_game->quote(character.magicmastery), character.party_id, character.itemupgradeleft, character.totalek,
+        character.leftdeadpenaltytime, character.magicmastery, character.party_id, character.itemupgradeleft, character.totalek,
         character.totalpk, character.mmr, character.altmmr, character.head_appr, character.body_appr, character.arm_appr, character.leg_appr,
-        character.gold, character.luck, pq_game->quote(character.world_name), character.id, character.account_id);
+        character.gold, character.luck, character.world_name, character.id, character.account_id);
 }
 
 /**
@@ -43,6 +43,28 @@ void CGame::update_db_character(pqxx::transaction_base & t, character_db & chara
 void CGame::delete_db_character(pqxx::transaction_base & t, character_db & character)
 {
     t.exec_params0("DELETE FROM characters WHERE name=$1 AND account_id=$2", character.name, character.account_id);
+}
+
+int64_t CGame::create_db_item(pqxx::transaction_base & t, item_db & _item)
+{
+    pqxx::row r{
+        t.exec_prepared1("create_db_item", _item.char_id, _item.name, _item.count, _item.type, _item.id1, _item.id2, _item.id3,
+        _item.color, _item.effect1, _item.effect2, _item.effect3, _item.durability, _item.attribute, _item.itemequip, _item.itemposx,
+        _item.itemposy, _item.itemloc, _item.item_id)
+    };
+    return r["id"].as<int64_t>();
+}
+
+void CGame::update_db_item(pqxx::transaction_base & t, item_db & _item)
+{
+    t.exec_prepared("update_db_item", _item.id, _item.char_id, _item.name, _item.count, _item.type, _item.id1, _item.id2, _item.id3,
+        _item.color, _item.effect1, _item.effect2, _item.effect3, _item.durability, _item.attribute, _item.itemequip, _item.itemposx,
+        _item.itemposy, _item.itemloc, _item.item_id);
+}
+
+void CGame::delete_db_item(pqxx::transaction_base & t, int64_t id)
+{
+    t.exec_params0("DELETE FROM items WHERE id=$1", id);
 }
 
 void CGame::prepare_login_statements()
@@ -150,12 +172,56 @@ void CGame::prepare_game_statements()
                 gold=$76,
                 luck=$77,
                 world_name=$78
-                WHERE id=$79 and account_id=$80
+            WHERE id=$79 and account_id=$80
         )"
     );
     pq_game->prepare("check_character_count_by_account_id_wn", R"(SELECT COUNT(*) FROM characters WHERE account_id=$1 AND world_name=$2)");
     pq_game->prepare("check_character_count_by_name_wn", R"(SELECT COUNT(*) FROM characters WHERE name=$1 AND world_name=$2)");
-    pq_game->prepare("get_characters_by_account_id_wn", R"(SELECT * FROM characters WHERE account_id=$1 AND world_name=$2)");
-    pq_game->prepare("get_character_by_id_wn", R"(SELECT * FROM characters WHERE id=$1 AND world_name=$2)");
-    pq_game->prepare("get_character_by_name_wn", R"(SELECT * FROM characters WHERE name=$1 AND world_name=$2)");
+    pq_game->prepare("get_characters_by_account_id_wn", R"(SELECT * FROM characters WHERE account_id=$1 AND world_name=$2 ORDER BY id ASC)");
+    pq_game->prepare("get_character_by_id_wn", R"(SELECT * FROM characters WHERE id=$1 AND world_name=$2 ORDER BY id ASC)");
+    pq_game->prepare("get_character_by_name_wn", R"(SELECT * FROM characters WHERE name=$1 AND world_name=$2 ORDER BY id ASC)");
+    pq_game->prepare("delete_character_by_id_wn", R"(SELECT * FROM characters WHERE name=$1 AND world_name=$2 ORDER BY id ASC)");
+    pq_game->prepare("delete_item_by_id", R"(SELECT * FROM characters WHERE name=$1 AND world_name=$2 ORDER BY id ASC)");
+    pq_game->prepare("get_items_by_character_id", R"(SELECT * FROM items WHERE char_id=$1 ORDER BY id ASC)");
+    pq_game->prepare(
+        "create_db_item",
+        R"(
+            INSERT INTO items
+            (
+                char_id, name, count,
+                type, id1, id2, id3, color, effect1,
+                effect2, effect3, durability,
+                attribute, itemequip, itemposx,
+                itemposy, itemloc, item_id
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+            RETURNING id
+        )"
+    );
+    pq_game->prepare(
+        "update_db_item",
+        R"(
+            UPDATE items
+            SET
+                char_id=$2,
+                name=$3,
+                count=$4,
+                type=$5,
+                id1=$6,
+                id2=$7,
+                id3=$8,
+                color=$9,
+                effect1=$10,
+                effect2=$11,
+                effect3=$12,
+                durability=$13,
+                attribute=$14,
+                itemequip=$15,
+                itemposx=$16,
+                itemposy=$17,
+                itemloc=$18,
+                item_id=$19
+            WHERE id=$1
+        )"
+    );
 }

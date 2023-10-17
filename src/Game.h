@@ -218,6 +218,8 @@ enum class login_server_status
     offline
 };
 
+class CMap;
+
 class CGame  
 {
 public:
@@ -238,7 +240,7 @@ public:
 
     std::unique_ptr<ix::WebSocketServer> server;
     std::set<std::pair<std::shared_ptr<ix::WebSocket>, std::shared_ptr<ix::ConnectionState>>> websocket_clients;
-    std::mutex websocket_list;
+    std::recursive_mutex websocket_list;
 
     spdlog::level::level_enum loglevel = spdlog::level::level_enum::info;
     std::string log_formatting;
@@ -295,7 +297,7 @@ public:
     std::deque<std::unique_ptr<socket_message>> packet_queue;
     std::mutex packet_mtx;
 
-    bool check_account_auth(CClient * client, std::string & account, std::string & pass, int64_t & account_id);
+    uint64_t check_account_auth(CClient * client, std::string & account, std::string & pass);
     std::set<std::shared_ptr<CClient>> client_list;
     std::set<std::shared_ptr<CNpc>> npc_list;
     std::recursive_mutex client_list_mtx;
@@ -311,9 +313,21 @@ public:
     int64_t create_db_character(pqxx::transaction_base & t, character_db & character);
     void update_db_character(pqxx::transaction_base & t, character_db & character);
     void delete_db_character(pqxx::transaction_base & t, character_db & character);
+    int64_t create_db_item(pqxx::transaction_base & t, item_db & _item);
+    void update_db_item(pqxx::transaction_base & t, item_db & _item);
+    void delete_db_item(pqxx::transaction_base & t, int64_t id);
     void prepare_login_statements();
     void prepare_game_statements();
     bool is_account_in_use(int64_t account_id);
+
+    void delete_client_nolock(std::shared_ptr<CClient> client, bool save = false, bool deleteobj = false);
+    void delete_client_lock(std::shared_ptr<CClient> client, bool save = false, bool deleteobj = false);
+
+    bool save_player_data(std::shared_ptr<CClient> client);
+
+    void add_bag_item(CClient * client, pqxx::row & row);
+    void add_bank_item(CClient * client, pqxx::row & row);
+    void add_mail_item(CClient * client, pqxx::row & row);
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -559,8 +573,6 @@ public:
 	void SetExchangeItem(int iClientH, int iItemIndex, int iAmount);
 	void ExchangeItemHandler(int iClientH, short sItemIndex, int iAmount, short dX, short dY, WORD wObjectID, char * pItemName);
 
-	void _BWM_Command_Shutup(char * pData);
-	void _BWM_Init(int iClientH, char * pData);
 	void CheckUniqueItemEquipment(int iClientH);
 	void _SetItemPos(int iClientH, char * pData);
 	

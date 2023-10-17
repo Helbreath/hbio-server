@@ -23,7 +23,18 @@ int main(int argc, char * argv[])
 #endif
 
     CGame * game = new CGame();
-    game->run();
+    try
+    {
+        game->run();
+    }
+    catch (const std::exception & e)
+    {
+        game->log->critical("Unhandled exception: {}", e.what());
+    }
+    catch (...)
+    {
+        game->log->critical("Unhandled exception: unknown");
+    }
 
 #if defined(WIN32)
     ix::uninitNetSystem();

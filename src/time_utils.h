@@ -13,9 +13,9 @@
 using namespace std::chrono;
 using namespace std::chrono_literals;
 
-inline time_point<steady_clock> now() noexcept
+inline time_point<system_clock> now() noexcept
 {
-    return steady_clock::now();
+    return system_clock::now();
 }
 
 template<typename A = seconds>

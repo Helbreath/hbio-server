@@ -8,7 +8,7 @@
 
 int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDir, char cMoveType)
 {
-    char * cp, cData[3000];
+    char * cp, cData[3000]{};
     CTile * pTile;
     DWORD * dwp, dwTime;
     WORD * wp, wObjectID;
@@ -323,7 +323,7 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
 
 int CGame::iClientMotion_Attack_Handler(int iClientH, short sX, short sY, short dX, short dY, short wType, char cDir, WORD wTargetObjectID, BOOL bResponse, BOOL bIsDash)
 {
-    char cData[100];
+    char cData[100]{};
     DWORD * dwp, dwTime;
     WORD * wp;
     int     iRet, iExp, tdX = 0, tdY = 0, i;
@@ -706,7 +706,7 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
 
 int CGame::iClientMotion_Stop_Handler(int iClientH, short sX, short sY, char cDir)
 {
-    char cData[100];
+    char cData[100]{};
     DWORD * dwp;
     WORD * wp;
     int     iRet;
@@ -773,7 +773,7 @@ int CGame::iClientMotion_Stop_Handler(int iClientH, short sX, short sY, char cDi
 
 int CGame::iClientMotion_Magic_Handler(int iClientH, short sX, short sY, char cDir)
 {
-    char  cData[100];
+    char  cData[100]{};
     DWORD * dwp;
     WORD * wp;
     int     iRet;

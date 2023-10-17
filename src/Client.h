@@ -153,7 +153,7 @@ public:
 
     // 0 = dead connect, 1 = login screen, 2 = in game
     // can switch between 1 and 2 but can only be 0 when connection closing
-    client_status currentstatus = client_status::in_game;
+    client_status currentstatus = client_status::login_screen;
 
     std::shared_ptr<CClient> get_ptr()
     {
@@ -164,52 +164,53 @@ public:
 
     std::string address;
 
-    std::weak_ptr<ix::ConnectionState> connection_state;
+    std::shared_ptr<ix::ConnectionState> connection_state;
 
-    bool disconnected = false;
-    time_point<steady_clock> connecttime = steady_clock::now();
-    time_point<steady_clock> disconnecttime = steady_clock::now();
-    time_point<steady_clock> lastpackettime = steady_clock::now();
-    time_point<steady_clock> lastchecktime = steady_clock::now();
-    time_point<steady_clock> logintime = steady_clock::now();
+    bool connected = true;
+    time_point<system_clock> connecttime = now();
+    time_point<system_clock> disconnecttime = now();
+    time_point<system_clock> lastpackettime = now();
+    time_point<system_clock> lastchecktime = now();
+    time_point<system_clock> logintime = now();
 
-    void set_disconnected(bool s);
-    void set_connect_time(time_point<steady_clock> t);
-    void set_disconnect_time(time_point<steady_clock> t);
-    void set_last_packet_time(time_point<steady_clock> t);
-    void set_last_check_time(time_point<steady_clock> t);
-    void set_login_time(time_point<steady_clock> t);
+    void set_connected(bool s = true);
+    void set_connect_time(time_point<system_clock> t);
+    void set_disconnect_time(time_point<system_clock> t);
+    void set_last_packet_time(time_point<system_clock> t);
+    void set_last_check_time(time_point<system_clock> t);
+    void set_login_time(time_point<system_clock> t);
 
-    bool get_disconnected();
-    time_point<steady_clock> get_connect_time();
-    time_point<steady_clock> get_disconnect_time();
-    time_point<steady_clock> get_last_packet_time();
-    time_point<steady_clock> get_last_check_time();
-    time_point<steady_clock> get_login_time();
+    bool get_connected();
+    time_point<system_clock> get_connect_time();
+    time_point<system_clock> get_disconnect_time();
+    time_point<system_clock> get_last_packet_time();
+    time_point<system_clock> get_last_check_time();
+    time_point<system_clock> get_login_time();
 
-    std::size_t iSendMsg(const char * pMsg, std::size_t iSize, char key = 0)
+    int32_t iSendMsg(const char * pMsg, std::size_t iSize, char key = 0)
     {
         auto data = ix::IXWebSocketSendData{ pMsg, (std::size_t)iSize };
-        auto wsres = get_websocket()->sendBinary(data);
+        auto ws = get_websocket();
+        if (!ws) return -128;// DEF_XSOCKEVENT_NOTCONNECTED
+        auto wsres = ws->sendBinary(data);
         if (!wsres.success)
             return -129;// DEF_XSOCKEVENT_SOCKETERROR
-        return wsres.payloadSize;
+        return (int32_t)wsres.payloadSize;
     }
 
     connection_state_hb * get_connection_state()
     {
-        auto connstate = connection_state.lock();
-        if (!connstate) return nullptr;
-        return reinterpret_cast<connection_state_hb *>(connstate.get());
+        if (!connection_state) return nullptr;
+        return reinterpret_cast<connection_state_hb *>(connection_state.get());
     }
 
-    ix::WebSocket * get_websocket()
+    std::shared_ptr<ix::WebSocket> get_websocket()
     {
         auto connstate = get_connection_state();
         if (!connstate) return nullptr;
         auto ws = connstate->websocket.lock();
         if (!ws) return nullptr;
-        return ws.get();
+        return ws;
     }
 
     uint64_t socknum;
@@ -534,7 +535,7 @@ public:
 	} m_stPartyMemberName[DEF_MAXPARTYMEMBERS];
 
 	DWORD m_dwLastActionTime;
-	int m_iDeadPenaltyTime;
+    int m_iDeadPenaltyTime{};
 
 	char m_cWhisperPlayerName[11];
 	BOOL m_bIsAdminOrderGoto;

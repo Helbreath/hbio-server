@@ -49,5 +49,4 @@ CNpc::CNpc(char * pName5)
 
 	m_iNpcItemType = 0;
 	m_iNpcItemMax = 0;
-
 }

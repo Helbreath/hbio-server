@@ -28,23 +28,23 @@ public:
         HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, mem);
     };
 
-	char  m_cOwnerClass;
-	short m_sOwner;
+	char  m_cOwnerClass{};
+	short m_sOwner{};
 
-	char  m_cDeadOwnerClass;
-	short m_sDeadOwner;
+	char  m_cDeadOwnerClass{};
+	short m_sDeadOwner{};
 
-	CItem * m_pItem[DEF_TILE_PER_ITEMS];
-	char  m_cTotalItem;
+	CItem * m_pItem[DEF_TILE_PER_ITEMS]{};
+	char  m_cTotalItem{};
 
-	WORD  m_wDynamicObjectID;
-	short m_sDynamicObjectType;
-	DWORD m_dwDynamicObjectRegisterTime;
+	WORD  m_wDynamicObjectID{};
+	short m_sDynamicObjectType{};
+	DWORD m_dwDynamicObjectRegisterTime{};
 
-	BOOL  m_bIsMoveAllowed, m_bIsTeleport, m_bIsWater, m_bIsFarm, m_bIsTempMoveAllowed;
+	BOOL  m_bIsMoveAllowed{}, m_bIsTeleport{}, m_bIsWater{}, m_bIsFarm{}, m_bIsTempMoveAllowed{};
 
-	int   m_iOccupyStatus;
-	int   m_iOccupyFlagIndex;
+	int   m_iOccupyStatus{};
+	int   m_iOccupyFlagIndex{};
 
-	int	  m_iAttribute;
+	int	  m_iAttribute{};
 };

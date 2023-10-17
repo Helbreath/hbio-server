@@ -405,7 +405,6 @@ public:
     {
         data = new char[size];
         memcpy(data, input, size);
-        //size += 4;
     }
 
     ~stream_read()

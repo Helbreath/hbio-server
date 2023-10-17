@@ -326,7 +326,6 @@ void CMap::ClearOwner(int iDebugCode, short sOwnerH, char cOwnerType, short sX, 
         pTile->m_cOwnerClass = NULL;
     }
 
-    // 
     if ((pTile->m_sDeadOwner == sOwnerH) && (pTile->m_cDeadOwnerClass == cOwnerType))
     {
         pTile->m_sDeadOwner = NULL;
@@ -353,7 +352,6 @@ BOOL CMap::bSetItem(short sX, short sY, CItem * pItem)
 
     pTile = (CTile *)(m_pTile + sX + sY * m_sSizeY);
 
-    // v1.4 ¸¶Áö¸· Å¸ÀÏ¿¡ ¾ÆÀÌÅÛÀÌ ÀÖ´Ù¸é »èÁ¦½ÃÅ°°í ÀÌµ¿ÇÑ´Ù. 
     if (pTile->m_pItem[DEF_TILE_PER_ITEMS - 1] != NULL)
         delete pTile->m_pItem[DEF_TILE_PER_ITEMS - 1];
     else pTile->m_cTotalItem++;
@@ -362,12 +360,12 @@ BOOL CMap::bSetItem(short sX, short sY, CItem * pItem)
         pTile->m_pItem[i + 1] = pTile->m_pItem[i];
 
     pTile->m_pItem[0] = pItem;
-    //pTile->m_cTotalItem++;
+    pTile->m_cTotalItem++;
     return TRUE;
 }
 
 
-CItem * CMap::pGetItem(short sX, short sY, short * pRemainItemSprite, short * pRemainItemSpriteFrame, char * pRemainItemColor) //v1.4 color
+CItem * CMap::pGetItem(short sX, short sY, short * pRemainItemSprite, short * pRemainItemSpriteFrame, char * pRemainItemColor)
 {
     CTile * pTile;
     CItem * pItem;

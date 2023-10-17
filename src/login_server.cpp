@@ -24,21 +24,30 @@ void CGame::handle_login_server_message(socket_message & sm)
 
         CClient * client = sm.connection_state->client.get();
 
-        if (client == nullptr)
-        {
-            log->error("Client is null from {}", sm.connection_state->getRemoteIp());
-            return;
-        }
+//         if (client == nullptr)
+//         {
+//             log->error("Client is null from {}", sm.connection_state->getRemoteIp());
+//             return;
+//         }
 
         int client_handle = sm.connection_state->client_handle;
 
         uint32_t msgid = sr.read_uint32();
         sr.read_uint16();
 
-        log->info(fmt::format("Login Packet [{:X}]", msgid));
+        log->info(std::format("Login Packet [{:X}]", msgid));
 
         static auto check_login = [&](CClient * client) -> bool
             {
+                if (client == nullptr)
+                {
+                    sw.write_uint32(MSGID_RESPONSE_LOG);
+                    sw.write_uint16(DEF_LOGRESMSGTYPE_REJECT);
+                    sw.write_string("Not logged in");
+                    client->write(sw);
+                    log->info("Player object does not exist for <{}>", sm.connection_state->getRemoteIp());
+                    return false;
+                }
                 if (!client->logged_in)
                 {
                     sw.write_uint32(MSGID_RESPONSE_LOG);
@@ -90,6 +99,17 @@ void CGame::handle_login_server_message(socket_message & sm)
             {
                 if (!check_login_status()) return;
 
+                if (client && client->logged_in)
+                {
+                    sw.write_uint32(MSGID_RESPONSE_LOG);
+                    sw.write_uint16(DEF_LOGRESMSGTYPE_REJECT);
+                    sw.write_string("Invalid access");
+                    auto data = ix::IXWebSocketSendData{ sw.data, sw.position };
+                    log->warn("Player trying to login twice <{}> for account <{}>", sm.connection_state->getRemoteIp(), client->account);
+                    sm.websocket.sendBinary(data);
+                    return;
+                }
+
                 std::string account = sr.read_string();
                 std::string password = sr.read_string();
                 std::string worldname = sr.read_string();
@@ -104,10 +124,15 @@ void CGame::handle_login_server_message(socket_message & sm)
                 }
 
                 // pass account name and password and get back account_id if successful
-                if (!check_account_auth(client, account, password, account_id))
+                uint64_t account_id{};
+                try
+                {
+                    account_id = check_account_auth(client, account, password);
+                }
+                catch (std::exception & ex)
                 {
                     // login failed
-                    log->info("Failed login from <{}> for account <{}>", sm.connection_state->getRemoteIp(), account);
+                    log->info("Failed login from <{}> for account <{}> - <{}>", sm.connection_state->getRemoteIp(), account, ex.what());
                     // todo - add login spam protection
 
                     sw.write_uint32(MSGID_RESPONSE_LOG);
@@ -125,8 +150,31 @@ void CGame::handle_login_server_message(socket_message & sm)
                 client->account = account;
                 std::lock_guard<std::recursive_mutex> lock(client_list_mtx);
                 client_list.insert(sm.connection_state->client);
-                client->logged_in = true;
                 client->address = sm.connection_state->getRemoteIp();
+
+                client->set_connect_time(now());
+                client->set_last_packet_time(now());
+
+                // todo: fix this client list system
+                for (int i = 1; i < DEF_MAXCLIENTS; i++)
+                {
+                    if (m_pClientList[i] == nullptr)
+                    {
+                        m_pClientList[i] = client;
+                        sm.connection_state->client_handle = i;
+                        bAddClientShortCut(i);
+                        m_pClientList[i]->m_dwSPTime = m_pClientList[i]->m_dwMPTime =
+                            m_pClientList[i]->m_dwHPTime = m_pClientList[i]->m_dwAutoSaveTime =
+                            m_pClientList[i]->m_dwTime = m_pClientList[i]->m_dwHungerTime = m_pClientList[i]->m_dwExpStockTime =
+                            m_pClientList[i]->m_dwRecentAttackTime = m_pClientList[i]->m_dwAutoExpTime = m_pClientList[i]->m_dwSpeedHackCheckTime = timeGetTime();
+
+                        log->info("<{}> Client logged in: ({})", i, m_pClientList[i]->address);
+                        break;
+                    }
+                }
+
+                client->logged_in = true;
+                client->currentstatus = client_status::login_screen;
 
                 sw.write_uint32(MSGID_RESPONSE_LOG);
                 sw.write_int16(DEF_MSGTYPE_CONFIRM);

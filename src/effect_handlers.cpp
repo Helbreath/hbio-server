@@ -67,8 +67,8 @@ void CGame::Effect_Damage_Spot(short sAttackerH, char cAttackerType, short sTarg
                 sItemIndex = m_pClientList[sAttackerH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_NECK];
                 if ((sItemIndex != -1) && (m_pClientList[sAttackerH]->m_pItemList[sItemIndex] != NULL))
                 {
-                    if (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 859)
-                    { // NecklaceOfKloness  
+                    if (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 859) // NecklaceOfKloness 
+                    { 
                         if (cTargetType == DEF_OWNERTYPE_PLAYER)
                         {
                             if (m_pClientList[sTargetH] != NULL)
@@ -628,8 +628,8 @@ void CGame::Effect_Damage_Spot_Type2(short sAttackerH, char cAttackerType, short
                 sItemIndex = m_pClientList[sAttackerH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_NECK];
                 if ((sItemIndex != -1) && (m_pClientList[sAttackerH]->m_pItemList[sItemIndex] != NULL))
                 {
-                    if (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 859)
-                    { // NecklaceOfKloness  
+                    if (m_pClientList[sAttackerH]->m_pItemList[sItemIndex]->m_sIDnum == 859) // NecklaceOfKloness  
+                    {
                         if (cTargetType == DEF_OWNERTYPE_PLAYER)
                         {
                             if (m_pClientList[sTargetH] != NULL)
@@ -653,7 +653,7 @@ void CGame::Effect_Damage_Spot_Type2(short sAttackerH, char cAttackerType, short
             dTmp3 = dTmp1 + (dTmp1 * (dTmp2 / 100.0f));
             iDamage = (int)(dTmp3 + 0.5f);
             if (iDamage <= 0) iDamage = 0;
-            // order switched with above
+
             iDamage += m_pClientList[sAttackerH]->m_iAddMagicalDamage;
 
             if (m_pMapList[m_pClientList[sAttackerH]->m_cMapIndex]->m_bIsFightZone == TRUE)
@@ -1106,13 +1106,11 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
     sTgtX = 0;
     sTgtY = 0;
 
-    // ÇØ´ç Å¸ÄÏ¿¡°Ô ´ë¹ÌÁö¸¦ ¸ÔÀÎ´Ù. 
     iDamage = iDice(sV1, sV2) + sV3;
     if (iDamage <= 0) iDamage = 0;
 
     iPartyID = 0;
 
-    // °ø°ÝÀÚ°¡ ÇÃ·¹ÀÌ¾î¶ó¸é Mag¿¡ µû¸¥ º¸³Ê½º ´ë¹ÌÁö¸¦ °¡»ê 
     switch (cAttackerType)
     {
         case DEF_OWNERTYPE_PLAYER:
@@ -1127,21 +1125,17 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
             iDamage = (int)(dTmp3 + 0.5f);
             if (iDamage <= 0) iDamage = 0;
 
-            // v1.432 2001 4 7 13 7
             iDamage += m_pClientList[sAttackerH]->m_iAddMagicalDamage;
 
-            // v1.44 »çÅõÀåÀÌ¸é ´ë¹ÌÁö 1.33¹è 
             if (m_pMapList[m_pClientList[sAttackerH]->m_cMapIndex]->m_bIsFightZone == TRUE)
                 iDamage += iDamage / 3;
 
-            // Crusade : Àü¸éÀü ¸ðµåÀÏ¶§ ´ëÀÎ °ø°Ý·Â 1.33¹è 
             if ((cTargetType == DEF_OWNERTYPE_PLAYER) && (m_bIsCrusadeMode == TRUE) && (m_pClientList[sAttackerH]->m_iCrusadeDuty == 1))
             {
-                // v2.15 Àú·¦ÀÇ °æ¿ì´Â µ¥¹ÌÁö°¡ Áõ°¡ÇÑ´Ù. 1.7 ¹è 
                 if (m_pClientList[sAttackerH]->m_iLevel <= 80)
                 {
                     iDamage += (iDamage * 7) / 10;
-                } // v2.15 Àú·¦ÀÇ °æ¿ì´Â µ¥¹ÌÁö°¡ Áõ°¡ÇÑ´Ù. 1.5 ¹è 
+                }
                 else if (m_pClientList[sAttackerH]->m_iLevel <= 100)
                 {
                     iDamage += iDamage / 2;
@@ -1178,31 +1172,22 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
     switch (cTargetType)
     {
         case DEF_OWNERTYPE_PLAYER:
-            // °ø°Ý ´ë»óÀÌ Á¸ÀçÇÏÁö ¾ÊÀ¸¸é ¸®ÅÏ 
             if (m_pClientList[sTargetH] == NULL) return;
             if (m_pClientList[sTargetH]->m_bIsInitComplete == FALSE) return;
-            // ÀÌ¹Ì Á×¾î ÀÖ´Ù¸é Ã³¸® ¾ÈÇÔ.
             if (m_pClientList[sTargetH]->m_bIsKilled == TRUE) return;
-            // ·¢À¸·Î ÀÎÇØ º¸È£¸¦ ¹Þ¾Æ¾ß ÇÑ´Ù¸é 
             if ((dwTime - m_pClientList[sTargetH]->m_dwTime) > DEF_RAGPROTECTIONTIME) return;
-            // °ø°ÝÀÚ°¡ À§Ä¡ÇÑ ¸ÊÀÌ °ø°Ý ºÒ°¡´É ¸ÊÀÌ¶ó¸é 
-            // v2.03 ¼­¹ö ´Ù¿îµÇ¾î¼­ °íÄ§ 
             if (m_pClientList[sTargetH]->m_cMapIndex == -1) return;
             if ((m_pMapList[m_pClientList[sTargetH]->m_cMapIndex]->m_bIsAttackEnabled == FALSE) && (m_pClientList[sTargetH]->m_iAdminUserLevel == 0)) return;
-            // v1.41 °ø°ÝÀÚ°¡ Áß¸³ÀÌ¸é ´ëÀÎ °ø°ÝÀÌ ºÒ°¡´ÉÇÏ´Ù. 
             if ((cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sAttackerH]->m_bIsNeutral == TRUE) && (m_pClientList[sTargetH]->m_iPKCount == 0)) return;
 
-            // v2.172 °°ÀºÆí³¢¸®´Â ¸¶À»¿¡¼­ °ø°Ý´çÇÏÁö ¾Ê´Â´Ù. ¹üÁËÀÚ¿Í NPC´Â ¿¹¿Ü Áß¸³µµ °ø°Ý ¾ÊµÇ°Ô 
             if ((m_bIsCrusadeMode == FALSE) && (m_pClientList[sTargetH]->m_iPKCount == 0) && (cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sTargetH]->m_bIsPlayerCivil == TRUE)) return;
             if ((m_bIsCrusadeMode == FALSE) && (m_pClientList[sTargetH]->m_iPKCount == 0) && (cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sAttackerH]->m_bIsPlayerCivil == TRUE)) return;
 
             if ((cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sTargetH]->m_bIsNeutral == TRUE) && (m_pClientList[sTargetH]->m_iPKCount == 0) && (m_pClientList[sTargetH]->m_bIsPlayerCivil == TRUE)) return;
 
-            // 01-12-17 °°Àº ÆÄÆ¼¿øÀÌ¸é °ø°Ý ºÒ°¡ 
             if ((m_pClientList[sTargetH]->m_iPartyID != NULL) && (iPartyID == m_pClientList[sTargetH]->m_iPartyID)) return;
             m_pClientList[sTargetH]->m_dwLogoutHackCheck = dwTime;
 
-            // ¸¸¾à °ø°ÝÀÚ°¡ ÇÃ·¹ÀÌ¾îÀÌ°í °ø°ÝÀÚ°¡ ¾ÈÀü °ø°Ý ¸ðµå¶ó¸é °ø°ÝÀÇ ÀÇ¹Ì°¡ ¾ø´Ù. 
             if (cAttackerType == DEF_OWNERTYPE_PLAYER)
             {
 
@@ -1211,16 +1196,13 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                     iSideCondition = iGetPlayerRelationship(sAttackerH, sTargetH);
                     if ((iSideCondition == 7) || (iSideCondition == 2) || (iSideCondition == 6))
                     {
-                        // ¾Æ¹« È¿°ú ¾øÀ½. ¸¶³ª ¼Òºñ·®ÀÌ ÁÙ¾úÀ¸¹Ç·Î 
                     }
                     else
                     {
-                        // °°Àº ÆíÀÌÁö¸¸ ¸¸¾à »çÅõÀå ³»¿¡¼­ ÆíÀÌ °°´Ù¸é °ø°Ý Ã³¸®¸¦ ÇØ¾ßÇÑ´Ù.
                         if (m_pMapList[m_pClientList[sAttackerH]->m_cMapIndex]->m_bIsFightZone == TRUE)
                         {
                             if (m_pClientList[sAttackerH]->m_iGuildGUID != m_pClientList[sTargetH]->m_iGuildGUID)
                             {
-                                // »çÅõÀå ³»¿¡¼­ ´Ù¸¥ ±æµå´Ù. °ø°ÝÀÌ °¡´ÉÇÏ´Ù. 
                             }
                             else return;
                         }
@@ -1228,14 +1210,11 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                     }
                 }
 
-                // ¸¶¹ý º¸È£ È¤Àº ¾ÈÀü ¿µ¿ªÀÌ¶ó¸é °ø°Ý ¼º°ø ¸øÇÔ 
                 if (m_pMapList[m_pClientList[sTargetH]->m_cMapIndex]->iGetAttribute(m_pClientList[sTargetH]->m_sX, m_pClientList[sTargetH]->m_sY, 0x00000005) != 0) return;
             }
 
-            // ½ºÅ³ÀÇ »ç¿ë»óÅÂ¸¦ ¸ðµÎ ¹«È¿È­ ÇÑ´Ù.
             ClearSkillUsingStatus(sTargetH);
 
-            // v1.432 ¼Ó¼ºº° ´ë¹ÌÁö °¨¼Ò 
             switch (iAttr)
             {
                 case 1:
@@ -1288,19 +1267,16 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
             iIndex = m_pClientList[sTargetH]->m_iMagicDamageSaveItemIndex;
             if ((iIndex != -1) && (iIndex >= 0) && (iIndex < DEF_MAXITEMS))
             {
-                // ¸¶¹ý ´ë¹ÌÁö Àý°¨ È¿°ú¸¦ °¡Áø ¾ÆÀÌÅÛÀÌ´Ù.
-
-                // ¾ÆÀÌÅÛÀÇ Á¾·ù¿¡ µû¶ó ´ë¹ÌÁö¸¦ ÁÙÀÎ´Ù. 
                 switch (m_pClientList[sTargetH]->m_pItemList[iIndex]->m_sIDnum)
                 {
-                    case 335: // ¿¡¸Ó¶öµå ¹ÝÁö 20%
+                    case 335:
                         dTmp1 = (double)iDamage;
                         dTmp2 = dTmp1 * 0.2f;
                         dTmp3 = dTmp1 - dTmp2;
                         iDamage = (int)(dTmp3 + 0.5f);
                         break;
 
-                    case 337: // ·çºñ ¹ÝÁö 10%
+                    case 337:
                         dTmp1 = (double)iDamage;
                         dTmp2 = dTmp1 * 0.1f;
                         dTmp3 = dTmp1 - dTmp2;
@@ -1312,17 +1288,14 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                 iRemainLife = m_pClientList[sTargetH]->m_pItemList[iIndex]->m_wCurLifeSpan;
                 if (iRemainLife <= iDamage)
                 {
-                    // ¸¶¹ý µ¥¹ÌÁö Àý°¨ ¾ÆÀÌÅÛÀÌ ºÎ¼­Áø´Ù. 
                     ItemDepleteHandler(sTargetH, iIndex, TRUE);
                 }
                 else
                 {
-                    // ¸¶¹ý µ¥¹ÌÁö Àý°¨ ¾ÆÀÌÅÛÀÇ ¼ö¸í¸¸ ÁÙÀÎ´Ù. 
                     m_pClientList[sTargetH]->m_pItemList[iIndex]->m_wCurLifeSpan -= iDamage;
                 }
             }
 
-            // v1.42 Ãß°¡µÈ °íÁ¤ ¸¶¹ý ´ë¹ÌÁö Àý°¨
             if (m_pClientList[sTargetH]->m_iAddAbsMD != 0)
             {
                 dTmp1 = (double)iDamage;
@@ -1331,25 +1304,21 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                 iDamage = iDamage - (int)dTmp3;
             }
 
-            // v1.4 VIT¿¡ µû¸¥ ´ë¹ÌÁö °¨¼Ò 
             if (cTargetType == DEF_OWNERTYPE_PLAYER)
             {
                 iDamage -= (iDice(1, m_pClientList[sTargetH]->m_iVit / 10) - 1);
                 if (iDamage <= 0) iDamage = 0;
             }
 
-            // ¸¸¾à ¸¶¹ý º¸È£ÁßÀÌ¶ó¸é ´ë¹ÌÁö´Â 1/2 
             if (m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_PROTECT] == 2)
                 iDamage = iDamage / 2;
 
             if ((m_pClientList[sTargetH]->m_bIsLuckyEffect == TRUE) &&
                 (iDice(1, 10) == 5) && (m_pClientList[sTargetH]->m_iHP <= iDamage))
             {
-                // Çà¿îÈ¿°ú·Î Á×À½À» ¸ð¸éÇÑ´Ù.
                 iDamage = m_pClientList[sTargetH]->m_iHP - 1;
             }
 
-            // v1.432 Æ¯¼ö ´É·Â Áß ¸ðµç ´ë¹ÌÁö¸¦ ¸·´Â È¿°ú°¡ È°¼ºÈ­ µÈ °æ¿ì ´ë¹ÌÁö¸¦ ÀÔÁö ¾Ê´Â´Ù.
             if ((cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sTargetH]->m_bIsSpecialAbilityEnabled == TRUE))
             {
                 switch (m_pClientList[sTargetH]->m_iSpecialAbilityType)
@@ -1364,48 +1333,39 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
             m_pClientList[sTargetH]->m_iHP -= iDamage;
             if (m_pClientList[sTargetH]->m_iHP <= 0)
             {
-                // ÇÃ·¹ÀÌ¾î°¡ »ç¸ÁÇß´Ù.
                 ClientKilledHandler(sTargetH, sAttackerH, cAttackerType, iDamage);
             }
             else
             {
                 if (iDamage > 0)
                 {
-                    // v2.04 Å¸°ÝÀ» ¹Þ¾Ò´Âµ¥ ¸¶³ª º¯È¯ Æ¯¼ºÄ¡°¡ ÀÖ¾ú´Ù¸é 
                     if (m_pClientList[sTargetH]->m_iAddTransMana > 0)
                     {
                         dTmp1 = (double)m_pClientList[sTargetH]->m_iAddTransMana;
                         dTmp2 = (double)iDamage;
                         dTmp3 = (dTmp1 / 100.0f) * dTmp2 + 1.0f;
 
-                        // ÃÖ´ë ¸¶³ªÄ¡ 
                         iTemp = (2 * m_pClientList[sTargetH]->m_iMag) + (2 * m_pClientList[sTargetH]->m_iLevel) + (m_pClientList[sTargetH]->m_iInt / 2);
                         m_pClientList[sTargetH]->m_iMP += (int)dTmp3;
                         if (m_pClientList[sTargetH]->m_iMP > iTemp) m_pClientList[sTargetH]->m_iMP = iTemp;
                     }
 
-                    // v2.04 Å¸°ÝÀ» ¹Þ¾Ò´Âµ¥ ÇÊ»ì ÃæÀüÀÇ Æ¯¼ºÄ¡°¡ ÀÖ¾ú´Ù¸é 
                     if (m_pClientList[sTargetH]->m_iAddChargeCritical > 0)
                     {
-                        // È®·ü °è»ê¿¡ µû¶ó¼­ ÇÊ»ì±â°¡ ÃæÀüµÈ´Ù.
                         if (iDice(1, 100) < (m_pClientList[sTargetH]->m_iAddChargeCritical))
                         {
                             iMaxSuperAttack = (m_pClientList[sTargetH]->m_iLevel / 10);
                             if (m_pClientList[sTargetH]->m_iSuperAttackLeft < iMaxSuperAttack) m_pClientList[sTargetH]->m_iSuperAttackLeft++;
-                            // v1.12 ¼­¹ö¿Í Å¬¶óÀÌ¾ðÆ® °£¿¡ Ä«¿îÆ®°¡ ÀÏÄ¡ÇÏÁö ¾Ê´Â °æ¿ì°¡ ÀÖÀ» ¼ö ÀÖÀ¸¹Ç·Î °¡°¨¿¡ »ó°ü¾øÀÌ º¸³½´Ù.
                             SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_SUPERATTACKLEFT, NULL, NULL, NULL, NULL);
                         }
                     }
 
-                    // v1.44 »çÅõÀåÀÌ¸é ´ë¹ÌÁö 80ÀÌ»óÀÏ¶§ ¹Ð¸°´Ù.
                     if ((cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pMapList[m_pClientList[sAttackerH]->m_cMapIndex]->m_bIsFightZone == TRUE))
                         iMoveDamage = 80;
                     else iMoveDamage = 50;
 
                     if (iDamage >= iMoveDamage)
                     {
-                        // ´ë¹ÌÁö°¡ 50ÀÌ»óÀÌ¸é Æ¨±ä´Ù.
-                ///		char cDamageMoveDir;
                         sTgtX = m_pClientList[sTargetH]->m_sX;
                         sTgtY = m_pClientList[sTargetH]->m_sY;
 
@@ -1428,23 +1388,17 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                             else if (sTgtY < sAtkY) cDamageMoveDir = 8;
                         }
 
-                        // v1.44 ¹Ð·Á³¯¶§ ´ë¹ÌÁö¸¦ ÀÔ·ÂÇÑ´Ù.
                         m_pClientList[sTargetH]->m_iLastDamage = iDamage;
-                        // ¹ÞÀº ´ë¹ÌÁö¸¦ Åëº¸ÇÑ´Ù. <- HP¸¦ ±×´ë·Î ¾Ë¸°´Ù.
                         SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_HP, NULL, NULL, NULL, NULL);
-                        // Æ¨°Ü ³ª°¡¶ó´Â ¸Þ½ÃÁö ÀÔ·Â 	
                         SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_DAMAGEMOVE, cDamageMoveDir, iDamage, NULL, NULL);
                     }
                     else
                     {
                         EDSD_SKIPDAMAGEMOVE:;
-                        // ¹ÞÀº ´ë¹ÌÁö¸¦ Åëº¸ÇÑ´Ù. <- HP¸¦ ±×´ë·Î ¾Ë¸°´Ù.
                         SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_HP, NULL, NULL, NULL, NULL);
-                        // Ãæ°ÝÀ» ¹Þ¾Ò´Ù¸é Ãæ°Ýµ¿ÀÛ Àü¼Û 
                         SendEventToNearClient_TypeA(sTargetH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, NULL, NULL);
                     }
 
-                    // v1.4 Á×ÀºÃ´ÇÏ°í ÀÖ´Â °æ¿ì´Â Owner À§Ä¡¸¦ ¿Å±ä´Ù. 
                     if (m_pClientList[sTargetH]->m_bSkillUsingStatus[19] != TRUE)
                     {
                         m_pMapList[m_pClientList[sTargetH]->m_cMapIndex]->ClearOwner(0, sTargetH, DEF_OWNERTYPE_PLAYER, m_pClientList[sTargetH]->m_sX, m_pClientList[sTargetH]->m_sY);
@@ -1453,9 +1407,8 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
 
                     if (m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] != 0)
                     {
-                        // Hold-Person µÇ¾î ÀÖ¾ú´ø »óÅÂ¶ó¸é Ç®¸°´Ù. ¸¶¹ý°ø°Ý ÆÐ·²¶óÀÌÁî µÈ °Íµµ Ç®¸°´Ù.
                         // 1: Hold-Person 
-                        // 2: Paralize
+                        // 2: Paralyze
                         SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_HOLDOBJECT, m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT], NULL, NULL);
 
                         m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = NULL;
@@ -1478,7 +1431,6 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                     return;
             }
 
-            // ÀüÀï¿ë ±¸Á¶¹°Áß ±×·£µå ¸ÅÁ÷ Á¦³×·¹ÀÌÅÍ, ¿¡³ÊÁö ½Çµå Á¦³×·¹ÀÌÅÍ´Â ¾Æ±ºÀÌ³ª Áß¸³ÀÇ °ø°Ý¿¡ ´ë¹ÌÁö¸¦ ÀÔÁö ¾Ê´Â´Ù.
             if (cAttackerType == DEF_OWNERTYPE_PLAYER)
             {
                 switch (m_pNpcList[sTargetH]->m_sType)
@@ -1499,7 +1451,6 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                     break;
             }
 
-            // ¸ó½ºÅÍ°¡ ¸¶¹ý ´ë¹ÌÁö Èí¼ö·üÀÌ ÀÖ´Ù¸é(AbsDamage°¡ 0º¸´Ù Å©´Ù) ¿ø·¡ ¸¶¹ý ´ë¹ÌÁö¸¦ °¨¼Ò½ÃÅ²´Ù.
             if (m_pNpcList[sTargetH]->m_iAbsDamage > 0)
             {
                 dTmp1 = (double)iDamage;
@@ -1510,25 +1461,19 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                 if (iDamage < 0) iDamage = 1;
             }
 
-            // ¸¸¾à ¸¶¹ý º¸È£ÁßÀÌ¶ó¸é ´ë¹ÌÁö´Â 1/2 
             if (m_pNpcList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_PROTECT] == 2)
                 iDamage = iDamage / 2;
 
             m_pNpcList[sTargetH]->m_iHP -= iDamage;
             if (m_pNpcList[sTargetH]->m_iHP < 0)
             {
-                // NPC°¡ »ç¸ÁÇß´Ù.
                 NpcKilledHandler(sAttackerH, cAttackerType, sTargetH, iDamage);
             }
             else
             {
-                // °ø°Ý´çÇßÁö¸¸ »ì¾ÆÀÖ´Ù. ¹Ý°ÝÇÑ´Ù.
-
-                // ÆíÀÌ °°À¸¸é ¹Ý°ÝÇÏÁö ¾Ê´Â´Ù.
                 switch (cAttackerType)
                 {
                     case DEF_OWNERTYPE_PLAYER:
-                        // v2.15 °æºñ´Â °°Àº Æíµµ ¹Ý°ÝÇÑ´Ù.			
                         if ((m_pNpcList[sTargetH]->m_sType != 21) && (m_pNpcList[sTargetH]->m_sType != 55) && (m_pNpcList[sTargetH]->m_sType != 56)
                             && (m_pNpcList[sTargetH]->m_cSide == cAttackerSide)) return;
                         break;
@@ -1538,50 +1483,37 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                         break;
                 }
 
-                // Ãæ°ÝÀ» ¹Þ¾Ò´Ù¸é Ãæ°Ýµ¿ÀÛ Àü¼Û
                 SendEventToNearClient_TypeA(sTargetH, DEF_OWNERTYPE_NPC, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, NULL, NULL);
 
                 if ((iDice(1, 3) == 2) && (m_pNpcList[sTargetH]->m_cActionLimit == 0))
                 {
-
-                    // µ¿Á·ÀÌ°í ÆíÀÌ °°À¸¸é ¹Ý°ÝÇÏÁö ¾Ê´Â´Ù.
                     if ((cAttackerType == DEF_OWNERTYPE_NPC) &&
                         (m_pNpcList[sAttackerH]->m_sType == m_pNpcList[sTargetH]->m_sType) &&
                         (m_pNpcList[sAttackerH]->m_cSide == m_pNpcList[sTargetH]->m_cSide)) return;
 
-                    // ActionLimit°¡ 1ÀÌ¸é ¹Ý°ÝÀ» ÇÏÁö ¾Ê´Â´Ù. ¿ÀÁ÷ ¿òÁ÷ÀÏ¼ö¸¸ ÀÖÀ¸´Ï.
                     m_pNpcList[sTargetH]->m_cBehavior = DEF_BEHAVIOR_ATTACK;
                     m_pNpcList[sTargetH]->m_sBehaviorTurnCount = 0;
                     m_pNpcList[sTargetH]->m_iTargetIndex = sAttackerH;
                     m_pNpcList[sTargetH]->m_cTargetType = cAttackerType;
 
-                    // ¿©±â¼­ Ç¥È¿ µ¿ÀÛ°°Àº°ÍÀ» À§ÇÑ ¸Þ½ÃÁö ¹ß¼Û.
-
-                    // Damage¸¦ ÀÔÀº Ãæ°ÝÀ¸·Î ÀÎÇÑ Áö¿¬È¿°ú.
                     m_pNpcList[sTargetH]->m_dwTime = dwTime;
 
                     if (m_pNpcList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] != 0)
                     {
-                        // Hold µÇ¾î ÀÖ¾ú´ø »óÅÂ¶ó¸é Ç®¸°´Ù. 	
                         m_pNpcList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = NULL;
                         bRemoveFromDelayEventList(sTargetH, DEF_OWNERTYPE_NPC, DEF_MAGICTYPE_HOLDOBJECT);
                     }
 
-                    //Crusade
                     int iExp;
 
-                    // NPC¿¡ ´ëÇÑ °ø°ÝÀÌ ¼º°øÇßÀ¸¹Ç·Î °ø°ÝÀÚ°¡ ÇÃ·¹ÀÌ¾î¶ó¸é ÀÔÈù ´ë¹ÌÁö ¸¸Å­ÀÇ °æÇèÄ¡¸¦ °ø°ÝÀÚ¿¡°Ô ÁØ´Ù. 
                     if ((m_pNpcList[sTargetH]->m_iNoDieRemainExp > 0) && (m_pNpcList[sTargetH]->m_bIsSummoned != TRUE) &&
                         (cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sAttackerH] != NULL))
                     {
-                        // ExpStockÀ» ¿Ã¸°´Ù. ´Ü ¼ÒÈ¯¸÷ÀÎ °æ¿ì °æÇèÄ¡¸¦ ¿Ã¸®Áö ¾Ê´Â´Ù.
                         if (m_pNpcList[sTargetH]->m_iNoDieRemainExp > iDamage)
                         {
-                            // Crusade
                             iExp = iDamage;
                             if ((m_bIsCrusadeMode == TRUE) && (iExp > 10)) iExp = 10;
 
-                            //v2.03 918 °æÇèÄ¡ Áõ°¡ 
                             if (m_pClientList[sAttackerH]->m_iAddExp > 0)
                             {
                                 dTmp1 = (double)m_pClientList[sAttackerH]->m_iAddExp;
@@ -1590,7 +1522,6 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                                 iExp += (int)dTmp3;
                             }
 
-                            // v2.17 2002-8-6 °ø°ÝÀÚÀÇ ·¹º§ÀÌ 100 ÀÌ»óÀÌ¸é Åä³¢³ª °í¾çÀÌ¸¦ ÀâÀ»¶§ °æÇèÄ¡°¡ ¿Ã¶ó°¡Áö ¾Ê´Â´Ù.
                             if (m_pClientList[sAttackerH]->m_iLevel > 100)
                             {
                                 switch (m_pNpcList[sTargetH]->m_sType)
@@ -1604,17 +1535,15 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                             }
 
                             if (bExp == TRUE)
-                                GetExp(sAttackerH, iExp); //m_pClientList[sAttackerH]->m_iExpStock += iExp;     //iDamage;
-                            else GetExp(sAttackerH, (iExp / 2)); //m_pClientList[sAttackerH]->m_iExpStock += (iExp/2); //(iDamage/2);
+                                GetExp(sAttackerH, iExp);
+                            else GetExp(sAttackerH, (iExp / 2));
                             m_pNpcList[sTargetH]->m_iNoDieRemainExp -= iDamage;
                         }
                         else
                         {
-                            // Crusade
                             iExp = m_pNpcList[sTargetH]->m_iNoDieRemainExp;
                             if ((m_bIsCrusadeMode == TRUE) && (iExp > 10)) iExp = 10;
 
-                            //v2.03 918 °æÇèÄ¡ Áõ°¡ 
                             if (m_pClientList[sAttackerH]->m_iAddExp > 0)
                             {
                                 dTmp1 = (double)m_pClientList[sAttackerH]->m_iAddExp;
@@ -1623,7 +1552,6 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                                 iExp += (int)dTmp3;
                             }
 
-                            // v2.17 2002-8-6 °ø°ÝÀÚÀÇ ·¹º§ÀÌ 100 ÀÌ»óÀÌ¸é Åä³¢³ª °í¾çÀÌ¸¦ ÀâÀ»¶§ °æÇèÄ¡°¡ ¿Ã¶ó°¡Áö ¾Ê´Â´Ù.
                             if (m_pClientList[sAttackerH]->m_iLevel > 100)
                             {
                                 switch (m_pNpcList[sTargetH]->m_sType)
@@ -1638,8 +1566,8 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
 
 
                             if (bExp == TRUE)
-                                GetExp(sAttackerH, iExp); //m_pClientList[sAttackerH]->m_iExpStock += iExp;     //m_pNpcList[sTargetH]->m_iNoDieRemainExp;
-                            else GetExp(sAttackerH, (iExp / 2)); //m_pClientList[sAttackerH]->m_iExpStock += (iExp/2); //(m_pNpcList[sTargetH]->m_iNoDieRemainExp/2);
+                                GetExp(sAttackerH, iExp);
+                            else GetExp(sAttackerH, (iExp / 2));
                             m_pNpcList[sTargetH]->m_iNoDieRemainExp = 0;
                         }
                     }
@@ -1699,7 +1627,6 @@ void CGame::Effect_SpDown_Spot(short sAttackerH, char cAttackerType, short sTarg
     if (cAttackerType == DEF_OWNERTYPE_PLAYER)
         if (m_pClientList[sAttackerH] == NULL) return;
 
-    // Ã‡Ã˜Â´Ã§ Ã…Â¸Ã„ÃÃ€Ã‡ SpÂ¸Â¦ Â³Â»Â¸Â°Â´Ã™.
     iSP = iDice(sV1, sV2) + sV3;
 
     switch (cTargetType)
@@ -1714,8 +1641,6 @@ void CGame::Effect_SpDown_Spot(short sAttackerH, char cAttackerType, short sTarg
             iMaxSP = (2 * m_pClientList[sTargetH]->m_iStr) + (2 * m_pClientList[sTargetH]->m_iLevel);
             if (m_pClientList[sTargetH]->m_iSP > 0)
             {
-
-                //v1.42 
                 if (m_pClientList[sTargetH]->m_iTimeLeft_FirmStaminar == 0)
                 {
                     m_pClientList[sTargetH]->m_iSP -= iSP;
@@ -1726,7 +1651,6 @@ void CGame::Effect_SpDown_Spot(short sAttackerH, char cAttackerType, short sTarg
             break;
 
         case DEF_OWNERTYPE_NPC:
-            // NPCÂ´Ã‚ Â½ÂºÃ…Ã‚Â¹ÃŒÂ³ÃŠ Â°Â³Â³Ã¤Ã€ÃŒ Â¾Ã¸Â´Ã™.
             break;
     }
 }
@@ -1739,7 +1663,6 @@ void CGame::Effect_SpUp_Spot(short sAttackerH, char cAttackerType, short sTarget
     if (cAttackerType == DEF_OWNERTYPE_PLAYER)
         if (m_pClientList[sAttackerH] == NULL) return;
 
-    // Ã‡Ã˜Â´Ã§ Ã…Â¸Ã„ÃÃ€Ã‡ SpÂ¸Â¦ Â¿ÃƒÂ¸Â°Â´Ã™.
     iSP = iDice(sV1, sV2) + sV3;
 
     switch (cTargetType)
@@ -1761,7 +1684,6 @@ void CGame::Effect_SpUp_Spot(short sAttackerH, char cAttackerType, short sTarget
             break;
 
         case DEF_OWNERTYPE_NPC:
-            // NPCÂ´Ã‚ Â½ÂºÃ…Ã‚Â¹ÃŒÂ³ÃŠ Â°Â³Â³Ã¤Ã€ÃŒ Â¾Ã¸Â´Ã™.
             break;
     }
 }

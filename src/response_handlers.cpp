@@ -6,6 +6,8 @@
 
 #include "Game.h"
 
+extern char G_cTxt[512];
+
 int CGame::iComposeInitMapData(short sX, short sY, int iClientH, char * pData)
 {
     int * ip, ix, iy, iSize, iTileExists;
@@ -856,7 +858,7 @@ void CGame::InitPlayerData(int iClientH, char * pData, DWORD dwSize)
     memcpy(cName, cp, 10);
     cp += 10;
 
-    m_pClientList[iClientH]->m_cAccountStatus = *cp;
+    //m_pClientList[iClientH]->m_cAccountStatus = *cp;
     cp++;
 
     cGuildStatus = *cp;

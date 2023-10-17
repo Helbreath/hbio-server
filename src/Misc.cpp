@@ -265,8 +265,6 @@ BOOL CMisc::bCheckValidName(char * pStr)
             if (((unsigned char)pStr[i] == 164) && ((unsigned char)pStr[i + 1] >= 161) &&
                 ((unsigned char)pStr[i + 1] <= 211))
             {
-                // ÀûÇÕ	
-
             }
             else
                 if (((unsigned char)pStr[i] >= 176) && ((unsigned char)pStr[i] <= 200) &&
@@ -315,7 +313,6 @@ void CMisc::Temp()
     ZeroMemory(cTemp, sizeof(cTemp));
     for (i = 1; i <= 68; i++) fwrite(cTemp, 1, 824 * 10, pDestFile);
 
-    //148
     /*
     ZeroMemory(cTemp, sizeof(cTemp));
     for (i = 1; i <= 150; i++) fwrite(cTemp, 1, 824*10, pDestFile);

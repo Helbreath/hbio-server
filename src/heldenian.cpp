@@ -6,6 +6,8 @@
 
 #include "Game.h"
 
+extern char G_cTxt[512];
+
 void CGame::GlobalEndHeldenianMode()
 {
     char * cp, cData[32];
@@ -96,14 +98,12 @@ BOOL CGame::bNotifyHeldenianWinner()
 {
     if (var_88C == 0)
     {
-        //bSendMsgToLS(MSGID_REQUEST_HELDENIAN_WINNER, NULL, 1, NULL);
         return TRUE;
     }
     else
     {
         return FALSE;
     }
-
 }
 
 void CGame::RemoveHeldenianNpc(int iNpcH)
@@ -394,7 +394,7 @@ void CGame::GlobalStartHeldenianMode()
     ZeroMemory(cData, sizeof(cData));
 
     cp = (char *)cData;
-    *cp = GSM_STARTHELDENIAN; // 21
+    *cp = GSM_STARTHELDENIAN;
     cp++;
 
     wp = (WORD *)cp;
@@ -623,7 +623,6 @@ void CGame::ManualStartHeldenianMode(int iClientH, char * pData, DWORD dwMsgSize
     GlobalStartHeldenianMode();
     wsprintf(G_cTxt, "GM Order(%s): begin Heldenian", m_pClientList[iClientH]->m_cCharName);
     log->info(G_cTxt);
-    //bSendMsgToLS(MSGID_GAMEMASTERLOG, iClientH, FALSE, G_cTxt);
 }
 
 void CGame::ManualEndHeldenianMode(int iClientH, char * pData, DWORD dwMsgSize)
@@ -638,7 +637,7 @@ void CGame::ManualEndHeldenianMode(int iClientH, char * pData, DWORD dwMsgSize)
         GlobalEndHeldenianMode();
         m_bHeldenianRunning = FALSE;
         wsprintf(G_cTxt, "GM Order(%s): end Heldenian", m_pClientList[iClientH]->m_cCharName);
-        //bSendMsgToLS(MSGID_GAMEMASTERLOG, iClientH, FALSE, G_cTxt);
+        log->info(G_cTxt);
     }
 }
 

@@ -7,7 +7,9 @@
 #pragma once
 
 #include <windows.h>
-										   
+#include <cstdint>
+#include <string>
+
 #define DEF_MAXITEMEQUIPPOS		15
 #define DEF_EQUIPPOS_NONE		0
 #define DEF_EQUIPPOS_HEAD		1
@@ -28,7 +30,7 @@
 #define DEF_ITEMTYPE_NONE		 0
 #define DEF_ITEMTYPE_EQUIP		 1
 #define DEF_ITEMTYPE_APPLY		 2
-#define DEF_ITEMTYPE_USE_DEPLETE 3       
+#define DEF_ITEMTYPE_USE_DEPLETE 3
 #define DEF_ITEMTYPE_INSTALL	 4
 #define DEF_ITEMTYPE_CONSUME	 5
 #define DEF_ITEMTYPE_ARROW		 6
@@ -79,6 +81,28 @@
 #define DEF_ITET_ID							2
 #define DEF_ITET_DATE						3
 
+struct item_db
+{
+    int64_t id{};
+    int64_t char_id{};
+    int64_t item_id{};
+    std::string name;
+    int64_t count{};
+    int32_t type{};
+    int32_t color{};
+    int32_t id1{};
+    int32_t id2{};
+    int32_t id3{};
+    int32_t effect1{};
+    int32_t effect2{};
+    int32_t effect3{};
+    int32_t durability{};
+    int64_t attribute{};
+    int32_t itemequip{};
+    int32_t itemposx{};
+    int32_t itemposy{};
+    std::string itemloc;
+};
 
 class CItem  
 {
@@ -98,6 +122,8 @@ public:
     };
 
 	char  m_cName[30];
+
+    int64_t id{};
 	
 	short m_sIDnum;
 	char  m_cItemType;

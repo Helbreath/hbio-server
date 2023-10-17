@@ -132,7 +132,6 @@ void CGame::_CreateApocalypseGUID(DWORD dwApocalypseGUID)
     pFile = fopen(cFn, "wt");
     if (pFile == NULL)
     {
-        // Ã†Ã„Ã€ÃÃ€Â» Â¸Â¸ÂµÃ© Â¼Ã¶ Â¾Ã¸Â°Ã…Â³Âª Â»Ã§Ã€ÃŒÃÃ®Â°Â¡ ÃÃ¶Â³ÂªÃ„Â¡Â°Ã” Ã€Ã›Ã€Âº Â°Ã¦Â¿Ã¬Â´Ã‚ . 
         wsprintf(cTxt, "(!) Cannot create ApocalypseGUID(%d) file", dwApocalypseGUID);
         log->info(cTxt);
     }

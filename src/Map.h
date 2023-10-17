@@ -113,7 +113,7 @@ public:
 	//short m_sInitialPointX, m_sInitialPointY;
 	POINT m_pInitialPoint[DEF_MAXINITIALPOINT];
 
-	BOOL  m_bNamingValueUsingStatus[1000]; // 0~999
+	BOOL  m_bNamingValueUsingStatus[1000];
 	BOOL  m_bRandomMobGenerator;
 	char  m_cRandomMobGeneratorLevel;
 	int   m_iTotalActiveObject;

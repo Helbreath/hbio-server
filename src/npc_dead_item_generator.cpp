@@ -11,7 +11,7 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
     CItem * pItem;
     char  cColor, cItemName[30];
     BOOL  bIsGold;
-    int   iGenLevel, iResult, iItemID;
+    int   iGenLevel, iResult, iItemID{};
     DWORD dwType, dwValue;
     double dTmp1, dTmp2, dTmp3;
 
@@ -49,7 +49,6 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
 
             pItem->m_dwCount = (DWORD)(iDice(1, (m_pNpcList[iNpcH]->m_iGoldDiceMax - m_pNpcList[iNpcH]->m_iGoldDiceMin)) + m_pNpcList[iNpcH]->m_iGoldDiceMin);
 
-            // v1.42 Gold 
             if ((cAttackerType == DEF_OWNERTYPE_PLAYER) && (m_pClientList[sAttackerH]->m_iAddGold != NULL))
             {
                 dTmp1 = (double)m_pClientList[sAttackerH]->m_iAddGold;
@@ -600,20 +599,20 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
                     else if ((iResult >= 29800) && (iResult < 29900))  dwValue = 11; // 156/29348 = 0.5%
                     else if ((iResult >= 29900) && (iResult < 29970))  dwValue = 12; // 103/29348 = 0.3%
                     else if ((iResult >= 29970) && (iResult <= 30000))  dwValue = 13; // 68/29348 = 0.1%
-                    else dwValue = 1; // v2.03 906
+                    else dwValue = 1;
 
                     switch (dwType)
                     {
                         case 1:
                             if (dwValue <= 5) dwValue = 5;
                             break;
-                        case 2: // 
+                        case 2:
                             if (dwValue <= 4) dwValue = 4;
                             break;
-                        case 6: // 
+                        case 6:
                             if (dwValue <= 4) dwValue = 4;
                             break;
-                        case 8: // 					
+                        case 8:
                             if (dwValue <= 2) dwValue = 2;
                             break;
                     }
@@ -626,7 +625,6 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
 
                     if (iDice(1, 10000) >= 6000)
                     {
-
                         iResult = iDice(1, 10000);
                         if ((iResult >= 1) && (iResult <= 4999))          dwType = 2;
                         else if ((iResult >= 5000) && (iResult <= 8499))  dwType = 10;
@@ -647,7 +645,7 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
                         else if ((iResult >= 29800) && (iResult < 29900))  dwValue = 11; // 156/29348 = 0.5%
                         else if ((iResult >= 29900) && (iResult < 29970))  dwValue = 12; // 103/29348 = 0.3%
                         else if ((iResult >= 29970) && (iResult <= 30000))  dwValue = 13; // 68/29348 = 0.1%
-                        else dwValue = 1; // v2.03 906
+                        else dwValue = 1;
 
                         switch (dwType)
                         {
@@ -694,7 +692,7 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
                     else if ((iResult >= 29800) && (iResult < 29900))  dwValue = 11; // 156/29348 = 0.5%
                     else if ((iResult >= 29900) && (iResult < 29970))  dwValue = 12; // 103/29348 = 0.3%
                     else if ((iResult >= 29970) && (iResult <= 30000))  dwValue = 13; // 68/29348 = 0.1%
-                    else dwValue = 1; // v2.03 906
+                    else dwValue = 1;
 
                     if ((iGenLevel <= 2) && (dwValue > 7)) dwValue = 7;
 
@@ -705,7 +703,6 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
 
                     if (iDice(1, 10000) >= 6000)
                     {
-
                         iResult = iDice(1, 10000);
                         if ((iResult >= 1) && (iResult <= 4999))          dwType = 2;
                         else if ((iResult >= 5000) && (iResult <= 8499))  dwType = 10;
@@ -726,7 +723,7 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
                         else if ((iResult >= 29800) && (iResult < 29900))  dwValue = 11; // 156/29348 = 0.5%
                         else if ((iResult >= 29900) && (iResult < 29970))  dwValue = 12; // 103/29348 = 0.3%
                         else if ((iResult >= 29970) && (iResult <= 30000))  dwValue = 13; // 68/29348 = 0.1%
-                        else dwValue = 1; // v2.03 906
+                        else dwValue = 1;
 
                         if ((iGenLevel <= 2) && (dwValue > 7)) dwValue = 7;
 
@@ -753,7 +750,6 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
                 }
                 else if (pItem->m_sItemEffectType == DEF_ITEMEFFECTTYPE_DEFENSE)
                 {
-
                     iResult = iDice(1, 10000);
                     if ((iResult >= 1) && (iResult <= 5999))          dwType = 8;
                     else if ((iResult >= 6000) && (iResult <= 8999))  dwType = 6;
@@ -774,7 +770,7 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
                     else if ((iResult >= 29800) && (iResult < 29900))  dwValue = 11; // 156/29348 = 0.5%
                     else if ((iResult >= 29900) && (iResult < 29970))  dwValue = 12; // 103/29348 = 0.3%
                     else if ((iResult >= 29970) && (iResult <= 30000))  dwValue = 13; // 68/29348 = 0.1%
-                    else dwValue = 1; // v2.03 906
+                    else dwValue = 1;
 
                     switch (dwType)
                     {
@@ -787,7 +783,6 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
 
                         case 11:
                         case 12:
-                            // v2.04
                             dwValue = (dwValue + 1) / 2;
                             if (dwValue < 1) dwValue = 1;
                             if ((iGenLevel <= 3) && (dwValue > 2)) dwValue = 2;
@@ -802,7 +797,6 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
 
                     if (iDice(1, 10000) >= 6000)
                     {
-
                         iResult = iDice(1, 10000);
                         if ((iResult >= 1) && (iResult <= 999))           dwType = 3;
                         else if ((iResult >= 1000) && (iResult <= 3999))  dwType = 1;
@@ -827,7 +821,7 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
                         else if ((iResult >= 29800) && (iResult < 29900))  dwValue = 11; // 156/29348 = 0.5%
                         else if ((iResult >= 29900) && (iResult < 29970))  dwValue = 12; // 103/29348 = 0.3%
                         else if ((iResult >= 29970) && (iResult <= 30000))  dwValue = 13; // 68/29348 = 0.1%
-                        else dwValue = 1; // v2.03 906
+                        else dwValue = 1;
 
                         switch (dwType)
                         {
@@ -867,7 +861,7 @@ void CGame::NpcDeadItemGenerator(int iNpcH, short sAttackerH, char cAttackerType
 
         SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_ITEMDROP, m_pNpcList[iNpcH]->m_cMapIndex,
             m_pNpcList[iNpcH]->m_sX, m_pNpcList[iNpcH]->m_sY,
-            pItem->m_sSprite, pItem->m_sSpriteFrame, pItem->m_cItemColor); //v1.4 color
+            pItem->m_sSprite, pItem->m_sSpriteFrame, pItem->m_cItemColor);
 
         _bItemLog(DEF_ITEMLOG_NEWGENDROP, NULL, NULL, pItem);
     }

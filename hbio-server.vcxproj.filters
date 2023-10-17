@@ -244,9 +244,6 @@
     <ClCompile Include="src\npc_behaviors.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\client_motion_handlers.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\party_operations.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -273,6 +270,9 @@
     </ClCompile>
     <ClCompile Include="src\npc_dead_item_generator.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\client_motion_handlers.cpp">
+      <Filter>src\sockets</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

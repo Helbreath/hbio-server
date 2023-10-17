@@ -9,9 +9,9 @@
 
 using json = nlohmann::json;
 
-bool CGame::check_account_auth(CClient * client, std::string & account, std::string & pass, int64_t & account_id)
+uint64_t CGame::check_account_auth(CClient * client, std::string & account, std::string & pass)
 {
-    if (client && client->logged_in == true) return true;
+    if (client && client->logged_in == true) return client->account_id;
     try
     {
         ix::HttpClient httpClient;
@@ -43,21 +43,17 @@ bool CGame::check_account_auth(CClient * client, std::string & account, std::str
         {
             if (out->body == "badaccount")
             {
-                log->critical("Account doesn't exist [{}]", account);
-                return false;
+                throw std::exception(std::format("Account doesn't exist [{}]", account).c_str());
             }
             if (out->body == "badpass")
             {
-                log->critical("Wrong pass [{}]", account);
-                return false;
+                throw std::exception(std::format("Wrong pass [{}]", account).c_str());
             }
             if (out->body == "Invalid Access 1" || out->body == "Invalid Access 2")
             {
-                log->critical("Configuration incorrect on login script");
-                return false;
+                throw std::exception("Configuration incorrect on login script");
             }
-            log->critical("Unknown error during login call");
-            return false;
+            throw std::exception("Unknown error during login call");
         }
 
         try
@@ -67,7 +63,7 @@ bool CGame::check_account_auth(CClient * client, std::string & account, std::str
             pqxx::row r{ txn.exec_params1("SELECT * FROM accounts WHERE forum_member_id=$1 LIMIT 1", external_member_id) };
             txn.commit();
 
-            account_id = r["id"].as<int64_t>();
+            return r["id"].as<int64_t>();
         }
         catch (pqxx::unexpected_rows &)
         {
@@ -76,19 +72,17 @@ bool CGame::check_account_auth(CClient * client, std::string & account, std::str
             pqxx::work txn{ *pq_game };
             pqxx::row r{ txn.exec_params1(
                 "INSERT INTO accounts (email, forum_member_id) VALUES ($1, $2) RETURNING *",
-                pq_game->quote(account),
+                account,
                 external_member_id
             ) };
             txn.commit();
 
-            account_id = r["id"].as<int64_t>();
-            return true;
+            return r["id"].as<int64_t>();
         }
-        return true;
     }
     catch (std::exception & ex)
     {
-        log->critical("Error querying login attempt for account [{}] - {}", account, ex.what());
+        throw std::exception(std::format("Error querying login attempt for account [{}] - {}", account, ex.what()).c_str());
     }
-    return false;
+    throw std::exception("Unknown error during login call 2");
 }

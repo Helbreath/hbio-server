@@ -67,7 +67,7 @@ static inline const std::string sideMapRes[MAXSIDES] = { "default", "resurr1", "
 #define CLIENTTIMEOUT		18000
 #define AUTOSAVETIME		3*60000
 #define HPUPTIME			8000
-#define MPUPTIME			15000 // Changed 9->15 Sec
+#define MPUPTIME			15000
 #define SPUPTIME			10000
 
 #define HUNGERTIME			1*60000
@@ -81,7 +81,7 @@ static inline const std::string sideMapRes[MAXSIDES] = { "default", "resurr1", "
 
 
 
-#define TOTALLEVELUPPOINT	7 // Level Stat Bonus xRisenx
+#define TOTALLEVELUPPOINT	3
 
 #define MAXDYNAMICOBJECTS	60000
 #define MAXDELAYEVENTS		60000
@@ -91,14 +91,14 @@ static inline const std::string sideMapRes[MAXSIDES] = { "default", "resurr1", "
 #define MAXNOTIFYMSGS		1000
 #define NIGHTTIME			40
 
-#define CHARPOINTLIMIT		700 // Max Stats xRisenx
+#define CHARPOINTLIMIT		200
 #define RAGPROTECTIONTIME	7000
 #define MAXREWARDGOLD		99999999
 
-#define MAXSUPERATTACK		10000 // Max Critical Limit xRisenx
-#define MAXLUCKY			5000 // Max Lucky Limit xRisenx
-#define MAXREP				10000 // Max Rep Limit xRisenx
-#define MAXNEGAREP			-10000 // Max Negative Rep Limit xRisenx
+#define MAXSUPERATTACK		10000
+#define MAXLUCKY			5000
+#define MAXREP				10000
+#define MAXNEGAREP			-10000
 
 #define ATTACKAI_NORMAL				1
 #define ATTACKAI_EXCHANGEATTACK		2
@@ -134,15 +134,15 @@ static inline const std::string sideMapRes[MAXSIDES] = { "default", "resurr1", "
 #define ITEMLOG_REPAIR				17
 #define ITEMLOG_JOINGUILD           18
 #define ITEMLOG_BANGUILD            19
-#define ITEMLOG_RESERVEFIGZONE      20	//  "
-#define ITEMLOG_APPLY               21	//  "
-#define ITEMLOG_SHUTUP              22	//  "
-#define ITEMLOG_CLOSECONN			23	//  "
-#define ITEMLOG_SPELLFIELD			24	//  "
-#define ITEMLOG_CREATEGUILD			25	//  "
-#define ITEMLOG_GUILDDISMISS		26	//  "
-#define ITEMLOG_SUMMONPLAYER        27	//  "
-#define ITEMLOG_CREATE				28	//  "
+#define ITEMLOG_RESERVEFIGZONE      20
+#define ITEMLOG_APPLY               21
+#define ITEMLOG_SHUTUP              22
+#define ITEMLOG_CLOSECONN			23
+#define ITEMLOG_SPELLFIELD			24
+#define ITEMLOG_CREATEGUILD			25
+#define ITEMLOG_GUILDDISMISS		26
+#define ITEMLOG_SUMMONPLAYER        27
+#define ITEMLOG_CREATE				28
 #define ITEMLOG_UPGRADEFAIL         29
 #define ITEMLOG_UPGRADESUCCESS      30
 #define ITEMLOG_MAILRETRIEVE			31
@@ -177,52 +177,34 @@ static inline const std::string sideMapRes[MAXSIDES] = { "default", "resurr1", "
 #define MAXGATESERVERSTOCKMSGSIZE	30000
 
 
-#define MAXCONSTRUCTNUM			20 //raised from 10 to 20 to in corporate 4mana stones
+#define MAXCONSTRUCTNUM			20
 
-#define MAXSCHEDULE				15 // Raised from 10 to 15
+#define MAXSCHEDULE				15
 
 
 
 #define MAXFIGHTZONE 10
 
-//============================
-// #define LEVELLIMIT		130
-#define LEVELLIMIT		50
-//============================
+#define LEVELLIMIT		20
 
-//============================
-#define MAGICHITRATIO 85.5f // xRisenx
-//#define MAGICHITRATIO 204.5f // xRisenx
-//============================
-
-//============================
+#define MAGICHITRATIO 85.5f
+//#define MAGICHITRATIO 204.5f
 #define MINIMUMHITRATIO 15
-//============================
-
-//============================
 #define MAXIMUMHITRATIO	99
-//============================
-
-//============================
-#define PLAYERMAXLEVEL	205
-//============================
-
-//============================
+#define PLAYERMAXLEVEL	180
 #define GMGMANACONSUMEUNIT	15
-//============================
 
 #define MAXCONSTRUCTIONPOINT 30000
 
 #define MAXWARCONTRIBUTION	 500000
 
 #define MAXPARTYNUM			200
-//#define MAXARENAPLAYERS     200 // Gladiator Arena xRisenx
+//#define MAXARENAPLAYERS     200
 
 #define ALLSIDES			100
 #define ATTACKER			101
 #define DEFENDER			102
 
-//v2.19 2002-11-19
 #define PK					0
 #define NONPK				1
 #define NEVERNONPK			2
@@ -239,12 +221,12 @@ static inline const std::string sideMapRes[MAXSIDES] = { "default", "resurr1", "
 #define MAXHELDENIAN				10
 #define MAXHELDENIANSUMMONPOINT		12000
 #ifdef RestatScroll
-#define STR 0x01 //Correct
-#define DEX 0x02 //Correct
-#define INT	0x03 //Correct
-#define VIT 0x04 //Correct
-#define MAG	0x05 //Correct
-#define CHR 0x06 //Correct
+#define STR 0x01
+#define DEX 0x02
+#define INT	0x03
+#define VIT 0x04
+#define MAG	0x05
+#define CHR 0x06
 #endif
 
 #define DEF_SOCKETTHREADS 2
@@ -385,36 +367,10 @@ enum NPCType
     NPC_GUARDB_ELVINE = 100,
     NPC_WILLIAMB = 101,
     NPC_PRINCESS = 102,
-    NPC_AS = 103,
-    //NPC_ORCLORD = 103,
-    NPC_DARKUNICORN = 104,
-    NPC_BLACK_DEMON = 105,
-    NPC_EARTH_WYVERN = 106,
-    NPC_WIND_WYVERN = 107,
-    NPC_DARK_WYVERN = 108,
-    NPC_GRASS_WYVERN = 109,
-    NPC_SKY_WYVERN = 110,
-    NPC_SEA_WYVERN = 111,
-    NPC_METAL_WYVERN = 112,
-    NPC_VOID_WYVERN = 113,
-    NPC_ETERNAL_DRAGON = 114,
-    /*NPC_MOTHER_DRAGON = 115,
-    NPC_HELL_DRAGON = 116,
-    NPC_ALLIGATOR = 117,
-    NPC_PUMA = 118,
-    NPC_ZOMBIE_KING = 119,
-    NPC_SLIME_KING = 120,
-    NPC_SLIME_PRINESS = 121,*/
-    NPC_ENRAGED_TROLL = 122,
-    NPC_ENRAGED_CYCLOPS = 123,
-    NPC_ENRAGED_STALKER = 124,
-    NPC_ENRAGED_GAGOYLE = 125,
-    NPC_ENRAGED_HELLCLAW = 126,
-    NPC_ENRAGED_TIGERWORM = 127
+    NPC_AS = 103
 };
 
 
-// for Client Data
 #define MAXTELEPORTLOC		200
 #define MAXWAYPOINTCFG		200
 #define MAXMGAR				50
@@ -422,7 +378,7 @@ enum NPCType
 #define MAXSPOTMOBGENERATOR	100
 #define MAXFISHPOINT		200
 #define MAXMINERALPOINT		200
-#define MAXOCCUPYFLAG		20001 //3001
+#define MAXOCCUPYFLAG		20001
 #define MAXINITIALPOINT		20
 
 #define MAPTYPE_NORMAL				0
@@ -448,7 +404,6 @@ enum ApocMobGenType
 
 
 
-// for Client Data
 #define DEF_MAPDATASIZEX		30
 #define DEF_MAPDATASIZEY		25
 #define DEF_MAXTELEPORTLOC		200
@@ -458,7 +413,7 @@ enum ApocMobGenType
 #define DEF_MAXSPOTMOBGENERATOR	100
 #define DEF_MAXFISHPOINT		200
 #define DEF_MAXMINERALPOINT		200
-#define DEF_MAXOCCUPYFLAG		20001 //3001
+#define DEF_MAXOCCUPYFLAG		20001
 #define	DEF_MAXINITIALPOINT		20
 
 
@@ -534,10 +489,10 @@ enum magic_type
     mt_scan,
     mt_resurrection,
     mt_damage_area_move,
-    mt_sotg_linear, // ?
-    mt_cotg_linear, // ?
-    mt_fsw_linear, // ?
-    mt_mb_linear // ?
+    mt_sotg_linear,
+    mt_cotg_linear,
+    mt_fsw_linear,
+    mt_mb_linear
 };
 
 #define MAXMAGICEFFECTS			40
@@ -564,9 +519,9 @@ enum magicTypes
     MAGICTYPE_DAMAGE_SPOT,
     MAGICTYPE_HPUP_SPOT,
     MAGICTYPE_DAMAGE_AREA,
-    MAGICTYPE_SPDOWN_SPOT,	// unused
+    MAGICTYPE_SPDOWN_SPOT,
     MAGICTYPE_SPDOWN_AREA,
-    MAGICTYPE_SPUP_SPOT,		// unused
+    MAGICTYPE_SPUP_SPOT,
     MAGICTYPE_SPUP_AREA,
     MAGICTYPE_TELEPORT,
     MAGICTYPE_SUMMON,
@@ -584,7 +539,7 @@ enum magicTypes
     MAGICTYPE_DAMAGE_AREA_NOSPOT,
     MAGICTYPE_TREMOR,
     MAGICTYPE_ICE,
-    MAGICTYPE_DAMAGE_SPOT_SPDOWN,		// no spells
+    MAGICTYPE_DAMAGE_SPOT_SPDOWN,
     MAGICTYPE_DAMAGE_AREA_NOSPOT_SPDOWN,
 
     MAGICTYPE_DAMAGE_AREA_ARMOR_BREAK,
@@ -685,7 +640,6 @@ enum motion_id
 enum class log_message_id
 {
     login = 25,
-    //create_new_account = 26,
     create_new_character = 28,
     enter_game = 29,
     delete_character = 31
@@ -889,7 +843,6 @@ enum message_id
     REQUEST_CHARGED_TELEPORT,
     RESPONSE_CHARGED_TELEPORT,
 
-    //====HG CONFIG==============================================================================
     REQUEST_REGISTERGAMESERVERSOCKET,
 
     GAMEMASTERLOG,
@@ -910,11 +863,9 @@ enum message_id
     REQUEST_HELDENIAN_WINNER,
     REQUEST_HELDENIAN_SCROLL,
 
-    // Ressurection
     REQUEST_RESURRECTPLAYER_YES,
     REQUEST_RESURRECTPLAYER_NO,
 
-    // MJ Stats Change
     STATECHANGEPOINT,
     GUILDINFO,
     REQUEST_GUILDBANK,
@@ -1141,12 +1092,12 @@ const char motion_to_actionid[MOTION_MAX] =
 #define DEFAULTBAGSIZE	20
 #define DEFAULTEXTRABAGSIZE	5
 #define DEFAULTBANKSIZE 20
-#define MAXITEMTYPES			2000 // 1500->2000 xRisenx
+#define MAXITEMTYPES			2000
 #define MAXNPCTYPES			200
 #define MAXNPCTIERS			10
 #define MAXPARTYMEMBERS		40
-#define MAXBANKITEMS			120 // 120->300 xRisenx
-#define MAXITEMS		75			// 50->75 xRisenx
+#define MAXBANKITEMS			120
+#define MAXITEMS		50
 #define MAXGUILDSMAN	128
 #define MAXMAGICTYPE	100
 #define MAXSKILLTYPE	25
@@ -1270,27 +1221,27 @@ enum ChatType
 
 enum StatusFlags
 {
-    STATUS_INVISIBILITY = 1 << 4,	// 0x00000010
-    STATUS_BERSERK = 1 << 5,	// 0x00000020
+    STATUS_INVISIBILITY = 1 << 4, // 0x00000010
+    STATUS_BERSERK = 1 << 5, // 0x00000020
     STATUS_FROZEN = 1 << 6,	// 0x00000040
     STATUS_POISON = 1 << 7,	// 0x00000080
 
-    STATUS_ANGELSTR = 1 << 12,	// 0x00001000
-    STATUS_ANGELDEX = 1 << 13,	// 0x00002000
-    STATUS_ANGELINT = 1 << 14,	// 0x00004000
-    STATUS_ANGELMAG = 1 << 15,	// 0x00008000
+    STATUS_ANGELSTR = 1 << 12, // 0x00001000
+    STATUS_ANGELDEX = 1 << 13, // 0x00002000
+    STATUS_ANGELINT = 1 << 14, // 0x00004000
+    STATUS_ANGELMAG = 1 << 15, // 0x00008000
 
-    STATUS_RELICHOLDER = 1 << 17,	// 0x00020000 - previously STATUS_HEROFLAG
-    STATUS_AFK = 1 << 18,	// 0x00040000
-    STATUS_GREENSLATE = 1 << 16,	// 0x00010000
-    STATUS_REDSLATE = 1 << 22,	// 0x00400000
-    STATUS_BLUESLATE = 1 << 23,	// 0x00800000
-    STATUS_ILLUSIONMOVEMENT = 1 << 21,	// 0x00200000
-    STATUS_ILLUSION = 1 << 24,	// 0x01000000
+    STATUS_RELICHOLDER = 1 << 17, // 0x00020000 - previously STATUS_HEROFLAG
+    STATUS_AFK = 1 << 18, // 0x00040000
+    STATUS_GREENSLATE = 1 << 16, // 0x00010000
+    STATUS_REDSLATE = 1 << 22, // 0x00400000
+    STATUS_BLUESLATE = 1 << 23, // 0x00800000
+    STATUS_ILLUSIONMOVEMENT = 1 << 21, // 0x00200000
+    STATUS_ILLUSION = 1 << 24, // 0x01000000
     STATUS_DEFENSESHIELD = 1 << 25,	// 0x02000000
-    STATUS_PFM = 1 << 26,	// 0x04000000
-    STATUS_PFA = 1 << 27,	// 0x08000000
-    STATUS_PK = 1 << 20,	// 0x00100000
+    STATUS_PFM = 1 << 26, // 0x04000000
+    STATUS_PFA = 1 << 27, // 0x08000000
+    STATUS_PK = 1 << 20, // 0x00100000
     STATUS_SIDE = 0xF0000000,
     STATUS_ALL = 0xFFFFFFFF,
     STATUS_ENEMYFLAGS = STATUS_ALL - (STATUS_PFA |
@@ -1299,8 +1250,6 @@ enum StatusFlags
         STATUS_ILLUSION |
         STATUS_POISON)
 };
-
-//-----------------------------------------------------------------------------------------------------------------------
 
 enum GMFlags
 {
@@ -1329,7 +1278,6 @@ enum Element
     ELEMENT_WATER = 4,
     ELEMENT_MAX
 };
-//----------------------------------Events-------------------------------------------------------------------------------------
 
 #define RELICVICTORYTIME		(10 * 1000)
 
@@ -1340,10 +1288,9 @@ enum EventType
     ET_DESTROY_SHIELD,
     ET_CRUSADE,
     ET_APOCALYPSE,
-    ET_MONSTEREVENT, // Monster Kill Event xRisenx
+    ET_MONSTEREVENT,
     ET_MAX
 };
-//static const char * eventName[] = { "", "Capture the Relic", "Destroy the Shield", "Crusade", "Apocalypse", "MonsterEvent"};
 static inline const std::string eventName[] = { "", "Capture the Relic", "Destroy the Shield", "Crusade", "Apocalypse", "MonsterEvent" };
 
 struct Casualties
@@ -1351,8 +1298,6 @@ struct Casualties
     uint32_t deaths;
     uint32_t kills;
 };
-
-//----------------------------------------------------------------------------------------------------------------------------------------
 
 enum HeroReq
 {
@@ -1374,13 +1319,13 @@ struct HeroItemCost
 
 const HeroItemCost heroPrice[HR_MAX] =
 {
-    {300,0},		// HR_CAPE
-    {150,20},	// HR_HELM
-    {100,20},	// HR_CAP
-    {300,30},	// HR_PLATE
-    {200,20},	// HR_ROBE
-    {100,10},	// HR_HAUBERK
-    {150,15}		// HR_LEGGINGS
+    {300,0}, // HR_CAPE
+    {150,20}, // HR_HELM
+    {100,20}, // HR_CAP
+    {300,30}, // HR_PLATE
+    {200,20}, // HR_ROBE
+    {100,10}, // HR_HAUBERK
+    {150,15} // HR_LEGGINGS
 };
 
 static inline const uint32_t HeroItemID[HR_MAX][MAXSIDES - 1][2] =
@@ -1415,8 +1360,6 @@ static inline const uint32_t HeroItemID[HR_MAX][MAXSIDES - 1][2] =
     }
 };
 
-//----------------------------------------------------------------------------------------------------------------------------------------
-
 enum Directions
 {
     CENTER,
@@ -1430,13 +1373,9 @@ enum Directions
     NORTHWEST
 };
 
-//----------------------------------------------------------------------------------------------------------------------------------------
-
 #define atoul(str)			strtoul(str, 0, 10)
 #define atoull(str)			_strtoui64(str, 0, 10)
 #define strcpyn(dst, src)	strncpy(dst, src, sizeof(dst))
-
-//#define logb(n, b)	(log(n)/log(b))
 
 struct Point
 {
@@ -1540,12 +1479,6 @@ struct hbxpoint
 #define DYNAMICOBJECT_FIRE2			13
 #define DYNAMICOBJECT_FIRE3			14 //for FireBow
 
-
-
-
-//#include <cmath>
-//#include <math.h>
-
 //TODO: need a new way to detect speed hacking and not "you can speed hack 10 steps then slow down"
 #ifdef _DEBUG
 #define SPEEDCHECKTURNS 1
@@ -1566,7 +1499,7 @@ struct hbxpoint
 #define GOLDDROPMULTIPLIER			2
 #define EXPMULTIPLIER				355
 
-//TODO: what are these and why do they exist hardcoded?
+//TODO: should not be hard coded
 #define BISLEGOLDCOST				100
 #define ARENAGOLDCOST				500
 
@@ -1620,30 +1553,30 @@ enum Sex
 
 enum skillIndexes
 {
-    SKILL_MINING,			// 0
-    SKILL_FISHING,			// 1
-    SKILL_FARMING,			// 2
-    SKILL_MAGICRES,			// 3
-    SKILL_MAGIC,			// 4
-    SKILL_HANDATTACK,		// 5
-    SKILL_ARCHERY,			// 6
-    SKILL_SHORTSWORD,		// 7
-    SKILL_LONGSWORD,		// 8
-    SKILL_FENCING,			// 9
-    SKILL_AXE,				// 10
-    SKILL_SHIELD,			// 11
-    SKILL_ALCHEMY,			// 12
-    SKILL_MANUFACTURING,	// 13
-    SKILL_HAMMER,			// 14
-    SKILL_15,			    // 15	
-    SKILL_CRAFTING,			// 16	
+    SKILL_MINING,
+    SKILL_FISHING,
+    SKILL_FARMING,
+    SKILL_MAGICRES,
+    SKILL_MAGIC,
+    SKILL_HANDATTACK,
+    SKILL_ARCHERY,
+    SKILL_SHORTSWORD,
+    SKILL_LONGSWORD,
+    SKILL_FENCING,
+    SKILL_AXE,
+    SKILL_SHIELD,
+    SKILL_ALCHEMY,
+    SKILL_MANUFACTURING,
+    SKILL_HAMMER,
+    SKILL_15,
+    SKILL_CRAFTING,
     SKILL_17,
     SKILL_18,
-    SKILL_PRETENDCORPSE,	// 19
+    SKILL_PRETENDCORPSE,
     SKILL_20,
-    SKILL_STAFF,			// 21
+    SKILL_STAFF,
     SKILL_22,
-    SKILL_POISONRES			// 23
+    SKILL_POISONRES
 };
 
 #define DELAYEVENTTYPE_DAMAGEOBJECT				1
@@ -2743,7 +2676,7 @@ enum ItemStat
     ITEMSTAT_CRITICAL,
     ITEMSTAT_POISONING,
     ITEMSTAT_RIGHTEOUS,
-    ITEMSTAT_UNUSED,		// UNUSED
+    ITEMSTAT_UNUSED,
     ITEMSTAT_AGILE,
     ITEMSTAT_LIGHT,
     ITEMSTAT_SHARP,
@@ -2752,8 +2685,8 @@ enum ItemStat
     ITEMSTAT_CASTPROB,
     ITEMSTAT_MANACONV,
     ITEMSTAT_CRITICAL2,
-    ITEMSTAT_FLAWLESSSHARP, // Flawless Sharp
-    ITEMSTAT_FLAWLESSANCIENT // Flawless Ancient
+    ITEMSTAT_FLAWLESSSHARP,
+    ITEMSTAT_FLAWLESSANCIENT
 };
 
 enum ItemStat2
@@ -2815,20 +2748,20 @@ static inline const ItemStats2 itemStats2[] = {
 enum ItemTypes
 {
     ITEMTYPE_NOTUSED = -1,
-    ITEMTYPE_NONE,				// 0
-    ITEMTYPE_EQUIP,			// 1
-    ITEMTYPE_APPLY,			// 2
-    ITEMTYPE_USE_DEPLETE,	// 3
-    ITEMTYPE_INSTALL,			// 4
-    ITEMTYPE_CONSUME,			// 5
-    ITEMTYPE_ARROW,			// 6
-    ITEMTYPE_EAT,				// 7
-    ITEMTYPE_USE_SKILL,		// 8
-    ITEMTYPE_USE_PERM,		// 9
-    ITEMTYPE_USE_SKILL_ENABLEDIALOGBOX,	// 10
-    ITEMTYPE_USE_DEPLETE_DEST,				// 11
-    ITEMTYPE_MATERIAL,		// 12
-    ITEMTYPE_RELIC				// 13
+    ITEMTYPE_NONE,
+    ITEMTYPE_EQUIP,
+    ITEMTYPE_APPLY,
+    ITEMTYPE_USE_DEPLETE,
+    ITEMTYPE_INSTALL,
+    ITEMTYPE_CONSUME,
+    ITEMTYPE_ARROW,
+    ITEMTYPE_EAT,
+    ITEMTYPE_USE_SKILL,
+    ITEMTYPE_USE_PERM,
+    ITEMTYPE_USE_SKILL_ENABLEDIALOGBOX,
+    ITEMTYPE_USE_DEPLETE_DEST,
+    ITEMTYPE_MATERIAL,
+    ITEMTYPE_RELIC
 };
 
 
@@ -3275,17 +3208,12 @@ enum Side
 
 #define MAXITEMSOCKETS		4
 
-// ----------------------------------Guild-------------------------------------------------------------------------------------
 #define MAXGUILDBANKITEMS		75*4
 #define GUILDSUMMONSGOLDCOST	5000
 #define GUILDSUMMONSTIME		MINUTE(5)
 
-//-----------------------------------------------------------------------------------------------------------------------
-
 #define GetBoolText(val)	( val ? "True" : "False" )
 
-
-//----------------------------------------------- TYPEDEFS ----------------------------------------------------------------------------------
 
 //typedef std::map<int16_t, CGuild*> GuildMap;
 //typedef GuildMap::iterator GuildMapIter;

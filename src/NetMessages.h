@@ -70,11 +70,10 @@ static inline constexpr uint16_t DEF_COMMONTYPE_QUESTACCEPTED = 0x0A22;
 static inline constexpr uint16_t DEF_COMMONTYPE_BUILDITEM = 0x0A23;
 static inline constexpr uint16_t DEF_COMMONTYPE_GETMAGICABILITY = 0x0A24;
 
-// v1.4311-3 Ãß°¡ ¸Þ¼¼Áö ¼±¾ð ÀÔÀå±Ç ¹Þ±âÀ§ÇÑ ¸Þ¼¼Áö ±æµå¿¡¼­ °­ÅðµÊ DEF_COMMONTYPE_REQ_GETOCCUPYFIGHTZONETICKET DEF_COMMONTYPE_BANGUILD
 static inline constexpr uint16_t DEF_COMMONTYPE_REQ_GETOCCUPYFIGHTZONETICKET = 0x0A25;
 static inline constexpr uint16_t DEF_COMMONTYPE_BANGUILD = 0x0A26;
 
-static inline constexpr uint16_t DEF_COMMONTYPE_REQUEST_ACCEPTJOINPARTY = 0x0A30;// Original DEF_COMMONTYPE_REQUEST_CREATENEWPARTY
+static inline constexpr uint16_t DEF_COMMONTYPE_REQUEST_ACCEPTJOINPARTY = 0x0A30;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQUEST_JOINPARTY = 0x0A31;
 static inline constexpr uint16_t DEF_COMMONTYPE_RESPONSE_JOINPARTY = 0x0A32;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQUEST_ACTIVATESPECABLTY = 0x0A40;
@@ -204,7 +203,6 @@ static inline constexpr uint16_t DEF_NOTIFY_CANNOTBANGUILDMAN = 0x0B79;
 static inline constexpr uint16_t DEF_NOTIFY_RESPONSE_CREATENEWPARTY = 0x0B80;
 static inline constexpr uint16_t DEF_NOTIFY_QUERY_JOINPARTY = 0x0B81;
 
-// v1.4311-3 ¸Þ¼¼Áö ¼±¾ð ¼±¾ð »çÅõÀå ¿¹¾àÀÌ Ãë¼Ò ¹× ±æµå ¸¶½ºÅÍ ¸í·É »ç¿ë±ÇÇÑÀÌ ¾øÀ½À» ¾Ë¸²
 // static inline constexpr uint16_t DEF_NOTIFY_SUCCESSBANGUILDMAN = 0x0B82;
 
 
@@ -235,9 +233,9 @@ static inline constexpr uint16_t DEF_NOTIFY_REQGUILDNAMEANSWER = 0x0BA6;
 static inline constexpr uint16_t DEF_NOTIFY_FORCERECALLTIME = 0x0BA7;
 static inline constexpr uint16_t DEF_NOTIFY_ITEMUPGRADEFAIL = 0x0BA8;
 
-static inline constexpr uint16_t DEF_NOTIFY_NOMOREAGRICULTURE = 0x0BB0; //? ³óÀÛ¹° = Á¦ÇÑ
-static inline constexpr uint16_t DEF_NOTIFY_AGRICULTURESKILLLIMIT = 0x0BB1; //? ½ºÅ³ = Á¦ÇÑ
-static inline constexpr uint16_t DEF_NOTIFY_AGRICULTURENOAREA = 0x0BB2; //? ³óÀÛ¹°À» ÁöÀ»¼ö ÀÖ´Â °ø°£ÀÌ = ¾Æ´Ï´Ù.
+static inline constexpr uint16_t DEF_NOTIFY_NOMOREAGRICULTURE = 0x0BB0;
+static inline constexpr uint16_t DEF_NOTIFY_AGRICULTURESKILLLIMIT = 0x0BB1;
+static inline constexpr uint16_t DEF_NOTIFY_AGRICULTURENOAREA = 0x0BB2;
 static inline constexpr uint16_t DEF_NOTIFY_SETTING_SUCCESS = 0x0BB3;
 static inline constexpr uint16_t DEF_NOTIFY_SETTING_FAILED = 0x0BB4;
 static inline constexpr uint16_t DEF_NOTIFY_STATECHANGE_SUCCESS = 0x0BB5;
@@ -291,7 +289,7 @@ static inline constexpr uint32_t MSGID_RESPONSE_REGISTERDBSERVER = 0x0512A3F7;
 
 static inline constexpr uint32_t MSGID_REQUEST_LOGIN = 0x0FC94201;
 static inline constexpr uint32_t MSGID_REQUEST_CREATENEWACCOUNT = 0x0FC94202;
-static inline constexpr uint32_t MSGID_RESPONSE_LOG = 0x0FC94203; // Login, createnewaccount, createnewcharacter, deletecharacter µîµî¿¡ ´ëÇÑ ÀÀ´ä
+static inline constexpr uint32_t MSGID_RESPONSE_LOG = 0x0FC94203;
 static inline constexpr uint32_t MSGID_REQUEST_CREATENEWCHARACTER = 0x0FC94204;
 static inline constexpr uint32_t MSGID_REQUEST_ENTERGAME = 0x0FC94205;
 static inline constexpr uint32_t MSGID_RESPONSE_ENTERGAME = 0x0FC94206;
@@ -331,12 +329,10 @@ static inline constexpr uint16_t DEF_LOGRESMSGTYPE_PASSWORDCHANGESUCCESS = 0x0A0
 static inline constexpr uint16_t DEF_LOGRESMSGTYPE_PASSWORDCHANGEFAIL = 0x0A01;
 static inline constexpr uint16_t DEF_LOGRESMSGTYPE_NOTEXISTINGWORLDSERVER = 0x0A02;
 
-// °ÔÀÓ Á¢±Ù½Ã ¿É¼Ç
 static inline constexpr uint16_t DEF_ENTERGAMEMSGTYPE_NEW = 0x0F1C;
 static inline constexpr uint16_t DEF_ENTERGAMEMSGTYPE_NOENTER_FORCEDISCONN = 0x0F1D;
 static inline constexpr uint16_t DEF_ENTERGAMEMSGTYPE_CHANGINGSERVER = 0x0F1E;
 
-// °ÔÀÓ Á¢±Ù °á°ú
 static inline constexpr uint16_t DEF_ENTERGAMERESTYPE_PLAYING = 0x0F20;
 static inline constexpr uint16_t DEF_ENTERGAMERESTYPE_REJECT = 0x0F21;
 static inline constexpr uint16_t DEF_ENTERGAMERESTYPE_CONFIRM = 0x0F22;
@@ -356,11 +352,9 @@ static inline constexpr uint32_t MSGID_RESPONSE_RETRIEVEITEM = 0x0DF30752;
 
 static inline constexpr uint32_t MSGID_REQUEST_FULLOBJECTDATA = 0x0DF40000;
 
-// ·Î±×¼­¹ö¿¡¼­ °ÔÀÓ¼­¹ö·Î Åëº¸ÇÏ´Â ¸Þ½ÃÁö
 static inline constexpr uint32_t MSGID_GUILDNOTIFY = 0x0DF30760;
 static inline constexpr uint16_t DEF_GUILDNOTIFY_NEWGUILDSMAN = 0x1F00;
 
-// ÅÚ·¹Æ÷Æ®
 static inline constexpr uint32_t MSGID_REQUEST_TELEPORT = 0x0EA03201;
 static inline constexpr uint32_t MSGID_REQUEST_CITYHALLTELEPORT = 0x0EA03202;
 static inline constexpr uint32_t MSGID_REQUEST_HELDENIANTELEPORT = 0x0EA03206;
@@ -376,7 +370,6 @@ static inline constexpr uint32_t MSGID_TOTALGAMESERVERCLIENTS = 0x12A01005;
 
 static inline constexpr uint32_t MSGID_ENTERGAMECONFIRM = 0x12A01006;
 
-// v1.4311-3 ¼±¾ð »çÅõÀå ¿¹¾à °ü·Ã ¸Þ¼¼Áö
 static inline constexpr uint32_t MSGID_REQUEST_FIGHTZONE_RESERVE = 0x12A01007;
 static inline constexpr uint32_t MSGID_RESPONSE_FIGHTZONE_RESERVE = 0x12A01008;
 
@@ -434,9 +427,8 @@ static inline constexpr uint32_t MSGID_REQUEST_CHECKACCOUNTPASSWORD = 0x2654203A
 static inline constexpr uint32_t MSGID_WORLDSERVERACTIVATED = 0x27049D0C;
 
 static inline constexpr uint32_t MSGID_REQUEST_PANNING = 0x27B314D0;
-static inline constexpr uint32_t MSGID_RESPONSE_PANNING = 0x27B314D1; // 0x27B314D1
-// 0,1,2,3,
-// 210A9150
+static inline constexpr uint32_t MSGID_RESPONSE_PANNING = 0x27B314D1;
+
 static inline constexpr uint32_t MSGID_REQUEST_RESTART = 0x28010EEE;
 static inline constexpr uint32_t MSGID_RESPONSE_REGISTER_WORLDSERVERSOCKET = 0x280120A0;
 
@@ -458,7 +450,6 @@ static inline constexpr uint32_t MSGID_METEORSTRIKE = 0x3AE90001;
 
 static inline constexpr uint32_t MSGID_SERVERSTOCKMSG = 0x3AE90013;
 
-// Gate-Server°£ Àü´Þ ³»¿ë
 static inline constexpr uint16_t GSM_REQUEST_FINDCHARACTER = 0x01;
 static inline constexpr uint16_t GSM_RESPONSE_FINDCHARACTER = 0x02;
 static inline constexpr uint16_t GSM_GRANDMAGICRESULT = 0x03;
@@ -484,43 +475,35 @@ static inline constexpr uint16_t GSM_REQUEST_SUMMONALL = 0x16;
 static inline constexpr uint16_t GSM_ENDHELDENIAN = 0x17;
 static inline constexpr uint16_t GSM_UPDATECONFIGS = 0x18;
 static inline constexpr uint16_t GSM_STARTHELDENIAN = 0x19;
-// 2.06
+
 static inline constexpr uint16_t DEF_COMMONTYPE_REQ_CHANGEPLAYMODE = 0x0A60;
 static inline constexpr uint16_t DEF_NOTIFY_CHANGEPLAYMODE = 0x0BA9;
 
-// Party Code
 static inline constexpr uint32_t MSGID_PARTYOPERATION = 0x3C00123A;
 static inline constexpr uint16_t DEF_PARTYSTATUS_PROCESSING = 1;
 static inline constexpr uint16_t DEF_PARTYSTATUS_NULL = 0;
 static inline constexpr uint16_t DEF_PARTYSTATUS_CONFIRM = 2;
 
-// Upgrade code
 static inline constexpr uint16_t DEF_COMMONTYPE_UPGRADEITEM = 0x0A58;
 static inline constexpr uint16_t DEF_ITEMLOG_UPGRADESUCCESS = 30;
 static inline constexpr uint16_t DEF_ITEMLOG_UPGRADEFAIL = 29;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQGUILDNAME = 0x0A59;
 
-// Log Msg
 static inline constexpr uint32_t MSGID_GAMEITEMLOG = 0x210A914F;
 
-// Crusade
 static inline constexpr uint16_t DEF_CRUSADELOG_ENDCRUSADE = 1;
 static inline constexpr uint16_t DEF_CRUSADELOG_STARTCRUSADE = 2;
 static inline constexpr uint16_t DEF_CRUSADELOG_SELECTDUTY = 3;
 static inline constexpr uint16_t DEF_CRUSADELOG_GETEXP = 4;
 static inline constexpr uint32_t MSGID_GAMECRUSADELOG = 0x210A914F;
 
-// NPC drops
 static inline constexpr uint16_t DEF_ITEMSPREAD_RANDOM = 1;
 static inline constexpr uint16_t DEF_ITEMSPREAD_FIXED = 2;
 static inline constexpr uint16_t MAX_NPCITEMDROP = 25;
 
-
-// Slates
 static inline constexpr uint16_t DEF_COMMONTYPE_REQ_CREATESLATE = 0x0A61;
 static inline constexpr uint16_t DEF_NOTIFY_SLATECLEAR = 99;
 
-//PK
 static inline constexpr uint16_t DEF_PKLOG_REDUCECRIMINAL = 1;
 static inline constexpr uint16_t DEF_PKLOG_BYPLAYER = 2;
 static inline constexpr uint16_t DEF_PKLOG_BYPK = 3;
@@ -528,8 +511,5 @@ static inline constexpr uint16_t DEF_PKLOG_BYENERMY = 4;
 static inline constexpr uint16_t DEF_PKLOG_BYNPC = 5;
 static inline constexpr uint16_t DEF_PKLOG_BYOTHER = 6;
 
-// Resurrection
 static inline constexpr uint32_t DEF_REQUEST_RESURRECTPLAYER_NO = 0x0FC94215;
 static inline constexpr uint32_t DEF_REQUEST_RESURRECTPLAYER_YES = 0x0FC94214;
-
-
