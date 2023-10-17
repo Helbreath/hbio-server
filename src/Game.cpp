@@ -3332,6 +3332,14 @@ BOOL CGame::_bAddClientItemList(int iClientH, CItem * pItem, int * pDelReq)
                 m_pClientList[iClientH]->m_pItemList[i]->m_dwCount += pItem->m_dwCount;
                 *pDelReq = 1;
 
+                update_db_bag_item(
+                    m_pClientList[iClientH]->m_pItemList[i],
+                    m_pClientList[iClientH]->m_ItemPosList[i].x,
+                    m_pClientList[iClientH]->m_ItemPosList[i].y,
+                    m_pClientList[iClientH]->id,
+                    m_pClientList[iClientH]->m_bIsItemEquipped[i]
+                );
+
                 iCalcTotalWeight(iClientH);
 
                 return TRUE;
@@ -3350,6 +3358,14 @@ BOOL CGame::_bAddClientItemList(int iClientH, CItem * pItem, int * pDelReq)
 
             if (pItem->m_cItemType == DEF_ITEMTYPE_ARROW)
                 m_pClientList[iClientH]->m_cArrowIndex = _iGetArrowItemIndex(iClientH);
+
+            update_db_bag_item(
+                m_pClientList[iClientH]->m_pItemList[i],
+                m_pClientList[iClientH]->m_ItemPosList[i].x,
+                m_pClientList[iClientH]->m_ItemPosList[i].y,
+                m_pClientList[iClientH]->id,
+                m_pClientList[iClientH]->m_bIsItemEquipped[i]
+            );
 
             iCalcTotalWeight(iClientH);
 
@@ -4908,6 +4924,13 @@ int CGame::SetItemCount(int iClientH, char * pItemName, DWORD dwCount)
             else
             {
                 m_pClientList[iClientH]->m_pItemList[i]->m_dwCount = dwCount;
+                update_db_bag_item(
+                    m_pClientList[iClientH]->m_pItemList[i],
+                    m_pClientList[iClientH]->m_ItemPosList[i].x,
+                    m_pClientList[iClientH]->m_ItemPosList[i].y,
+                    m_pClientList[iClientH]->id,
+                    m_pClientList[iClientH]->m_bIsItemEquipped[i]
+                );
                 SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SETITEMCOUNT, i, dwCount, (char)TRUE, NULL);
             }
 
@@ -4933,6 +4956,13 @@ int CGame::SetItemCount(int iClientH, int iItemIndex, DWORD dwCount)
     else
     {
         m_pClientList[iClientH]->m_pItemList[iItemIndex]->m_dwCount = dwCount;
+        update_db_bag_item(
+            m_pClientList[iClientH]->m_pItemList[iItemIndex],
+            m_pClientList[iClientH]->m_ItemPosList[iItemIndex].x,
+            m_pClientList[iClientH]->m_ItemPosList[iItemIndex].y,
+            m_pClientList[iClientH]->id,
+            m_pClientList[iClientH]->m_bIsItemEquipped[iItemIndex]
+        );
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SETITEMCOUNT, iItemIndex, dwCount, (char)TRUE, NULL);
     }
 

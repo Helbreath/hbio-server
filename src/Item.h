@@ -98,7 +98,7 @@ struct item_db
     int32_t effect3{};
     int32_t durability{};
     int64_t attribute{};
-    int32_t itemequip{};
+    bool equipped{};
     int32_t itemposx{};
     int32_t itemposy{};
     std::string itemloc;

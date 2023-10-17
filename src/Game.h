@@ -313,9 +313,15 @@ public:
     int64_t create_db_character(pqxx::transaction_base & t, character_db & character);
     void update_db_character(pqxx::transaction_base & t, character_db & character);
     void delete_db_character(pqxx::transaction_base & t, character_db & character);
+    int64_t create_db_item(CItem * _item, int32_t x, int32_t y, int32_t character_handle, bool equipped = false);
+    void update_db_bag_item(CItem * _item, int32_t x, int32_t y, int32_t character_handle = 0, bool equipped = false);
+    void update_db_bank_item(CItem * _item, int32_t character_handle = 0);
+    void delete_db_item(int64_t id);
+    void force_delete_db_item(int64_t id);
     int64_t create_db_item(pqxx::transaction_base & t, item_db & _item);
     void update_db_item(pqxx::transaction_base & t, item_db & _item);
     void delete_db_item(pqxx::transaction_base & t, int64_t id);
+    void force_delete_db_item(pqxx::transaction_base & t, int64_t id);
     void prepare_login_statements();
     void prepare_game_statements();
     bool is_account_in_use(int64_t account_id);

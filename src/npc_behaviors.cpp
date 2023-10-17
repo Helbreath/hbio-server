@@ -344,7 +344,7 @@ void CGame::NpcBehavior_Move(int iNpcH)
 void CGame::NpcBehavior_Attack(int iNpcH)
 {
     int   iMagicType;
-    short sX, sY, dX, dY;
+    short sX, sY, dX{}, dY{};
     char  cDir;
     DWORD dwTime = timeGetTime();
 

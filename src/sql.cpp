@@ -49,22 +49,128 @@ int64_t CGame::create_db_item(pqxx::transaction_base & t, item_db & _item)
 {
     pqxx::row r{
         t.exec_prepared1("create_db_item", _item.char_id, _item.name, _item.count, _item.type, _item.id1, _item.id2, _item.id3,
-        _item.color, _item.effect1, _item.effect2, _item.effect3, _item.durability, _item.attribute, _item.itemequip, _item.itemposx,
+        _item.color, _item.effect1, _item.effect2, _item.effect3, _item.durability, _item.attribute, _item.equipped, _item.itemposx,
         _item.itemposy, _item.itemloc, _item.item_id)
     };
     return r["id"].as<int64_t>();
 }
 
+int64_t CGame::create_db_item(CItem * _item, int32_t x, int32_t y, int32_t character_handle, bool equipped)
+{
+    std::shared_lock<std::shared_mutex> l(game_sql_mtx);
+    pqxx::work txn{ *pq_game };
+    item_db it;
+    it.char_id = character_handle;
+    it.id = _item->id;
+    it.item_id = _item->m_sIDnum;
+    it.name = _item->m_cName;
+    it.count = _item->m_dwCount;
+    it.color = _item->m_cItemColor;
+    it.type = _item->m_sTouchEffectType;
+    it.id1 = _item->m_sTouchEffectValue1;
+    it.id2 = _item->m_sTouchEffectValue2;
+    it.id3 = _item->m_sTouchEffectValue3;
+    it.effect1 = _item->m_sItemEffectValue1;
+    it.effect2 = _item->m_sItemEffectValue2;
+    it.effect3 = _item->m_sItemEffectValue3;
+    it.durability = _item->m_wCurLifeSpan;
+    it.attribute = _item->m_dwAttribute;
+    it.equipped = equipped;
+    it.itemposx = x;
+    it.itemposy = y;
+    it.itemloc = "bag";
+    auto result = create_db_item(txn, it);
+    txn.commit();
+    return result;
+}
+
 void CGame::update_db_item(pqxx::transaction_base & t, item_db & _item)
 {
     t.exec_prepared("update_db_item", _item.id, _item.char_id, _item.name, _item.count, _item.type, _item.id1, _item.id2, _item.id3,
-        _item.color, _item.effect1, _item.effect2, _item.effect3, _item.durability, _item.attribute, _item.itemequip, _item.itemposx,
+        _item.color, _item.effect1, _item.effect2, _item.effect3, _item.durability, _item.attribute, _item.equipped, _item.itemposx,
         _item.itemposy, _item.itemloc, _item.item_id);
+}
+
+void CGame::update_db_bag_item(CItem * _item, int32_t x, int32_t y, int32_t character_handle, bool equipped)
+{
+    std::shared_lock<std::shared_mutex> l(game_sql_mtx);
+    pqxx::work txn{ *pq_game };
+    item_db it;
+    it.char_id = character_handle;
+    it.id = _item->id;
+    it.item_id = _item->m_sIDnum;
+    it.name = _item->m_cName;
+    it.count = _item->m_dwCount;
+    it.color = _item->m_cItemColor;
+    it.type = _item->m_sTouchEffectType;
+    it.id1 = _item->m_sTouchEffectValue1;
+    it.id2 = _item->m_sTouchEffectValue2;
+    it.id3 = _item->m_sTouchEffectValue3;
+    it.effect1 = _item->m_sItemEffectValue1;
+    it.effect2 = _item->m_sItemEffectValue2;
+    it.effect3 = _item->m_sItemEffectValue3;
+    it.durability = _item->m_wCurLifeSpan;
+    it.attribute = _item->m_dwAttribute;
+    it.equipped = equipped;
+    it.itemposx = x;
+    it.itemposy = y;
+    it.itemloc = "bag";
+    update_db_item(txn, it);
+    txn.commit();
+}
+
+void CGame::update_db_bank_item(CItem * _item, int32_t character_handle)
+{
+    std::shared_lock<std::shared_mutex> l(game_sql_mtx);
+    pqxx::work txn{ *pq_game };
+    item_db it;
+    it.char_id = character_handle;
+    it.id = _item->id;
+    it.item_id = _item->m_sIDnum;
+    it.name = _item->m_cName;
+    it.count = _item->m_dwCount;
+    it.color = _item->m_cItemColor;
+    it.type = _item->m_sTouchEffectType;
+    it.id1 = _item->m_sTouchEffectValue1;
+    it.id2 = _item->m_sTouchEffectValue2;
+    it.id3 = _item->m_sTouchEffectValue3;
+    it.effect1 = _item->m_sItemEffectValue1;
+    it.effect2 = _item->m_sItemEffectValue2;
+    it.effect3 = _item->m_sItemEffectValue3;
+    it.durability = _item->m_wCurLifeSpan;
+    it.attribute = _item->m_dwAttribute;
+    it.equipped = false;
+    it.itemposx = 0;
+    it.itemposy = 0;
+    it.itemloc = "bank";
+    update_db_item(txn, it);
+    txn.commit();
 }
 
 void CGame::delete_db_item(pqxx::transaction_base & t, int64_t id)
 {
-    t.exec_params0("DELETE FROM items WHERE id=$1", id);
+    t.exec_prepared("delete_db_item", id);
+}
+
+void CGame::delete_db_item(int64_t id)
+{
+    std::shared_lock<std::shared_mutex> l(game_sql_mtx);
+    pqxx::work txn{ *pq_game };
+    txn.exec_prepared("delete_db_item", id);
+    txn.commit();
+}
+
+void CGame::force_delete_db_item(pqxx::transaction_base & t, int64_t id)
+{
+    t.exec_prepared("force_delete_db_item", id);
+}
+
+void CGame::force_delete_db_item(int64_t id)
+{
+    std::shared_lock<std::shared_mutex> l(game_sql_mtx);
+    pqxx::work txn{ *pq_game };
+    txn.exec_prepared("force_delete_db_item", id);
+    txn.commit();
 }
 
 void CGame::prepare_login_statements()
@@ -191,7 +297,7 @@ void CGame::prepare_game_statements()
                 char_id, name, count,
                 type, id1, id2, id3, color, effect1,
                 effect2, effect3, durability,
-                attribute, itemequip, itemposx,
+                attribute, equipped, itemposx,
                 itemposy, itemloc, item_id
             )
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
@@ -216,12 +322,20 @@ void CGame::prepare_game_statements()
                 effect3=$12,
                 durability=$13,
                 attribute=$14,
-                itemequip=$15,
+                equipped=$15,
                 itemposx=$16,
                 itemposy=$17,
                 itemloc=$18,
                 item_id=$19
             WHERE id=$1
         )"
+    );
+    pq_game->prepare(
+        "delete_db_item",
+        R"(UPDATE items SET char_id=0 WHERE id=$1)"
+    );
+    pq_game->prepare(
+        "force_delete_db_item",
+        R"(DELETE FROM items WHERE id=$1)"
     );
 }

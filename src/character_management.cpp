@@ -126,10 +126,9 @@ bool CGame::save_player_data(std::shared_ptr<CClient> client)
             _item.effect3 = item->m_sItemEffectValue2;
             _item.durability = item->m_wCurLifeSpan;
             _item.attribute = item->m_dwAttribute;
-            _item.itemequip = item->m_sSpecialEffectValue1;
+            _item.equipped = client->m_bIsItemEquipped[i] == TRUE;
             _item.itemposx = client->m_ItemPosList[i].x;
             _item.itemposy = client->m_ItemPosList[i].y;
-            _item.itemequip = item->m_cEquipPos;
             _item.itemloc = "bag";
             if (item->id == 0)
                 _item.id = create_db_item(txn, _item);
@@ -156,7 +155,7 @@ bool CGame::save_player_data(std::shared_ptr<CClient> client)
             _item.effect3 = item->m_sItemEffectValue2;
             _item.durability = item->m_wCurLifeSpan;
             _item.attribute = item->m_dwAttribute;
-            _item.itemequip = item->m_sSpecialEffectValue1;
+            _item.equipped = false;
             _item.itemloc = "bank";
             if (item->id == 0)
                 _item.id = create_db_item(txn, _item);

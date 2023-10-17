@@ -270,7 +270,6 @@ void CGame::DropItemHandler(int iClientH, short sItemIndex, int iAmount, char * 
         (iAmount == -1))
         iAmount = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwCount;
 
-
     if (memcmp(m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cName, pItemName, 20) != 0) return;
 
     if (((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemType == DEF_ITEMTYPE_CONSUME) ||
@@ -316,6 +315,12 @@ void CGame::DropItemHandler(int iClientH, short sItemIndex, int iAmount, char * 
             pItem->m_sSprite, pItem->m_sSpriteFrame, pItem->m_cItemColor);
 
         SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_DROPITEMFIN_COUNTCHANGED, sItemIndex, iAmount, NULL, NULL);
+        update_db_bag_item(
+            m_pClientList[iClientH]->m_pItemList[sItemIndex],
+            m_pClientList[iClientH]->m_ItemPosList[sItemIndex].x,
+            m_pClientList[iClientH]->m_ItemPosList[sItemIndex].y,
+            m_pClientList[iClientH]->id
+        );
     }
     else
     {
@@ -324,6 +329,8 @@ void CGame::DropItemHandler(int iClientH, short sItemIndex, int iAmount, char * 
 
         if (m_pClientList[iClientH]->m_bIsItemEquipped[sItemIndex] == TRUE)
             SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
+
+        delete_db_item(m_pClientList[iClientH]->m_pItemList[sItemIndex]->id);
 
         if ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_ALTERITEMDROP) &&
             (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_wCurLifeSpan == 0))
@@ -4959,6 +4966,14 @@ void CGame::ItemDepleteHandler(int iClientH, short sItemIndex, BOOL bIsUseItemRe
     if (m_pClientList[iClientH]->m_pItemList[sItemIndex] == NULL) return;
 
     _bItemLog(DEF_ITEMLOG_DEPLETE, iClientH, NULL, m_pClientList[iClientH]->m_pItemList[sItemIndex]);
+
+    update_db_bag_item(
+        m_pClientList[iClientH]->m_pItemList[sItemIndex],
+        m_pClientList[iClientH]->m_ItemPosList[sItemIndex].x,
+        m_pClientList[iClientH]->m_ItemPosList[sItemIndex].y,
+        m_pClientList[iClientH]->id,
+        m_pClientList[iClientH]->m_bIsItemEquipped[sItemIndex]
+    );
 
     ReleaseItemHandler(iClientH, sItemIndex, TRUE);
 

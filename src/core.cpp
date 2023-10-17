@@ -776,7 +776,7 @@ void CGame::add_bag_item(CClient * client, pqxx::row & row)
             item->m_sItemSpecEffectValue3 = row["effect3"].as<int16_t>();
             item->m_wCurLifeSpan = row["durability"].as<uint16_t>();
             item->m_dwAttribute = row["attribute"].as<uint32_t>();
-            item->m_cEquipPos = (int8_t)row["itemequip"].as<int16_t>();
+            client->m_bIsItemEquipped[i] = row["equipped"].as<bool>();
             client->m_ItemPosList[i].x = row["itemposx"].as<int16_t>();
             client->m_ItemPosList[i].y = row["itemposy"].as<int16_t>();
 
@@ -830,7 +830,6 @@ void CGame::add_bank_item(CClient * client, pqxx::row & row)
             item->m_sItemSpecEffectValue3 = row["effect3"].as<int16_t>();
             item->m_wCurLifeSpan = row["durability"].as<uint16_t>();
             item->m_dwAttribute = row["attribute"].as<uint32_t>();
-            item->m_cEquipPos = (int8_t)row["itemequip"].as<int16_t>();
             client->m_ItemPosList[i].x = row["itemposx"].as<int16_t>();
             client->m_ItemPosList[i].y = row["itemposy"].as<int16_t>();
 
