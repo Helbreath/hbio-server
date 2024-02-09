@@ -95,6 +95,10 @@ void CGame::handle_login_server_message(socket_message & sm)
         switch (msgid)
         {
             // login related events
+            case MSGID_COMMAND_CHECKCONNECTION:
+            {
+                break;
+            }
             case MSGID_REQUEST_LOGIN:
             {
                 if (!check_login_status()) return;

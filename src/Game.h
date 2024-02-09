@@ -322,6 +322,11 @@ public:
     void update_db_item(pqxx::transaction_base & t, item_db & _item);
     void delete_db_item(pqxx::transaction_base & t, int64_t id);
     void force_delete_db_item(pqxx::transaction_base & t, int64_t id);
+
+    int64_t create_db_skill(pqxx::transaction_base & t, skill_db & _item);
+    void update_db_skill(pqxx::transaction_base & t, skill_db & _item);
+    void delete_db_skills(pqxx::transaction_base & t, int64_t id);
+
     void prepare_login_statements();
     void prepare_game_statements();
     bool is_account_in_use(int64_t account_id);

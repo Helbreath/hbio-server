@@ -173,6 +173,24 @@ void CGame::force_delete_db_item(int64_t id)
     txn.commit();
 }
 
+int64_t CGame::create_db_skill(pqxx::transaction_base & t, skill_db & skill)
+{
+    pqxx::row r{
+        t.exec_prepared1("create_db_skill", skill.character_id, skill.skill_id, skill.skill_level, skill.skill_exp)
+    };
+    return r["id"].as<int64_t>();
+}
+
+void CGame::update_db_skill(pqxx::transaction_base & t, skill_db & skill)
+{
+    t.exec_prepared("update_db_skill", skill.id, skill.character_id, skill.skill_id, skill.skill_level, skill.skill_exp);
+}
+
+void CGame::delete_db_skills(pqxx::transaction_base & t, int64_t id)
+{
+    t.exec_prepared("delete_db_skills", id);
+}
+
 void CGame::prepare_login_statements()
 {
 
@@ -337,5 +355,30 @@ void CGame::prepare_game_statements()
     pq_game->prepare(
         "force_delete_db_item",
         R"(DELETE FROM items WHERE id=$1)"
+    );
+    pq_game->prepare(
+        "create_db_skill",
+        R"(
+            INSERT INTO skills
+            (
+                char_id, skill_id, mastery, experience
+            )
+            VALUES ($1,$2,$3,$4)
+            RETURNING id
+        )"
+    );
+    pq_game->prepare(
+        "update_db_skill",
+        R"(
+            UPDATE skills
+            SET
+                mastery=$4,
+                experience=$5
+            WHERE id=$1 AND char_id=$2 AND skill_id=$3
+        )"
+    );
+    pq_game->prepare(
+        "delete_db_skills",
+        R"(DELETE FROM skills WHERE char_id=$1)"
     );
 }

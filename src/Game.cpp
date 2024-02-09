@@ -545,7 +545,6 @@ void CGame::DeleteClient(int iClientH, BOOL bSave, BOOL bNotify, BOOL bCountLogo
     WORD * wp;
 
     if (m_pClientList[iClientH] == NULL) return;
-    std::lock_guard<std::recursive_mutex> l(client_list_mtx);
     client_list.erase(m_pClientList[iClientH]->shared_from_this());
     if (m_pClientList[iClientH]->m_bIsInitComplete == TRUE)
     {
@@ -853,7 +852,7 @@ void CGame::DeleteClient(int iClientH, BOOL bSave, BOOL bNotify, BOOL bCountLogo
 
     //client_list.erase(m_pClientList[iClientH]->shared_from_this());
 
-    //delete m_pClientList[iClientH];
+    //delete m_pClientList[iClientH]; // TODO: should this still be commented?
     m_pClientList[iClientH] = NULL;
 
     RemoveClientShortCut(iClientH);
@@ -1364,6 +1363,7 @@ void CGame::CheckClientResponseTime()
     */
 
     dwTime = timeGetTime();
+    std::unique_lock<std::recursive_mutex> l(client_list_mtx);
 
     for (i = 1; i < DEF_MAXCLIENTS; i++)
     {
@@ -1378,10 +1378,12 @@ void CGame::CheckClientResponseTime()
                     log->info(G_cTxt);
 
                     DeleteClient(i, TRUE, TRUE);
+                    continue;
                 }
                 else if ((dwTime - m_pClientList[i]->m_dwTime) > DEF_CLIENTTIMEOUT)
                 {
                     DeleteClient(i, FALSE, FALSE);
+                    continue;
                 }
             }
             else if (m_pClientList[i]->m_bIsInitComplete == TRUE)
@@ -4881,7 +4883,7 @@ void CGame::SendNotifyMsg(int iFromH, int iToH, WORD wMsgType, DWORD sV1, DWORD 
     case DEF_XSOCKEVENT_SOCKETERROR:
     case DEF_XSOCKEVENT_CRITICALERROR:
     case DEF_XSOCKEVENT_SOCKETCLOSED:
-        DeleteClient(iToH, TRUE, TRUE);
+        //DeleteClient(iToH, TRUE, TRUE);
         return;
     }
 }
@@ -8179,9 +8181,9 @@ int CGame::_iGetArrowItemIndex(int iClientH)
 
 BOOL CGame::bCheckResistingMagicSuccess(char cAttackerDir, short sTargetH, char cTargetType, int iHitRatio)
 {
-    double dTmp1, dTmp2, dTmp3;
-    int    iTargetMagicResistRatio, iDestHitRatio, iResult;
-    char   cTargetDir, cProtect;
+    double dTmp1{}, dTmp2{}, dTmp3{};
+    int    iTargetMagicResistRatio{}, iDestHitRatio{}, iResult{};
+    char   cTargetDir{}, cProtect{};
 
     switch (cTargetType)
     {

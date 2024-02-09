@@ -130,6 +130,15 @@ struct character_db
     std::string world_name{};
 };
 
+struct skill_db
+{
+    int32_t id{};
+    int64_t character_id{};
+    int64_t skill_id{};
+    int32_t skill_level{};
+    int32_t skill_exp{};
+};
+
 enum class client_status
 {
     dead = 0,
@@ -325,22 +334,23 @@ public:
 	char m_cAttackBonus_SM;
 	char m_cAttackBonus_L;
 
-	CItem * m_pItemList[DEF_MAXITEMS];
-	POINT m_ItemPosList[DEF_MAXITEMS];
-	CItem * m_pItemInBankList[DEF_MAXBANKITEMS];
+	CItem * m_pItemList[DEF_MAXITEMS]{};
+	POINT m_ItemPosList[DEF_MAXITEMS]{};
+	CItem * m_pItemInBankList[DEF_MAXBANKITEMS]{};
 	
-	BOOL  m_bIsItemEquipped[DEF_MAXITEMS];
-	short m_sItemEquipmentStatus[DEF_MAXITEMEQUIPPOS];
+	BOOL  m_bIsItemEquipped[DEF_MAXITEMS]{};
+	short m_sItemEquipmentStatus[DEF_MAXITEMEQUIPPOS]{};
 	char  m_cArrowIndex;
 
-	char           m_cMagicMastery[DEF_MAXMAGICTYPE];
-	unsigned char  m_cSkillMastery[DEF_MAXSKILLTYPE];
+	char           m_cMagicMastery[DEF_MAXMAGICTYPE]{};
+	unsigned char  m_cSkillMastery[DEF_MAXSKILLTYPE]{};
+    int64_t m_cSkillId[DEF_MAXSKILLTYPE]{};
 
-	int   m_iSkillSSN[DEF_MAXSKILLTYPE];
-	BOOL  m_bSkillUsingStatus[DEF_MAXSKILLTYPE];
-	int   m_iSkillUsingTimeID[DEF_MAXSKILLTYPE];
+	int   m_iSkillSSN[DEF_MAXSKILLTYPE]{};
+	BOOL  m_bSkillUsingStatus[DEF_MAXSKILLTYPE]{};
+	int   m_iSkillUsingTimeID[DEF_MAXSKILLTYPE]{};
 
-	char  m_cMagicEffectStatus[DEF_MAXMAGICEFFECTS];
+	char  m_cMagicEffectStatus[DEF_MAXMAGICEFFECTS]{};
 
 	int   m_iWhisperPlayerIndex;
 	char  m_cProfile[256];

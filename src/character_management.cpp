@@ -105,6 +105,19 @@ bool CGame::save_player_data(std::shared_ptr<CClient> client)
     try
     {
         update_db_character(txn, character);
+        for (int i = 0; i < DEF_MAXSKILLTYPE; ++i)
+        {
+            skill_db _skill{};
+            _skill.id = client->m_cSkillId[i];
+            _skill.character_id = character.id;
+            _skill.skill_id = i;
+            _skill.skill_level = client->m_cSkillMastery[i];
+            _skill.skill_exp = client->m_iSkillSSN[i];
+            if (_skill.id == 0)
+                _skill.id = create_db_skill(txn, _skill);
+            else
+                update_db_skill(txn, _skill);
+        }
         for (int i = 0; i < DEF_MAXITEMS; ++i)
         {
             CItem * item = client->m_pItemList[i];

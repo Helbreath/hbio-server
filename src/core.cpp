@@ -395,6 +395,7 @@ void CGame::delete_character(CClient * client, stream_read & sr)
         else
         {
             delete_db_character(txn, character);
+            delete_db_skills(txn, charid);
             sw.write_uint32(MSGID_RESPONSE_LOG);
             sw.write_uint16(DEF_LOGRESMSGTYPE_CHARACTERDELETED);
             sw.write_byte(0x01);
@@ -462,6 +463,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             client->id = row["id"].as<uint64_t>();
 
             pqxx::result item_result{ txn.exec_params("SELECT * FROM items WHERE char_id=$1", client->id) };
+            pqxx::result skill_result{ txn.exec_params("SELECT * FROM skills WHERE char_id=$1", client->id) };
             txn.commit();
 
 
@@ -507,9 +509,9 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             client->m_iLevel = row["level"].as<int32_t>();
             client->m_iExp = row["experience"].as<int32_t>();
             client->m_iStr = row["strength"].as<int32_t>();
-            client->m_iInt = row["vitality"].as<int32_t>();
-            client->m_iVit = row["dexterity"].as<int32_t>();
-            client->m_iDex = row["intelligence"].as<int32_t>();
+            client->m_iVit = row["vitality"].as<int32_t>();
+            client->m_iDex = row["dexterity"].as<int32_t>();
+            client->m_iInt = row["intelligence"].as<int32_t>();
             client->m_iMag = row["magic"].as<int32_t>();
             client->m_iCharisma = row["charisma"].as<int32_t>();
             client->m_iLuck = row["luck"].as<int32_t>();
@@ -576,6 +578,13 @@ void CGame::enter_game(CClient * client, stream_read & sr)
                     // do mail items with the mail record itself
                     //add_mail_item(client, row);
                 }
+            }
+            for (pqxx::row row : skill_result)
+            {
+                int16_t skill_id = row["skill_id"].as<int16_t>();
+                client->m_cSkillId[skill_id] = row["skill_id"].as<uint32_t>();
+                client->m_cSkillMastery[skill_id] = (int8_t)row["mastery"].as<int16_t>();
+                client->m_iSkillSSN[skill_id] = row["experience"].as<int32_t>();
             }
         }
         catch (pqxx::unexpected_rows &)
