@@ -1031,10 +1031,10 @@ void CGame::SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, DWORD dw
             if ((bFlag == TRUE) && (m_pClientList[i] != NULL) && (m_pClientList[i]->m_bIsInitComplete == TRUE))
 
                 if ((m_pClientList[i]->m_cMapIndex == m_pClientList[sOwnerH]->m_cMapIndex) &&
-                    (m_pClientList[i]->m_sX >= m_pClientList[sOwnerH]->m_sX - 10 - sRange) &&
-                    (m_pClientList[i]->m_sX <= m_pClientList[sOwnerH]->m_sX + 10 + sRange) &&
-                    (m_pClientList[i]->m_sY >= m_pClientList[sOwnerH]->m_sY - 8 - sRange) &&
-                    (m_pClientList[i]->m_sY <= m_pClientList[sOwnerH]->m_sY + 8 + sRange))
+                    (m_pClientList[i]->m_sX >= m_pClientList[sOwnerH]->m_sX - 20 - sRange) &&
+                    (m_pClientList[i]->m_sX <= m_pClientList[sOwnerH]->m_sX + 20 + sRange) &&
+                    (m_pClientList[i]->m_sY >= m_pClientList[sOwnerH]->m_sY - 16 - sRange) &&
+                    (m_pClientList[i]->m_sY <= m_pClientList[sOwnerH]->m_sY + 16 + sRange))
                 {
                     if (m_pClientList[sOwnerH]->m_cSide != m_pClientList[i]->m_cSide)
                     {
@@ -1061,10 +1061,10 @@ void CGame::SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, DWORD dw
                     iTemp = (iTemp | (iTemp2 << 28));
                     *ipStatus = iTemp;
 
-                    if ((m_pClientList[i]->m_sX >= m_pClientList[sOwnerH]->m_sX - 9) &&
-                        (m_pClientList[i]->m_sX <= m_pClientList[sOwnerH]->m_sX + 9) &&
-                        (m_pClientList[i]->m_sY >= m_pClientList[sOwnerH]->m_sY - 7) &&
-                        (m_pClientList[i]->m_sY <= m_pClientList[sOwnerH]->m_sY + 7))
+                    if ((m_pClientList[i]->m_sX >= m_pClientList[sOwnerH]->m_sX - 18) &&
+                        (m_pClientList[i]->m_sX <= m_pClientList[sOwnerH]->m_sX + 18) &&
+                        (m_pClientList[i]->m_sY >= m_pClientList[sOwnerH]->m_sY - 14) &&
+                        (m_pClientList[i]->m_sY <= m_pClientList[sOwnerH]->m_sY + 14))
                     {
 
                         switch (wMsgType)
@@ -1262,10 +1262,10 @@ void CGame::SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, DWORD dw
             if ((bFlag == TRUE) && (m_pClientList[i] != NULL))
 
                 if ((m_pClientList[i]->m_cMapIndex == m_pNpcList[sOwnerH]->m_cMapIndex) &&
-                    (m_pClientList[i]->m_sX >= m_pNpcList[sOwnerH]->m_sX - 10 - sRange) &&
-                    (m_pClientList[i]->m_sX <= m_pNpcList[sOwnerH]->m_sX + 10 + sRange) &&
-                    (m_pClientList[i]->m_sY >= m_pNpcList[sOwnerH]->m_sY - 8 - sRange) &&
-                    (m_pClientList[i]->m_sY <= m_pNpcList[sOwnerH]->m_sY + 8 + sRange))
+                    (m_pClientList[i]->m_sX >= m_pNpcList[sOwnerH]->m_sX - 20 - sRange) &&
+                    (m_pClientList[i]->m_sX <= m_pNpcList[sOwnerH]->m_sX + 20 + sRange) &&
+                    (m_pClientList[i]->m_sY >= m_pNpcList[sOwnerH]->m_sY - 16 - sRange) &&
+                    (m_pClientList[i]->m_sY <= m_pNpcList[sOwnerH]->m_sY + 16 + sRange))
                 {
 
                     iTemp = *ipStatus;
@@ -1274,10 +1274,10 @@ void CGame::SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, DWORD dw
                     iTemp = (iTemp | (iTemp2 << 28));
                     *ipStatus = iTemp;
 
-                    if ((m_pClientList[i]->m_sX >= m_pNpcList[sOwnerH]->m_sX - 9) &&
-                        (m_pClientList[i]->m_sX <= m_pNpcList[sOwnerH]->m_sX + 9) &&
-                        (m_pClientList[i]->m_sY >= m_pNpcList[sOwnerH]->m_sY - 7) &&
-                        (m_pClientList[i]->m_sY <= m_pNpcList[sOwnerH]->m_sY + 7))
+                    if ((m_pClientList[i]->m_sX >= m_pNpcList[sOwnerH]->m_sX - 18) &&
+                        (m_pClientList[i]->m_sX <= m_pNpcList[sOwnerH]->m_sX + 18) &&
+                        (m_pClientList[i]->m_sY >= m_pNpcList[sOwnerH]->m_sY - 14) &&
+                        (m_pClientList[i]->m_sY <= m_pNpcList[sOwnerH]->m_sY + 14))
                     {
                         switch (wMsgType)
                         {
@@ -1352,13 +1352,13 @@ void CGame::CheckClientResponseTime()
     /*
     GetLocalTime(&SysTime);
     switch (SysTime.wDayOfWeek) {
-    case 1:	iWarPeriod = 30; break;
-    case 2:	iWarPeriod = 30; break;
-    case 3:	iWarPeriod = 60; break;
-    case 4:	iWarPeriod = 60*2;  break;
-    case 5:	iWarPeriod = 60*5;  break;
-    case 6:	iWarPeriod = 60*10; break;
-    case 0:	iWarPeriod = 60*20; break;
+        case 1:	iWarPeriod = 30; break;
+        case 2:	iWarPeriod = 30; break;
+        case 3:	iWarPeriod = 60; break;
+        case 4:	iWarPeriod = 60*2;  break;
+        case 5:	iWarPeriod = 60*5;  break;
+        case 6:	iWarPeriod = 60*10; break;
+        case 0:	iWarPeriod = 60*20; break;
     }
     */
 
@@ -2909,7 +2909,7 @@ void CGame::TargetSearch(int iNpcH, short * pTarget, char * pTargetType)
     short sX{}, sY{}, rX{}, rY{}, dX{}, dY{};
     short sOwner{}, sTargetOwner{}, sDistance{}, sTempDistance{};
     char  cOwnerType{}, cTargetType{}, cTargetSide{};
-    int   iInv;
+    int   iInv{};
 
     sTargetOwner = NULL;
     cTargetType = NULL;
@@ -3175,6 +3175,7 @@ void CGame::MsgProcess()
         if (m_pClientList[iClientH] == nullptr)
         {
             log->error(std::format("ClientList is null - Game Packet [{:X}]", *dwpMsgID));
+            sm.websocket.close();
             continue;
         }
 
@@ -3184,7 +3185,7 @@ void CGame::MsgProcess()
             continue;
         }
 
-        log->info(std::format("Game Packet [{:X}]", *dwpMsgID));
+        //log->info(std::format("Game Packet [{:X}]", *dwpMsgID));
         m_pClientList[iClientH]->m_dwTime = timeGetTime();
         switch (*dwpMsgID)
         {

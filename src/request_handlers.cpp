@@ -311,11 +311,11 @@ void CGame::RequestInitDataHandler(int iClientH, char * pData, char cKey)
     cp += 2;
 
     sp = (short *)cp;
-    *sp = m_pClientList[iClientH]->m_sX - 14 - 5;
+    *sp = m_pClientList[iClientH]->m_sX;
     cp += 2;
 
     sp = (short *)cp;
-    *sp = m_pClientList[iClientH]->m_sY - 12 - 5;
+    *sp = m_pClientList[iClientH]->m_sY;
     cp += 2;
 
     sp = (short *)cp;
@@ -392,6 +392,7 @@ void CGame::RequestInitDataHandler(int iClientH, char * pData, char cKey)
     iSize = iComposeInitMapData(m_pClientList[iClientH]->m_sX - 10, m_pClientList[iClientH]->m_sY - 7, iClientH, cp);
 
     iRet = m_pClientList[iClientH]->iSendMsg(pBuffer, 46 + iSize + 4 + 4 + 1 + 4 + 4 + 3);
+
     switch (iRet)
     {
         case DEF_XSOCKEVENT_QUENEFULL:
@@ -2245,11 +2246,11 @@ void CGame::RequestTeleportHandler(int iClientH, char * pData, char * cMapName, 
     cp += 2;
 
     sp = (short *)cp;
-    *sp = m_pClientList[iClientH]->m_sX - 14 - 5;
+    *sp = m_pClientList[iClientH]->m_sX;
     cp += 2;
 
     sp = (short *)cp;
-    *sp = m_pClientList[iClientH]->m_sY - 12 - 5;
+    *sp = m_pClientList[iClientH]->m_sY;
     cp += 2;
 
     sp = (short *)cp;
@@ -4408,17 +4409,18 @@ int CGame::iRequestPanningMapDataRequest(int iClientH, char * pData)
     cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
 
     sp = (short *)cp;
-    *sp = (short)(dX - 10);
+    *sp = (short)(dX);
     cp += 2;
 
     sp = (short *)cp;
-    *sp = (short)(dY - 7);
+    *sp = (short)(dY);
     cp += 2;
 
     *cp = cDir;
     cp++;
 
-    iSize = iComposeMoveMapData((short)(dX - 10), (short)(dY - 7), iClientH, cDir, cp);
+    iSize = 0;//iComposeMoveMapData((short)(dX - 10), (short)(dY - 7), iClientH, cDir, cp);
+
     iRet = m_pClientList[iClientH]->iSendMsg(cData, iSize + 12 + 1 + 4);
     switch (iRet)
     {

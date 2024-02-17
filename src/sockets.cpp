@@ -70,7 +70,7 @@ void CGame::on_message(std::shared_ptr<ix::ConnectionState> ixconnstate, ix::Web
     }
     else if (message->type == ix::WebSocketMessageType::Message)
     {
-        log->info(fmt::format("Message received - {} bytes", message->str.length()));
+        //log->info(fmt::format("Message received - {} bytes", message->str.length()));
 
         std::unique_ptr<stream_read> sr = std::make_unique<stream_read>(message->str.c_str(), static_cast<uint32_t>(message->str.length()));
 

@@ -50,10 +50,10 @@ int CGame::iComposeInitMapData(short sX, short sY, int iClientH, char * pData)
             {
                 iTileExists++;
                 sp = (short *)cp;
-                *sp = ix;
+                *sp = ix + sX;
                 cp += 2;
                 sp = (short *)cp;
-                *sp = iy;
+                *sp = iy + sY;
                 cp += 2;
                 iSize += 4;
 

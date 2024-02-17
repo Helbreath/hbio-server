@@ -158,11 +158,11 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
         cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
 
         sp = (short *)cp;
-        *sp = (short)(dX - 10);
+        *sp = (short)(dX);
         cp += 2;
 
         sp = (short *)cp;
-        *sp = (short)(dY - 7);
+        *sp = (short)(dY);
         cp += 2;
 
         *cp = cDir;
@@ -206,7 +206,7 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
         *ip = m_pClientList[iClientH]->m_iHP;
         cp += 4;
 
-        iSize = iComposeMoveMapData((short)(dX - 10), (short)(dY - 7), iClientH, cDir, cp);
+        iSize = 0;//iComposeMoveMapData((short)(dX - 10), (short)(dY - 7), iClientH, cDir, cp);
 
         iRet = m_pClientList[iClientH]->iSendMsg(cData, iSize + 12 + 1 + 4);
         switch (iRet)
