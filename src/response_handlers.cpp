@@ -343,332 +343,331 @@ int CGame::iComposeMoveMapData(short sX, short sY, int iClientH, char cDir, char
     pTileSrc = (CTile *)(m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_pTile +
         (sX)+(sY)*m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_sSizeY);
 
-    iIndex = 0;
+    CClient * client = m_pClientList[iClientH];
 
-    while (1)
+    for (int x = client->m_sX - client->screen_size_x / 2 - 3; x < client->m_sX - client->screen_size_x; ++x)
     {
-        ix = _tmp_iMoveLocX[cDir][iIndex];
-        iy = _tmp_iMoveLocY[cDir][iIndex];
-        if ((ix == -1) || (iy == -1)) break;
-
-        iIndex++;
-
-        pTile = (CTile *)(pTileSrc + ix + iy * m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_sSizeY);
-
-        if ((m_pClientList[pTile->m_sOwner] != NULL) && (pTile->m_sOwner != iClientH))
-            if ((m_pClientList[pTile->m_sOwner]->m_cSide != 0) &&
-                (m_pClientList[pTile->m_sOwner]->m_cSide != m_pClientList[iClientH]->m_cSide) &&
-                ((m_pClientList[pTile->m_sOwner]->m_iStatus & 0x00000010) != 0))
-            {
-                continue;
-            }
-
-        if ((pTile->m_sOwner != NULL) || (pTile->m_sDeadOwner != NULL) ||
-            (pTile->m_pItem[0] != NULL) || (pTile->m_sDynamicObjectType != NULL))
+        for (int y = client->m_sY - client->screen_size_y / 2 - 3; y < client->m_sY - client->screen_size_y; ++y)
         {
+            if (x < 0 || y < 0 || x >= m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_sSizeX || y >= m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_sSizeY)
+                continue;
 
-            iTileExists++;
+            pTile = (CTile *)(pTileSrc + x + y * m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_sSizeY);
 
-            sp = (short *)cp;
-            *sp = ix;
-            cp += 2;
-            sp = (short *)cp;
-            *sp = iy;
-            cp += 2;
-            iSize += 4;
+            if ((m_pClientList[pTile->m_sOwner] != NULL) && (pTile->m_sOwner != iClientH))
+                if ((m_pClientList[pTile->m_sOwner]->m_cSide != 0) &&
+                    (m_pClientList[pTile->m_sOwner]->m_cSide != m_pClientList[iClientH]->m_cSide) &&
+                    ((m_pClientList[pTile->m_sOwner]->m_iStatus & 0x00000010) != 0))
+                {
+                    continue;
+                }
 
-            ucHeader = 0;
-
-            if (pTile->m_sOwner != NULL)
+            if ((pTile->m_sOwner != NULL) || (pTile->m_sDeadOwner != NULL) ||
+                (pTile->m_pItem[0] != NULL) || (pTile->m_sDynamicObjectType != NULL))
             {
-                if (pTile->m_cOwnerClass == DEF_OWNERTYPE_PLAYER)
+
+                iTileExists++;
+
+                sp = (short *)cp;
+                *sp = x;
+                cp += 2;
+                sp = (short *)cp;
+                *sp = y;
+                cp += 2;
+                iSize += 4;
+
+                ucHeader = 0;
+
+                if (pTile->m_sOwner != NULL)
                 {
-                    if (m_pClientList[pTile->m_sOwner] != NULL) ucHeader = ucHeader | 0x01;
-                    else pTile->m_sOwner = NULL;
+                    if (pTile->m_cOwnerClass == DEF_OWNERTYPE_PLAYER)
+                    {
+                        if (m_pClientList[pTile->m_sOwner] != NULL) ucHeader = ucHeader | 0x01;
+                        else pTile->m_sOwner = NULL;
+                    }
+                    if (pTile->m_cOwnerClass == DEF_OWNERTYPE_NPC)
+                    {
+                        if (m_pNpcList[pTile->m_sOwner] != NULL) ucHeader = ucHeader | 0x01;
+                        else pTile->m_sOwner = NULL;
+                    }
                 }
-                if (pTile->m_cOwnerClass == DEF_OWNERTYPE_NPC)
+                if (pTile->m_sDeadOwner != NULL)
                 {
-                    if (m_pNpcList[pTile->m_sOwner] != NULL) ucHeader = ucHeader | 0x01;
-                    else pTile->m_sOwner = NULL;
+                    if (pTile->m_cDeadOwnerClass == DEF_OWNERTYPE_PLAYER)
+                    {
+                        if (m_pClientList[pTile->m_sDeadOwner] != NULL)	ucHeader = ucHeader | 0x02;
+                        else pTile->m_sDeadOwner = NULL;
+                    }
+                    if (pTile->m_cDeadOwnerClass == DEF_OWNERTYPE_NPC)
+                    {
+                        if (m_pNpcList[pTile->m_sDeadOwner] != NULL) ucHeader = ucHeader | 0x02;
+                        else pTile->m_sDeadOwner = NULL;
+                    }
                 }
-            }
-            if (pTile->m_sDeadOwner != NULL)
-            {
-                if (pTile->m_cDeadOwnerClass == DEF_OWNERTYPE_PLAYER)
+
+                if (pTile->m_pItem[0] != NULL)				ucHeader = ucHeader | 0x04;
+                if (pTile->m_sDynamicObjectType != NULL)    ucHeader = ucHeader | 0x08;
+
+                *cp = ucHeader;
+                cp++;
+                iSize++;
+
+                if ((ucHeader & 0x01) != 0)
                 {
-                    if (m_pClientList[pTile->m_sDeadOwner] != NULL)	ucHeader = ucHeader | 0x02;
-                    else pTile->m_sDeadOwner = NULL;
-                }
-                if (pTile->m_cDeadOwnerClass == DEF_OWNERTYPE_NPC)
-                {
-                    if (m_pNpcList[pTile->m_sDeadOwner] != NULL) ucHeader = ucHeader | 0x02;
-                    else pTile->m_sDeadOwner = NULL;
-                }
-            }
+                    switch (pTile->m_cOwnerClass)
+                    {
+                        case DEF_OWNERTYPE_PLAYER:
+                            sp = (short *)cp;
+                            *sp = pTile->m_sOwner;
+                            cp += 2;
+                            iSize += 2;
 
-            if (pTile->m_pItem[0] != NULL)				ucHeader = ucHeader | 0x04;
-            if (pTile->m_sDynamicObjectType != NULL)    ucHeader = ucHeader | 0x08;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sOwner]->m_sType;
+                            cp += 2;
+                            iSize += 2;
 
-            *cp = ucHeader;
-            cp++;
-            iSize++;
+                            *cp = m_pClientList[pTile->m_sOwner]->m_cDir;
+                            cp++;
+                            iSize++;
 
-            if ((ucHeader & 0x01) != 0)
-            {
-                switch (pTile->m_cOwnerClass)
-                {
-                    case DEF_OWNERTYPE_PLAYER:
-                        sp = (short *)cp;
-                        *sp = pTile->m_sOwner;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sOwner]->m_sAppr1;
+                            cp += 2;
+                            iSize += 2;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sOwner]->m_sType;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sOwner]->m_sAppr2;
+                            cp += 2;
+                            iSize += 2;
 
-                        *cp = m_pClientList[pTile->m_sOwner]->m_cDir;
-                        cp++;
-                        iSize++;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sOwner]->m_sAppr3;
+                            cp += 2;
+                            iSize += 2;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sOwner]->m_sAppr1;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sOwner]->m_sAppr4;
+                            cp += 2;
+                            iSize += 2;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sOwner]->m_sAppr2;
-                        cp += 2;
-                        iSize += 2;
+                            ip = (int *)cp;
+                            *ip = m_pClientList[pTile->m_sOwner]->m_iApprColor;
+                            cp += 4;
+                            iSize += 4;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sOwner]->m_sAppr3;
-                        cp += 2;
-                        iSize += 2;
+                            ip = (int *)cp;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sOwner]->m_sAppr4;
-                        cp += 2;
-                        iSize += 2;
-
-                        ip = (int *)cp;
-                        *ip = m_pClientList[pTile->m_sOwner]->m_iApprColor;
-                        cp += 4;
-                        iSize += 4;
-
-                        ip = (int *)cp;
-
-                        if (m_pClientList[iClientH]->m_cSide != m_pClientList[pTile->m_sOwner]->m_cSide)
-                        {
-                            if (iClientH != pTile->m_sOwner)
+                            if (m_pClientList[iClientH]->m_cSide != m_pClientList[pTile->m_sOwner]->m_cSide)
                             {
-                                iTemp = m_pClientList[pTile->m_sOwner]->m_iStatus & 0x0F0FFFF7F;
+                                if (iClientH != pTile->m_sOwner)
+                                {
+                                    iTemp = m_pClientList[pTile->m_sOwner]->m_iStatus & 0x0F0FFFF7F;
+                                }
+                                else
+                                {
+                                    iTemp = m_pClientList[pTile->m_sOwner]->m_iStatus;
+                                }
                             }
                             else
                             {
                                 iTemp = m_pClientList[pTile->m_sOwner]->m_iStatus;
                             }
-                        }
-                        else
-                        {
-                            iTemp = m_pClientList[pTile->m_sOwner]->m_iStatus;
-                        }
 
-                        iTemp = 0x0FFFFFFF & iTemp;
-                        iTemp2 = iGetPlayerABSStatus(pTile->m_sOwner, iClientH);
-                        iTemp = (iTemp | (iTemp2 << 28));
-                        *ip = iTemp;
-                        cp += 4;
-                        iSize += 4;
+                            iTemp = 0x0FFFFFFF & iTemp;
+                            iTemp2 = iGetPlayerABSStatus(pTile->m_sOwner, iClientH);
+                            iTemp = (iTemp | (iTemp2 << 28));
+                            *ip = iTemp;
+                            cp += 4;
+                            iSize += 4;
 
-                        memcpy(cp, m_pClientList[pTile->m_sOwner]->m_cCharName, 10);
-                        cp += 10;
-                        iSize += 10;
-                        break;
+                            memcpy(cp, m_pClientList[pTile->m_sOwner]->m_cCharName, 10);
+                            cp += 10;
+                            iSize += 10;
+                            break;
 
-                    case DEF_OWNERTYPE_NPC:
-                        sp = (short *)cp;
-                        *sp = pTile->m_sOwner + 10000;
-                        cp += 2;
-                        iSize += 2;
+                        case DEF_OWNERTYPE_NPC:
+                            sp = (short *)cp;
+                            *sp = pTile->m_sOwner + 10000;
+                            cp += 2;
+                            iSize += 2;
 
-                        sp = (short *)cp;
-                        *sp = m_pNpcList[pTile->m_sOwner]->m_sType;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pNpcList[pTile->m_sOwner]->m_sType;
+                            cp += 2;
+                            iSize += 2;
 
-                        *cp = m_pNpcList[pTile->m_sOwner]->m_cDir;
-                        cp++;
-                        iSize++;
+                            *cp = m_pNpcList[pTile->m_sOwner]->m_cDir;
+                            cp++;
+                            iSize++;
 
-                        sp = (short *)cp;
-                        *sp = m_pNpcList[pTile->m_sOwner]->m_sAppr2;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pNpcList[pTile->m_sOwner]->m_sAppr2;
+                            cp += 2;
+                            iSize += 2;
 
-                        ip = (int *)cp;
-                        iTemp = m_pNpcList[pTile->m_sOwner]->m_iStatus;
-                        iTemp = 0x0FFFFFFF & iTemp;
-                        iTemp2 = iGetNpcRelationship(pTile->m_sOwner, iClientH);
-                        iTemp = (iTemp | (iTemp2 << 28));
-                        *ip = iTemp;
-                        cp += 4;
-                        iSize += 4;
+                            ip = (int *)cp;
+                            iTemp = m_pNpcList[pTile->m_sOwner]->m_iStatus;
+                            iTemp = 0x0FFFFFFF & iTemp;
+                            iTemp2 = iGetNpcRelationship(pTile->m_sOwner, iClientH);
+                            iTemp = (iTemp | (iTemp2 << 28));
+                            *ip = iTemp;
+                            cp += 4;
+                            iSize += 4;
 
-                        memcpy(cp, m_pNpcList[pTile->m_sOwner]->m_cName, 5);
-                        cp += 5;
-                        iSize += 5;
+                            memcpy(cp, m_pNpcList[pTile->m_sOwner]->m_cName, 5);
+                            cp += 5;
+                            iSize += 5;
+                    }
                 }
-            }
 
-            if ((ucHeader & 0x02) != 0)
-            {
-                switch (pTile->m_cDeadOwnerClass)
+                if ((ucHeader & 0x02) != 0)
                 {
-                    case DEF_OWNERTYPE_PLAYER:
+                    switch (pTile->m_cDeadOwnerClass)
+                    {
+                        case DEF_OWNERTYPE_PLAYER:
 
-                        sp = (short *)cp;
-                        *sp = pTile->m_sDeadOwner;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = pTile->m_sDeadOwner;
+                            cp += 2;
+                            iSize += 2;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sDeadOwner]->m_sType;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sDeadOwner]->m_sType;
+                            cp += 2;
+                            iSize += 2;
 
-                        *cp = m_pClientList[pTile->m_sDeadOwner]->m_cDir;
-                        cp++;
-                        iSize++;
+                            *cp = m_pClientList[pTile->m_sDeadOwner]->m_cDir;
+                            cp++;
+                            iSize++;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sDeadOwner]->m_sAppr1;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sDeadOwner]->m_sAppr1;
+                            cp += 2;
+                            iSize += 2;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sDeadOwner]->m_sAppr2;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sDeadOwner]->m_sAppr2;
+                            cp += 2;
+                            iSize += 2;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sDeadOwner]->m_sAppr3;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sDeadOwner]->m_sAppr3;
+                            cp += 2;
+                            iSize += 2;
 
-                        sp = (short *)cp;
-                        *sp = m_pClientList[pTile->m_sDeadOwner]->m_sAppr4;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pClientList[pTile->m_sDeadOwner]->m_sAppr4;
+                            cp += 2;
+                            iSize += 2;
 
-                        ip = (int *)cp;
-                        *ip = m_pClientList[pTile->m_sDeadOwner]->m_iApprColor;
-                        cp += 4;
-                        iSize += 4;
+                            ip = (int *)cp;
+                            *ip = m_pClientList[pTile->m_sDeadOwner]->m_iApprColor;
+                            cp += 4;
+                            iSize += 4;
 
-                        ip = (int *)cp;
+                            ip = (int *)cp;
 
-                        if (m_pClientList[iClientH]->m_cSide != m_pClientList[pTile->m_sDeadOwner]->m_cSide)
-                        {
-                            if (iClientH != pTile->m_sDeadOwner)
+                            if (m_pClientList[iClientH]->m_cSide != m_pClientList[pTile->m_sDeadOwner]->m_cSide)
                             {
-                                iTemp = m_pClientList[pTile->m_sDeadOwner]->m_iStatus & 0x0F0FFFF7F;
+                                if (iClientH != pTile->m_sDeadOwner)
+                                {
+                                    iTemp = m_pClientList[pTile->m_sDeadOwner]->m_iStatus & 0x0F0FFFF7F;
+                                }
+                                else
+                                {
+                                    iTemp = m_pClientList[pTile->m_sDeadOwner]->m_iStatus;
+                                }
                             }
                             else
                             {
                                 iTemp = m_pClientList[pTile->m_sDeadOwner]->m_iStatus;
                             }
-                        }
-                        else
-                        {
-                            iTemp = m_pClientList[pTile->m_sDeadOwner]->m_iStatus;
-                        }
 
-                        iTemp = 0x0FFFFFFF & iTemp;
+                            iTemp = 0x0FFFFFFF & iTemp;
 
-                        iTemp2 = iGetPlayerABSStatus(pTile->m_sDeadOwner, iClientH);
-                        iTemp = (iTemp | (iTemp2 << 28));
-                        *ip = iTemp;
-                        cp += 4;
-                        iSize += 4;
+                            iTemp2 = iGetPlayerABSStatus(pTile->m_sDeadOwner, iClientH);
+                            iTemp = (iTemp | (iTemp2 << 28));
+                            *ip = iTemp;
+                            cp += 4;
+                            iSize += 4;
 
-                        memcpy(cp, m_pClientList[pTile->m_sDeadOwner]->m_cCharName, 10);
-                        cp += 10;
-                        iSize += 10;
-                        break;
+                            memcpy(cp, m_pClientList[pTile->m_sDeadOwner]->m_cCharName, 10);
+                            cp += 10;
+                            iSize += 10;
+                            break;
 
-                    case DEF_OWNERTYPE_NPC:
-                        sp = (short *)cp;
-                        *sp = pTile->m_sDeadOwner + 10000;
-                        cp += 2;
-                        iSize += 2;
+                        case DEF_OWNERTYPE_NPC:
+                            sp = (short *)cp;
+                            *sp = pTile->m_sDeadOwner + 10000;
+                            cp += 2;
+                            iSize += 2;
 
-                        sp = (short *)cp;
-                        *sp = m_pNpcList[pTile->m_sDeadOwner]->m_sType;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pNpcList[pTile->m_sDeadOwner]->m_sType;
+                            cp += 2;
+                            iSize += 2;
 
-                        *cp = m_pNpcList[pTile->m_sDeadOwner]->m_cDir;
-                        cp++;
-                        iSize++;
+                            *cp = m_pNpcList[pTile->m_sDeadOwner]->m_cDir;
+                            cp++;
+                            iSize++;
 
-                        sp = (short *)cp;
-                        *sp = m_pNpcList[pTile->m_sDeadOwner]->m_sAppr2;
-                        cp += 2;
-                        iSize += 2;
+                            sp = (short *)cp;
+                            *sp = m_pNpcList[pTile->m_sDeadOwner]->m_sAppr2;
+                            cp += 2;
+                            iSize += 2;
 
-                        ip = (int *)cp;
+                            ip = (int *)cp;
 
-                        iTemp = m_pNpcList[pTile->m_sDeadOwner]->m_iStatus;
-                        iTemp = 0x0FFFFFFF & iTemp;
-                        iTemp2 = iGetNpcRelationship(pTile->m_sDeadOwner, iClientH);
-                        iTemp = (iTemp | (iTemp2 << 28));
-                        *ip = iTemp;
+                            iTemp = m_pNpcList[pTile->m_sDeadOwner]->m_iStatus;
+                            iTemp = 0x0FFFFFFF & iTemp;
+                            iTemp2 = iGetNpcRelationship(pTile->m_sDeadOwner, iClientH);
+                            iTemp = (iTemp | (iTemp2 << 28));
+                            *ip = iTemp;
 
-                        cp += 4;
-                        iSize += 4;
+                            cp += 4;
+                            iSize += 4;
 
-                        memcpy(cp, m_pNpcList[pTile->m_sDeadOwner]->m_cName, 5);
-                        cp += 5;
-                        iSize += 5;
-                        break;
+                            memcpy(cp, m_pNpcList[pTile->m_sDeadOwner]->m_cName, 5);
+                            cp += 5;
+                            iSize += 5;
+                            break;
+                    }
+                }
+
+                if (pTile->m_pItem[0] != NULL)
+                {
+                    sp = (short *)cp;
+                    *sp = pTile->m_pItem[0]->m_sSprite;
+                    cp += 2;
+                    iSize += 2;
+
+                    sp = (short *)cp;
+                    *sp = pTile->m_pItem[0]->m_sSpriteFrame;
+                    cp += 2;
+                    iSize += 2;
+
+                    *cp = pTile->m_pItem[0]->m_cItemColor;
+                    cp++;
+                    iSize++;
+                }
+
+                if (pTile->m_sDynamicObjectType != NULL)
+                {
+                    wp = (WORD *)cp;
+                    *wp = pTile->m_wDynamicObjectID;
+                    cp += 2;
+                    iSize += 2;
+
+                    sp = (short *)cp;
+                    *sp = pTile->m_sDynamicObjectType;
+                    cp += 2;
+                    iSize += 2;
                 }
             }
-
-            if (pTile->m_pItem[0] != NULL)
-            {
-                sp = (short *)cp;
-                *sp = pTile->m_pItem[0]->m_sSprite;
-                cp += 2;
-                iSize += 2;
-
-                sp = (short *)cp;
-                *sp = pTile->m_pItem[0]->m_sSpriteFrame;
-                cp += 2;
-                iSize += 2;
-
-                *cp = pTile->m_pItem[0]->m_cItemColor;
-                cp++;
-                iSize++;
-            }
-
-            if (pTile->m_sDynamicObjectType != NULL)
-            {
-
-                wp = (WORD *)cp;
-                *wp = pTile->m_wDynamicObjectID;
-                cp += 2;
-                iSize += 2;
-
-                sp = (short *)cp;
-                *sp = pTile->m_sDynamicObjectType;
-                cp += 2;
-                iSize += 2;
-            }
-
         }
     }
+
     *pTotal = iTileExists;
     return iSize;
 }

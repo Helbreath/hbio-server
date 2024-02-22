@@ -810,6 +810,10 @@ public:
 	int iComposeMoveMapData(short sX, short sY, int iClientH, char cDir, char * pData);
 	void SendEventToNearClient_TypeB(DWORD dwMsgID, WORD wMsgType, char cMapIndex, short sX, short sY, short sV1, short sV2, short sV3, short sV4 = NULL);
 	void SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, DWORD dwMsgID, WORD wMsgType, short sV1, short sV2, short sV3);
+    void SendEventToNearClient_TypeA(CClient * client, char cOwnerType, DWORD dwMsgID, WORD wMsgType, short sV1, short sV2, short sV3)
+    {
+        SendEventToNearClient_TypeA(get_client_handle(client), cOwnerType, dwMsgID, wMsgType, sV1, sV2, sV3);
+    }
 	void DeleteClient(int iClientH, BOOL bSave, BOOL bNotify, BOOL bCountLogout = TRUE, BOOL bForceCloseConn = FALSE);
 	int  iComposeInitMapData(short sX, short sY, int iClientH, char * pData);
 	void RequestInitDataHandler(int iClientH, char * pData, char cKey);

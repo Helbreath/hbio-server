@@ -389,7 +389,9 @@ void CGame::RequestInitDataHandler(int iClientH, char * pData, char cKey)
     *cp = 0;
     cp++;
 
-    iSize = iComposeInitMapData(m_pClientList[iClientH]->m_sX - 10, m_pClientList[iClientH]->m_sY - 7, iClientH, cp);
+    CClient * client = m_pClientList[iClientH];
+
+    iSize = iComposeInitMapData(client->m_sX - client->screen_size_x / 2 - 3, client->m_sY - client->screen_size_y / 2 - 3, iClientH, cp);
 
     iRet = m_pClientList[iClientH]->iSendMsg(pBuffer, 46 + iSize + 4 + 4 + 1 + 4 + 4 + 3);
 
@@ -2323,7 +2325,10 @@ void CGame::RequestTeleportHandler(int iClientH, char * pData, char * cMapName, 
     *cp = 0;
     cp++;
 
-    iSize = iComposeInitMapData(m_pClientList[iClientH]->m_sX - 10, m_pClientList[iClientH]->m_sY - 7, iClientH, cp);
+    CClient * client = m_pClientList[iClientH];
+
+    iSize = iComposeInitMapData(client->m_sX - client->screen_size_x / 2 - 3, client->m_sY - client->screen_size_y / 2 - 3, iClientH, cp);
+
     iRet = m_pClientList[iClientH]->iSendMsg(pBuffer, 46 + iSize + 4 + 4 + 1 + 4 + 4 + 3);
     switch (iRet)
     {
@@ -4419,7 +4424,7 @@ int CGame::iRequestPanningMapDataRequest(int iClientH, char * pData)
     *cp = cDir;
     cp++;
 
-    iSize = 0;//iComposeMoveMapData((short)(dX - 10), (short)(dY - 7), iClientH, cDir, cp);
+    iSize = iComposeMoveMapData(dX, dY, iClientH, cDir, cp);
 
     iRet = m_pClientList[iClientH]->iSendMsg(cData, iSize + 12 + 1 + 4);
     switch (iRet)
