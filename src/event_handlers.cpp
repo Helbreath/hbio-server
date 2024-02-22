@@ -367,95 +367,97 @@ void CGame::DropItemHandler(int iClientH, short sItemIndex, int iAmount, char * 
     iCalcTotalWeight(iClientH);
 }
 
-BOOL CGame::bEquipItemHandler(int iClientH, short sItemIndex, BOOL bNotify)
+bool CGame::bEquipItemHandler(CClient * client, short sItemIndex, bool bNotify)
 {
     char  cEquipPos, cHeroArmorType;
     short   sSpeed;
     short sTemp;
     int iTemp;
 
-    if (m_pClientList[iClientH] == NULL) return FALSE;
+    int iClientH = get_client_handle(client);
+
+    if (client == nullptr) return FALSE;
     if ((sItemIndex < 0) || (sItemIndex >= DEF_MAXITEMS)) return FALSE;
-    if (m_pClientList[iClientH]->m_pItemList[sItemIndex] == NULL) return FALSE;
-    if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemType != DEF_ITEMTYPE_EQUIP) return FALSE;
+    if (client->m_pItemList[sItemIndex] == NULL) return FALSE;
+    if (client->m_pItemList[sItemIndex]->m_cItemType != DEF_ITEMTYPE_EQUIP) return FALSE;
 
-    if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_wCurLifeSpan == 0) return FALSE;
+    if (client->m_pItemList[sItemIndex]->m_wCurLifeSpan == 0) return FALSE;
 
-    if (((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_dwAttribute & 0x00000001) == NULL) &&
-        (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sLevelLimit > m_pClientList[iClientH]->m_iLevel)) return FALSE;
+    if (((client->m_pItemList[sItemIndex]->m_dwAttribute & 0x00000001) == NULL) &&
+        (client->m_pItemList[sItemIndex]->m_sLevelLimit > client->m_iLevel)) return FALSE;
 
 
-    if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cGenderLimit != 0)
+    if (client->m_pItemList[sItemIndex]->m_cGenderLimit != 0)
     {
-        switch (m_pClientList[iClientH]->m_sType)
+        switch (client->m_sType)
         {
             case 1:
             case 2:
             case 3:
-                if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cGenderLimit != 1) return FALSE;
+                if (client->m_pItemList[sItemIndex]->m_cGenderLimit != 1) return FALSE;
                 break;
             case 4:
             case 5:
             case 6:
-                if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cGenderLimit != 2) return FALSE;
+                if (client->m_pItemList[sItemIndex]->m_cGenderLimit != 2) return FALSE;
                 break;
         }
     }
 
-    if (iGetItemWeight(m_pClientList[iClientH]->m_pItemList[sItemIndex], 1) > m_pClientList[iClientH]->m_iStr * 100) return FALSE;
+    if (iGetItemWeight(client->m_pItemList[sItemIndex], 1) > client->m_iStr * 100) return FALSE;
 
-    cEquipPos = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos;
+    cEquipPos = client->m_pItemList[sItemIndex]->m_cEquipPos;
 
     if ((cEquipPos == DEF_EQUIPPOS_BODY) || (cEquipPos == DEF_EQUIPPOS_LEGGINGS) ||
         (cEquipPos == DEF_EQUIPPOS_ARMS) || (cEquipPos == DEF_EQUIPPOS_HEAD))
     {
-        switch (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue4)
+        switch (client->m_pItemList[sItemIndex]->m_sItemEffectValue4)
         {
             case 10:
-                if (m_pClientList[iClientH]->m_iStr < m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue5)
+                if (client->m_iStr < client->m_pItemList[sItemIndex]->m_sItemEffectValue5)
                 {
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
-                    ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], TRUE);
+                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, client->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
+                    ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], TRUE);
                     return FALSE;
                 }
                 break;
             case 11:
-                if (m_pClientList[iClientH]->m_iDex < m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue5)
+                if (client->m_iDex < client->m_pItemList[sItemIndex]->m_sItemEffectValue5)
                 {
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
-                    ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], TRUE);
+                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, client->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
+                    ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], TRUE);
                     return FALSE;
                 }
                 break;
             case 12:
-                if (m_pClientList[iClientH]->m_iVit < m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue5)
+                if (client->m_iVit < client->m_pItemList[sItemIndex]->m_sItemEffectValue5)
                 {
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
-                    ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], TRUE);
+                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, client->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
+                    ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], TRUE);
                     return FALSE;
                 }
                 break;
             case 13:
-                if (m_pClientList[iClientH]->m_iInt < m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue5)
+                if (client->m_iInt < client->m_pItemList[sItemIndex]->m_sItemEffectValue5)
                 {
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
-                    ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], TRUE);
+                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, client->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
+                    ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], TRUE);
                     return FALSE;
                 }
                 break;
             case 14:
-                if (m_pClientList[iClientH]->m_iMag < m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue5)
+                if (client->m_iMag < client->m_pItemList[sItemIndex]->m_sItemEffectValue5)
                 {
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
-                    ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], TRUE);
+                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, client->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
+                    ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], TRUE);
                     return FALSE;
                 }
                 break;
             case 15:
-                if (m_pClientList[iClientH]->m_iCharisma < m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue5)
+                if (client->m_iCharisma < client->m_pItemList[sItemIndex]->m_sItemEffectValue5)
                 {
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
-                    ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], TRUE);
+                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, client->m_pItemList[sItemIndex]->m_cEquipPos, sItemIndex, NULL, NULL);
+                    ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], TRUE);
                     return FALSE;
                 }
                 break;
@@ -465,11 +467,11 @@ BOOL CGame::bEquipItemHandler(int iClientH, short sItemIndex, BOOL bNotify)
     if (cEquipPos == DEF_EQUIPPOS_TWOHAND)
     {
         // Stormbringer
-        if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sIDnum == 845)
+        if (client->m_pItemList[sItemIndex]->m_sIDnum == 845)
         {
-            if (m_pClientList[iClientH]->m_iInt < 65)
+            if (client->m_iInt < 65)
             {
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_iSpecialAbilityEquipPos, sItemIndex, NULL, NULL);
+                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, client->m_iSpecialAbilityEquipPos, sItemIndex, NULL, NULL);
                 ReleaseItemHandler(iClientH, sItemIndex, TRUE);
                 return FALSE;
             }
@@ -479,26 +481,26 @@ BOOL CGame::bEquipItemHandler(int iClientH, short sItemIndex, BOOL bNotify)
     if (cEquipPos == DEF_EQUIPPOS_RHAND)
     {
         // Resurrection wand(MS.10) or Resurrection wand(MS.20)
-        if ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sIDnum == 865) || (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sIDnum == 866))
+        if ((client->m_pItemList[sItemIndex]->m_sIDnum == 865) || (client->m_pItemList[sItemIndex]->m_sIDnum == 866))
         {
-            if (m_pClientList[iClientH]->m_iInt > 99 && m_pClientList[iClientH]->m_iMag > 99 && m_pClientList[iClientH]->m_iSpecialAbilityTime < 1)
+            if (client->m_iInt > 99 && client->m_iMag > 99 && client->m_iSpecialAbilityTime < 1)
             {
-                m_pClientList[iClientH]->m_cMagicMastery[94] = TRUE;
+                client->m_cMagicMastery[94] = TRUE;
                 SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_STATECHANGE_SUCCESS, NULL, NULL, NULL, NULL);
             }
         }
     }
 
-    if ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_ATTACK_SPECABLTY) ||
-        (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_DEFENSE_SPECABLTY))
+    if ((client->m_pItemList[sItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_ATTACK_SPECABLTY) ||
+        (client->m_pItemList[sItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_DEFENSE_SPECABLTY))
     {
 
-        if ((m_pClientList[iClientH]->m_iSpecialAbilityType != 0))
+        if ((client->m_iSpecialAbilityType != 0))
         {
-            if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos != m_pClientList[iClientH]->m_iSpecialAbilityEquipPos)
+            if (client->m_pItemList[sItemIndex]->m_cEquipPos != client->m_iSpecialAbilityEquipPos)
             {
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, m_pClientList[iClientH]->m_iSpecialAbilityEquipPos, m_pClientList[iClientH]->m_sItemEquipmentStatus[m_pClientList[iClientH]->m_iSpecialAbilityEquipPos], NULL, NULL);
-                ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[m_pClientList[iClientH]->m_iSpecialAbilityEquipPos], TRUE);
+                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMRELEASED, client->m_iSpecialAbilityEquipPos, client->m_sItemEquipmentStatus[client->m_iSpecialAbilityEquipPos], NULL, NULL);
+                ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[client->m_iSpecialAbilityEquipPos], TRUE);
             }
         }
     }
@@ -508,58 +510,58 @@ BOOL CGame::bEquipItemHandler(int iClientH, short sItemIndex, BOOL bNotify)
 
     if (cEquipPos == DEF_EQUIPPOS_TWOHAND)
     {
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos] != -1)
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], FALSE);
+        if (client->m_sItemEquipmentStatus[cEquipPos] != -1)
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], FALSE);
         else
         {
-            if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND] != -1)
-                ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND], FALSE);
-            if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LHAND] != -1)
-                ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LHAND], FALSE);
+            if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND] != -1)
+                ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_RHAND], FALSE);
+            if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_LHAND] != -1)
+                ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_LHAND], FALSE);
         }
     }
     else
     {
         if ((cEquipPos == DEF_EQUIPPOS_LHAND) || (cEquipPos == DEF_EQUIPPOS_RHAND))
         {
-            if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND] != -1)
-                ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND], FALSE);
+            if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND] != -1)
+                ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND], FALSE);
         }
 
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos] != -1)
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], FALSE);
+        if (client->m_sItemEquipmentStatus[cEquipPos] != -1)
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], FALSE);
     }
 
 
     if (cEquipPos == DEF_EQUIPPOS_RELEASEALL)
     {
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos] != -1)
+        if (client->m_sItemEquipmentStatus[cEquipPos] != -1)
         {
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], FALSE);
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], FALSE);
         }
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_HEAD] != -1)
+        if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_HEAD] != -1)
         {
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_HEAD], FALSE);
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_HEAD], FALSE);
         }
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_BODY] != -1)
+        if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_BODY] != -1)
         {
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_BODY], FALSE);
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_BODY], FALSE);
         }
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_ARMS] != -1)
+        if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_ARMS] != -1)
         {
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_ARMS], FALSE);
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_ARMS], FALSE);
         }
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS] != -1)
+        if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS] != -1)
         {
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS], FALSE);
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS], FALSE);
         }
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_PANTS] != -1)
+        if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_PANTS] != -1)
         {
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_PANTS], FALSE);
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_PANTS], FALSE);
         }
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_BACK] != -1)
+        if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_BACK] != -1)
         {
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_BACK], FALSE);
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_BACK], FALSE);
         }
     }
     else
@@ -567,216 +569,216 @@ BOOL CGame::bEquipItemHandler(int iClientH, short sItemIndex, BOOL bNotify)
         if (cEquipPos == DEF_EQUIPPOS_HEAD || cEquipPos == DEF_EQUIPPOS_BODY || cEquipPos == DEF_EQUIPPOS_ARMS ||
             cEquipPos == DEF_EQUIPPOS_LEGGINGS || cEquipPos == DEF_EQUIPPOS_PANTS || cEquipPos == DEF_EQUIPPOS_BACK)
         {
-            if (m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RELEASEALL] != -1)
+            if (client->m_sItemEquipmentStatus[DEF_EQUIPPOS_RELEASEALL] != -1)
             {
-                ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_RELEASEALL], FALSE);
+                ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[DEF_EQUIPPOS_RELEASEALL], FALSE);
             }
         }
-        if (m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos] != -1)
-            ReleaseItemHandler(iClientH, m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos], FALSE);
+        if (client->m_sItemEquipmentStatus[cEquipPos] != -1)
+            ReleaseItemHandler(iClientH, client->m_sItemEquipmentStatus[cEquipPos], FALSE);
     }
 
 
-    m_pClientList[iClientH]->m_sItemEquipmentStatus[cEquipPos] = sItemIndex;
-    m_pClientList[iClientH]->m_bIsItemEquipped[sItemIndex] = TRUE;
+    client->m_sItemEquipmentStatus[cEquipPos] = sItemIndex;
+    client->m_bIsItemEquipped[sItemIndex] = TRUE;
 
     switch (cEquipPos)
     {
 
         case DEF_EQUIPPOS_HEAD:
-            sTemp = m_pClientList[iClientH]->m_sAppr3;
+            sTemp = client->m_sAppr3;
             sTemp = sTemp & 0xFF0F;
-            sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue) << 4);
-            m_pClientList[iClientH]->m_sAppr3 = sTemp;
+            sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue) << 4);
+            client->m_sAppr3 = sTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xFFFFFFF0;
-            iTemp = iTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor));
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            iTemp = iTemp | ((client->m_pItemList[sItemIndex]->m_cItemColor));
+            client->m_iApprColor = iTemp;
             break;
 
         case DEF_EQUIPPOS_PANTS:
-            sTemp = m_pClientList[iClientH]->m_sAppr3;
+            sTemp = client->m_sAppr3;
             sTemp = sTemp & 0xF0FF;
-            sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue) << 8);
-            m_pClientList[iClientH]->m_sAppr3 = sTemp;
+            sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue) << 8);
+            client->m_sAppr3 = sTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xFFFFF0FF;
-            iTemp = iTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor) << 8);
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            iTemp = iTemp | ((client->m_pItemList[sItemIndex]->m_cItemColor) << 8);
+            client->m_iApprColor = iTemp;
             break;
 
         case DEF_EQUIPPOS_LEGGINGS:
-            sTemp = m_pClientList[iClientH]->m_sAppr4;
+            sTemp = client->m_sAppr4;
             sTemp = sTemp & 0x0FFF;
-            sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue) << 12);
-            m_pClientList[iClientH]->m_sAppr4 = sTemp;
+            sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue) << 12);
+            client->m_sAppr4 = sTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xFFFFFF0F;
-            iTemp = iTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor) << 4);
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            iTemp = iTemp | ((client->m_pItemList[sItemIndex]->m_cItemColor) << 4);
+            client->m_iApprColor = iTemp;
             break;
 
         case DEF_EQUIPPOS_BODY:
-            sTemp = m_pClientList[iClientH]->m_sAppr3;
+            sTemp = client->m_sAppr3;
             sTemp = sTemp & 0x0FFF;
 
-            if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue < 100)
+            if (client->m_pItemList[sItemIndex]->m_cApprValue < 100)
             {
-                sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue) << 12);
-                m_pClientList[iClientH]->m_sAppr3 = sTemp;
+                sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue) << 12);
+                client->m_sAppr3 = sTemp;
             }
             else
             {
-                sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue - 100) << 12);
-                m_pClientList[iClientH]->m_sAppr3 = sTemp;
-                sTemp = m_pClientList[iClientH]->m_sAppr4;
+                sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue - 100) << 12);
+                client->m_sAppr3 = sTemp;
+                sTemp = client->m_sAppr4;
                 sTemp = sTemp | 0x080;
-                m_pClientList[iClientH]->m_sAppr4 = sTemp;
+                client->m_sAppr4 = sTemp;
             }
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xFF0FFFFF;
-            iTemp = iTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor) << 20);
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            iTemp = iTemp | ((client->m_pItemList[sItemIndex]->m_cItemColor) << 20);
+            client->m_iApprColor = iTemp;
             break;
 
         case DEF_EQUIPPOS_ARMS:
-            sTemp = m_pClientList[iClientH]->m_sAppr3;
+            sTemp = client->m_sAppr3;
             sTemp = sTemp & 0xFFF0;
-            sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue));
-            m_pClientList[iClientH]->m_sAppr3 = sTemp;
+            sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue));
+            client->m_sAppr3 = sTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xFFFFFFFF;
-            iTemp = iTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor) << 12);
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            iTemp = iTemp | ((client->m_pItemList[sItemIndex]->m_cItemColor) << 12);
+            client->m_iApprColor = iTemp;
             break;
 
         case DEF_EQUIPPOS_LHAND:
-            sTemp = m_pClientList[iClientH]->m_sAppr2;
+            sTemp = client->m_sAppr2;
             sTemp = sTemp & 0xFFF0;
-            sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue));
-            m_pClientList[iClientH]->m_sAppr2 = sTemp;
+            sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue));
+            client->m_sAppr2 = sTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xF0FFFFFF;
-            iTemp = iTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor) << 24);
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            iTemp = iTemp | ((client->m_pItemList[sItemIndex]->m_cItemColor) << 24);
+            client->m_iApprColor = iTemp;
             break;
 
         case DEF_EQUIPPOS_RHAND:
-            sTemp = m_pClientList[iClientH]->m_sAppr2;
+            sTemp = client->m_sAppr2;
             sTemp = sTemp & 0xF00F;
-            sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue) << 4);
-            m_pClientList[iClientH]->m_sAppr2 = sTemp;
+            sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue) << 4);
+            client->m_sAppr2 = sTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xFFFFFFF;
-            iTemp = iTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor) << 28);
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            iTemp = iTemp | ((client->m_pItemList[sItemIndex]->m_cItemColor) << 28);
+            client->m_iApprColor = iTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iStatus;
+            iTemp = client->m_iStatus;
             iTemp = iTemp & 0xFFFFFFF0;
-            sSpeed = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cSpeed);
-            sSpeed -= (m_pClientList[iClientH]->m_iStr / 13);
+            sSpeed = (client->m_pItemList[sItemIndex]->m_cSpeed);
+            sSpeed -= (client->m_iStr / 13);
             if (sSpeed < 0) sSpeed = 0;
             iTemp = iTemp | (int)sSpeed;
-            m_pClientList[iClientH]->m_iStatus = iTemp;
-            m_pClientList[iClientH]->m_iComboAttackCount = 0;
+            client->m_iStatus = iTemp;
+            client->m_iComboAttackCount = 0;
             break;
 
         case DEF_EQUIPPOS_TWOHAND:
-            sTemp = m_pClientList[iClientH]->m_sAppr2;
+            sTemp = client->m_sAppr2;
             sTemp = sTemp & 0xF00F;
-            sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue) << 4);
-            m_pClientList[iClientH]->m_sAppr2 = sTemp;
+            sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue) << 4);
+            client->m_sAppr2 = sTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xFFFFFFF;
-            iTemp = iTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor) << 28);
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            iTemp = iTemp | ((client->m_pItemList[sItemIndex]->m_cItemColor) << 28);
+            client->m_iApprColor = iTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iStatus;
+            iTemp = client->m_iStatus;
             iTemp = iTemp & 0xFFFFFFF0;
-            sSpeed = (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cSpeed);
-            sSpeed -= (m_pClientList[iClientH]->m_iStr / 13);
+            sSpeed = (client->m_pItemList[sItemIndex]->m_cSpeed);
+            sSpeed -= (client->m_iStr / 13);
             if (sSpeed < 0) sSpeed = 0;
             iTemp = iTemp | (int)sSpeed;
-            m_pClientList[iClientH]->m_iStatus = iTemp;
-            m_pClientList[iClientH]->m_iComboAttackCount = 0;
+            client->m_iStatus = iTemp;
+            client->m_iComboAttackCount = 0;
             break;
 
         case DEF_EQUIPPOS_BACK:
-            sTemp = m_pClientList[iClientH]->m_sAppr4;
+            sTemp = client->m_sAppr4;
             sTemp = sTemp & 0xF0FF;
-            sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue) << 8);
-            m_pClientList[iClientH]->m_sAppr4 = sTemp;
+            sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue) << 8);
+            client->m_sAppr4 = sTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xFFF0FFFF;
-            iTemp = iTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor) << 16);
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            iTemp = iTemp | ((client->m_pItemList[sItemIndex]->m_cItemColor) << 16);
+            client->m_iApprColor = iTemp;
             break;
 
         case DEF_EQUIPPOS_RELEASEALL:
-            sTemp = m_pClientList[iClientH]->m_sAppr3;
+            sTemp = client->m_sAppr3;
             sTemp = sTemp & 0x0FFF;
-            sTemp = sTemp | ((m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cApprValue) << 12);
-            m_pClientList[iClientH]->m_sAppr3 = sTemp;
+            sTemp = sTemp | ((client->m_pItemList[sItemIndex]->m_cApprValue) << 12);
+            client->m_sAppr3 = sTemp;
 
-            iTemp = m_pClientList[iClientH]->m_iApprColor;
+            iTemp = client->m_iApprColor;
             iTemp = iTemp & 0xFFF0FFFF;
-            m_pClientList[iClientH]->m_iApprColor = iTemp;
+            client->m_iApprColor = iTemp;
             break;
     }
 
-    if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_ATTACK_SPECABLTY)
+    if (client->m_pItemList[sItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_ATTACK_SPECABLTY)
     {
-        m_pClientList[iClientH]->m_sAppr4 = m_pClientList[iClientH]->m_sAppr4 & 0xFFF3;
-        switch (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSpecialEffect)
+        client->m_sAppr4 = client->m_sAppr4 & 0xFFF3;
+        switch (client->m_pItemList[sItemIndex]->m_sSpecialEffect)
         {
             case 0: break;
             case 1:
-                m_pClientList[iClientH]->m_sAppr4 = m_pClientList[iClientH]->m_sAppr4 | 0x0004;
+                client->m_sAppr4 = client->m_sAppr4 | 0x0004;
                 break;
 
             case 2:
-                m_pClientList[iClientH]->m_sAppr4 = m_pClientList[iClientH]->m_sAppr4 | 0x000C;
+                client->m_sAppr4 = client->m_sAppr4 | 0x000C;
                 break;
 
             case 3:
-                m_pClientList[iClientH]->m_sAppr4 = m_pClientList[iClientH]->m_sAppr4 | 0x0008;
+                client->m_sAppr4 = client->m_sAppr4 | 0x0008;
                 break;
         }
     }
 
-    if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_DEFENSE_SPECABLTY)
+    if (client->m_pItemList[sItemIndex]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_DEFENSE_SPECABLTY)
     {
-        m_pClientList[iClientH]->m_sAppr4 = m_pClientList[iClientH]->m_sAppr4 & 0xFFFC;
-        switch (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSpecialEffect)
+        client->m_sAppr4 = client->m_sAppr4 & 0xFFFC;
+        switch (client->m_pItemList[sItemIndex]->m_sSpecialEffect)
         {
             case 0:
                 break;
             case 50:
             case 51:
             case 52:
-                m_pClientList[iClientH]->m_sAppr4 = m_pClientList[iClientH]->m_sAppr4 | 0x0002;
+                client->m_sAppr4 = client->m_sAppr4 | 0x0002;
                 break;
             default:
-                if (m_pClientList[iClientH]->m_iAdminUserLevel > 0)
-                    m_pClientList[iClientH]->m_sAppr4 = m_pClientList[iClientH]->m_sAppr4 | 0x0001;
+                if (client->m_iAdminUserLevel > 0)
+                    client->m_sAppr4 = client->m_sAppr4 | 0x0001;
                 break;
         }
     }
 
-    cHeroArmorType = _cCheckHeroItemEquipped(iClientH);
-    if (cHeroArmorType != 0x0FFFFFFFF) m_pClientList[iClientH]->m_cHeroArmorBonus = cHeroArmorType;
+    cHeroArmorType = _cCheckHeroItemEquipped(client);
+    if (cHeroArmorType != 0x0FFFFFFFF) client->m_cHeroArmorBonus = cHeroArmorType;
 
-    SendEventToNearClient_TypeA(iClientH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
-    CalcTotalItemEffect(iClientH, sItemIndex, bNotify);
+    SendEventToNearClient_TypeA(client, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
+    CalcTotalItemEffect(client, sItemIndex, bNotify);
     return TRUE;
 
 }
@@ -1597,7 +1599,7 @@ void CGame::ReleaseItemHandler(int iClientH, short sItemIndex, BOOL bNotice)
 
     if (m_pClientList[iClientH]->m_bIsItemEquipped[sItemIndex] == FALSE) return;
 
-    cHeroArmorType = _cCheckHeroItemEquipped(iClientH);
+    //cHeroArmorType = _cCheckHeroItemEquipped(iClientH);
     if (cHeroArmorType != 0x0FFFFFFFF) m_pClientList[iClientH]->m_cHeroArmorBonus = 0;
 
     cEquipPos = m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cEquipPos;

@@ -327,6 +327,9 @@ public:
     void update_db_skill(pqxx::transaction_base & t, skill_db & _item);
     void delete_db_skills(pqxx::transaction_base & t, int64_t id);
 
+    std::vector<item_db> get_db_items(pqxx::transaction_base & t, uint64_t character_id);
+    std::vector<skill_db> get_db_skills(pqxx::transaction_base & t, uint64_t character_id);
+
     void prepare_login_statements();
     void prepare_game_statements();
     bool is_account_in_use(int64_t account_id);
@@ -336,9 +339,10 @@ public:
 
     bool save_player_data(std::shared_ptr<CClient> client);
 
-    void add_bag_item(CClient * client, pqxx::row & row);
-    void add_bank_item(CClient * client, pqxx::row & row);
-    void add_mail_item(CClient * client, pqxx::row & row);
+    uint16_t add_bag_item(CClient * client, item_db & item);
+    uint16_t add_bank_item(CClient * client, item_db & item);
+    uint16_t add_mail_item(CClient * client, item_db & item);
+    CItem * fill_item(CClient * player, item_db & item);
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -373,7 +377,7 @@ public:
 	void SetInhibitionCastingFlag(short sOwnerH, char cOwnerType, BOOL bStatus);
 	//void CalculateEnduranceDecrement(short sTargetH, short sAttackerH, char cTargetType, int iArmorType);
 	BOOL bCalculateEnduranceDecrement(short sTargetH, short sAttackerH, char cTargetType, int iArmorType);
-	char _cCheckHeroItemEquipped(int iClientH);
+	char _cCheckHeroItemEquipped(CClient * client);
 	BOOL bPlantSeedBag(int iMapIndex, int dX, int dY, int iItemEffectValue1, int iItemEffectValue2, int iClientH);
 	void _CheckFarmingAction(short sAttackerH, short sTargetH, BOOL bType);
 
@@ -647,6 +651,17 @@ public:
 	void RequestAdminUserMode(int iClientH, char * pData);
 	int _iGetPlayerNumberOnSpot(short dX, short dY, char cMapIndex, char cRange);
 	void CalcTotalItemEffect(int iClientH, int iEquipItemID, BOOL bNotify = TRUE);
+    void CalcTotalItemEffect(CClient * client, int iEquipItemID, BOOL bNotify = TRUE)
+    {
+        CalcTotalItemEffect(get_client_handle(client), iEquipItemID, bNotify);
+    }
+    int16_t get_client_handle(CClient * client) const
+    {
+        for (int i = 0; i < DEF_MAXCLIENTS; i++)
+            if (m_pClientList[i] == client)
+                return i;
+        throw std::runtime_error("client not found");
+    }
 	void ___RestorePlayerCharacteristics(int iClientH);
 	void GetPlayerProfile(int iClientH, char * pMsg, DWORD dwMsgSize);
 	void SetPlayerProfile(int iClientH, char * pMsg, DWORD dwMsgSize);
@@ -753,7 +768,11 @@ public:
 	void ResponseCreateNewGuildHandler(char * pData, DWORD dwMsgSize);
 	int  iClientMotion_Stop_Handler(int iClientH, short sX, short sY, char cDir);
 	
-	BOOL bEquipItemHandler(int iClientH, short sItemIndex, BOOL bNotify = TRUE);
+	bool bEquipItemHandler(CClient * client, short sItemIndex, bool bNotify = true);
+    bool bEquipItemHandler(int iClientH, short sItemIndex, bool bNotify = true)
+    {
+        return bEquipItemHandler(m_pClientList[iClientH], sItemIndex, bNotify);
+    }
 	BOOL _bAddClientItemList(int iClientH, CItem * pItem, int * pDelReq);
 	int  iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char cDir);
 	void DropItemHandler(int iClientH, short sItemIndex, int iAmount, char * pItemName, BOOL bByPlayer = TRUE);

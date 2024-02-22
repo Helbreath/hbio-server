@@ -191,6 +191,58 @@ void CGame::delete_db_skills(pqxx::transaction_base & t, int64_t id)
     t.exec_prepared("delete_db_skills", id);
 }
 
+std::vector<item_db> CGame::get_db_items(pqxx::transaction_base & t, uint64_t character_id)
+{
+    pqxx::result result{ t.exec_prepared("get_items_by_character_id", character_id) };
+
+    std::vector<item_db> items;
+    for (const auto & row : result)
+    {
+        item_db item;
+        item.id = row["id"].as<int64_t>();
+        item.char_id = row["char_id"].as<int64_t>();
+        item.name = row["name"].as<std::string>();
+        item.count = row["count"].as<int64_t>();
+        item.type = row["type"].as<int32_t>();
+        item.id1 = row["id1"].as<int32_t>();
+        item.id2 = row["id2"].as<int32_t>();
+        item.id3 = row["id3"].as<int32_t>();
+        item.color = row["color"].as<int32_t>();
+        item.effect1 = row["effect1"].as<int32_t>();
+        item.effect2 = row["effect2"].as<int32_t>();
+        item.effect3 = row["effect3"].as<int32_t>();
+        item.durability = row["durability"].as<int32_t>();
+        item.attribute = row["attribute"].as<int64_t>();
+        item.equipped = row["equipped"].as<bool>();
+        item.itemposx = row["itemposx"].as<int32_t>();
+        item.itemposy = row["itemposy"].as<int32_t>();
+        item.itemloc = row["itemloc"].as<std::string>();
+        item.item_id = row["item_id"].as<int64_t>();
+        items.push_back(item);
+    }
+
+    return items;
+}
+
+std::vector<skill_db> CGame::get_db_skills(pqxx::transaction_base & t, uint64_t character_id)
+{
+    pqxx::result result{ t.exec_prepared("get_skills_by_character_id", character_id) };
+
+    std::vector<skill_db> skills;
+    for (const auto & row : result)
+    {
+        skill_db skill;
+        skill.id = row["id"].as<int64_t>();
+        skill.character_id = row["char_id"].as<int64_t>();
+        skill.skill_id = row["skill_id"].as<int64_t>();
+        skill.skill_level = row["mastery"].as<int32_t>();
+        skill.skill_exp = row["experience"].as<int32_t>();
+        skills.push_back(skill);
+    }
+
+    return skills;
+}
+
 void CGame::prepare_login_statements()
 {
 
@@ -307,6 +359,7 @@ void CGame::prepare_game_statements()
     pq_game->prepare("delete_character_by_id_wn", R"(SELECT * FROM characters WHERE name=$1 AND world_name=$2 ORDER BY id ASC)");
     pq_game->prepare("delete_item_by_id", R"(SELECT * FROM characters WHERE name=$1 AND world_name=$2 ORDER BY id ASC)");
     pq_game->prepare("get_items_by_character_id", R"(SELECT * FROM items WHERE char_id=$1 ORDER BY id ASC)");
+    pq_game->prepare("get_skills_by_character_id", R"(SELECT * FROM skills WHERE char_id=$1 ORDER BY id ASC)");
     pq_game->prepare(
         "create_db_item",
         R"(

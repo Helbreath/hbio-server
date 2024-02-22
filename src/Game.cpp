@@ -16775,63 +16775,63 @@ void CGame::TimeHitPointsUp(int iClientH)
     m_pClientList[iClientH]->m_iHPstock = 0;
 }
 
-char CGame::_cCheckHeroItemEquipped(int iClientH)
+char CGame::_cCheckHeroItemEquipped(CClient * client)
 {
     short sHeroLeggings, sHeroHauberk, sHeroArmor, sHeroHelm;
 
-    if (m_pClientList[iClientH] == NULL) return 0;
+    if (client == NULL) return 0;
 
-    sHeroHelm = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_HEAD];
-    sHeroArmor = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_BODY];
-    sHeroHauberk = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_ARMS];
-    sHeroLeggings = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_PANTS];
+    sHeroHelm = client->m_sItemEquipmentStatus[DEF_EQUIPPOS_HEAD];
+    sHeroArmor = client->m_sItemEquipmentStatus[DEF_EQUIPPOS_BODY];
+    sHeroHauberk = client->m_sItemEquipmentStatus[DEF_EQUIPPOS_ARMS];
+    sHeroLeggings = client->m_sItemEquipmentStatus[DEF_EQUIPPOS_PANTS];
 
     if ((sHeroHelm < 0) || (sHeroLeggings < 0) || (sHeroArmor < 0) || (sHeroHauberk < 0)) return 0;
 
-    if (m_pClientList[iClientH]->m_pItemList[sHeroHelm] == NULL) return 0;
-    if (m_pClientList[iClientH]->m_pItemList[sHeroLeggings] == NULL) return 0;
-    if (m_pClientList[iClientH]->m_pItemList[sHeroArmor] == NULL) return 0;
-    if (m_pClientList[iClientH]->m_pItemList[sHeroHauberk] == NULL) return 0;
+    if (client->m_pItemList[sHeroHelm] == NULL) return 0;
+    if (client->m_pItemList[sHeroLeggings] == NULL) return 0;
+    if (client->m_pItemList[sHeroArmor] == NULL) return 0;
+    if (client->m_pItemList[sHeroHauberk] == NULL) return 0;
 
-    if ((m_pClientList[iClientH]->m_pItemList[sHeroHelm]->m_sIDnum == 403) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroArmor]->m_sIDnum == 411) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroHauberk]->m_sIDnum == 419) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroLeggings]->m_sIDnum == 423)) return 1;
+    if ((client->m_pItemList[sHeroHelm]->m_sIDnum == 403) &&
+        (client->m_pItemList[sHeroArmor]->m_sIDnum == 411) &&
+        (client->m_pItemList[sHeroHauberk]->m_sIDnum == 419) &&
+        (client->m_pItemList[sHeroLeggings]->m_sIDnum == 423)) return 1;
 
-    if ((m_pClientList[iClientH]->m_pItemList[sHeroHelm]->m_sIDnum == 407) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroArmor]->m_sIDnum == 415) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroHauberk]->m_sIDnum == 419) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroLeggings]->m_sIDnum == 423)) return 2;
+    if ((client->m_pItemList[sHeroHelm]->m_sIDnum == 407) &&
+        (client->m_pItemList[sHeroArmor]->m_sIDnum == 415) &&
+        (client->m_pItemList[sHeroHauberk]->m_sIDnum == 419) &&
+        (client->m_pItemList[sHeroLeggings]->m_sIDnum == 423)) return 2;
 
-    if ((m_pClientList[iClientH]->m_pItemList[sHeroHelm]->m_sIDnum == 404) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroArmor]->m_sIDnum == 412) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroHauberk]->m_sIDnum == 420) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroLeggings]->m_sIDnum == 424)) return 1;
+    if ((client->m_pItemList[sHeroHelm]->m_sIDnum == 404) &&
+        (client->m_pItemList[sHeroArmor]->m_sIDnum == 412) &&
+        (client->m_pItemList[sHeroHauberk]->m_sIDnum == 420) &&
+        (client->m_pItemList[sHeroLeggings]->m_sIDnum == 424)) return 1;
 
-    if ((m_pClientList[iClientH]->m_pItemList[sHeroHelm]->m_sIDnum == 408) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroArmor]->m_sIDnum == 416) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroHauberk]->m_sIDnum == 420) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroLeggings]->m_sIDnum == 424)) return 2;
+    if ((client->m_pItemList[sHeroHelm]->m_sIDnum == 408) &&
+        (client->m_pItemList[sHeroArmor]->m_sIDnum == 416) &&
+        (client->m_pItemList[sHeroHauberk]->m_sIDnum == 420) &&
+        (client->m_pItemList[sHeroLeggings]->m_sIDnum == 424)) return 2;
 
-    if ((m_pClientList[iClientH]->m_pItemList[sHeroHelm]->m_sIDnum == 405) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroArmor]->m_sIDnum == 413) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroHauberk]->m_sIDnum == 421) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroLeggings]->m_sIDnum == 425)) return 1;
+    if ((client->m_pItemList[sHeroHelm]->m_sIDnum == 405) &&
+        (client->m_pItemList[sHeroArmor]->m_sIDnum == 413) &&
+        (client->m_pItemList[sHeroHauberk]->m_sIDnum == 421) &&
+        (client->m_pItemList[sHeroLeggings]->m_sIDnum == 425)) return 1;
 
-    if ((m_pClientList[iClientH]->m_pItemList[sHeroHelm]->m_sIDnum == 409) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroArmor]->m_sIDnum == 417) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroHauberk]->m_sIDnum == 421) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroLeggings]->m_sIDnum == 425)) return 2;
+    if ((client->m_pItemList[sHeroHelm]->m_sIDnum == 409) &&
+        (client->m_pItemList[sHeroArmor]->m_sIDnum == 417) &&
+        (client->m_pItemList[sHeroHauberk]->m_sIDnum == 421) &&
+        (client->m_pItemList[sHeroLeggings]->m_sIDnum == 425)) return 2;
 
-    if ((m_pClientList[iClientH]->m_pItemList[sHeroHelm]->m_sIDnum == 406) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroArmor]->m_sIDnum == 414) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroHauberk]->m_sIDnum == 422) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroLeggings]->m_sIDnum == 426)) return 1;
+    if ((client->m_pItemList[sHeroHelm]->m_sIDnum == 406) &&
+        (client->m_pItemList[sHeroArmor]->m_sIDnum == 414) &&
+        (client->m_pItemList[sHeroHauberk]->m_sIDnum == 422) &&
+        (client->m_pItemList[sHeroLeggings]->m_sIDnum == 426)) return 1;
 
-    if ((m_pClientList[iClientH]->m_pItemList[sHeroHelm]->m_sIDnum == 410) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroArmor]->m_sIDnum == 418) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroHauberk]->m_sIDnum == 422) &&
-        (m_pClientList[iClientH]->m_pItemList[sHeroLeggings]->m_sIDnum == 426)) return 2;
+    if ((client->m_pItemList[sHeroHelm]->m_sIDnum == 410) &&
+        (client->m_pItemList[sHeroArmor]->m_sIDnum == 418) &&
+        (client->m_pItemList[sHeroHauberk]->m_sIDnum == 422) &&
+        (client->m_pItemList[sHeroLeggings]->m_sIDnum == 426)) return 2;
 
     return 0;
 }

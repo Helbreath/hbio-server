@@ -257,82 +257,84 @@ void CGame::create_character(CClient * client, stream_read & sr)
             return;
         }
 
-        std::shared_lock<std::shared_mutex> l(game_sql_mtx);
-        pqxx::work txn{ *pq_game };
-
         {
-            pqxx::row r{
-                txn.exec_prepared1("check_character_count_by_account_id_wn", character.account_id, character.world_name)
-            };
-            auto [charcount] = r.as<uint16_t>();
+            std::shared_lock<std::shared_mutex> l(game_sql_mtx);
+            pqxx::work txn{ *pq_game };
 
-            if (charcount > 3)
+            {
+                pqxx::row r{
+                    txn.exec_prepared1("check_character_count_by_account_id_wn", character.account_id, character.world_name)
+                };
+                auto [charcount] = r.as<uint16_t>();
+
+                if (charcount > 3)
+                {
+                    sw.write_uint32(MSGID_RESPONSE_LOG);
+                    sw.write_uint16(DEF_LOGRESMSGTYPE_NEWCHARACTERFAILED);
+                    client->write(sw);
+                    return;
+                }
+            }
+
+            {
+                pqxx::row r{
+                    txn.exec_prepared1("check_character_count_by_name_wn", character.name, character.world_name)
+                };
+                auto [charcount] = r.as<uint16_t>();
+
+                if (charcount > 3)
+                {
+                    sw.write_uint32(MSGID_RESPONSE_LOG);
+                    sw.write_uint16(DEF_LOGRESMSGTYPE_NEWCHARACTERFAILED);
+                    client->write(sw);
+                    return;
+                }
+            }
+
+            character.gender = sr.read_byte();
+            character.skin = sr.read_byte();
+            character.hairstyle = sr.read_byte();
+            character.haircolor = sr.read_byte();
+            character.underwear = sr.read_byte();
+
+            character.strength = sr.read_byte();
+            character.vitality = sr.read_byte();
+            character.dexterity = sr.read_byte();
+            character.intelligence = sr.read_byte();
+            character.magic = sr.read_byte();
+            character.charisma = sr.read_byte();
+
+            if (
+                ((character.strength + character.vitality + character.dexterity + character.intelligence + character.magic + character.charisma) != 70)
+                || character.strength < 10 || character.strength > 14
+                || character.vitality < 10 || character.vitality > 14
+                || character.dexterity < 10 || character.dexterity > 14
+                || character.intelligence < 10 || character.intelligence > 14 ||
+                character.magic < 10 || character.magic > 14 ||
+                character.charisma < 10 || character.charisma > 14
+                )
             {
                 sw.write_uint32(MSGID_RESPONSE_LOG);
                 sw.write_uint16(DEF_LOGRESMSGTYPE_NEWCHARACTERFAILED);
                 client->write(sw);
                 return;
             }
-        }
+            character.appr1 = (character.hairstyle << 8) | (character.haircolor << 4) | character.underwear;
+            character.hp = (character.vitality * 8) + (character.strength * 2) + (character.intelligence * 2) + 8;
+            character.mp = (character.magic * 3) + (character.intelligence * 2) + 2;
+            character.sp = character.strength + 17;
 
-        {
-            pqxx::row r{
-                txn.exec_prepared1("check_character_count_by_name_wn", character.name, character.world_name)
-            };
-            auto [charcount] = r.as<uint16_t>();
+            character.id = create_db_character(txn, character);
 
-            if (charcount > 3)
+            for (uint16_t s = 0; s < 24; ++s)//24 skills total
             {
-                sw.write_uint32(MSGID_RESPONSE_LOG);
-                sw.write_uint16(DEF_LOGRESMSGTYPE_NEWCHARACTERFAILED);
-                client->write(sw);
-                return;
+                if (/*s == 4 ||*/ s == 5 || s == 6 || s == 7 || s == 8 || s == 9 || s == 10 || s == 11 || s == 14 || s == 19 || s == 21)// All attack skills starts at 20%
+                    txn.exec_params("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 20, 0)", character.id, s);
+                else if (s == 3 || s == 23) // Magic Res / Poison Res starts at 2%
+                    txn.exec_params("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 2, 0)", character.id, s);
+                else// All crafting skills starts at 0% Magic skills starts at 0%
+                    txn.exec_params("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 0, 0)", character.id, s);
             }
-        }
-
-        character.gender = sr.read_byte();
-        character.skin = sr.read_byte();
-        character.hairstyle = sr.read_byte();
-        character.haircolor = sr.read_byte();
-        character.underwear = sr.read_byte();
-
-        character.strength = sr.read_byte();
-        character.vitality = sr.read_byte();
-        character.dexterity = sr.read_byte();
-        character.intelligence = sr.read_byte();
-        character.magic = sr.read_byte();
-        character.charisma = sr.read_byte();
-
-        if (
-            ((character.strength + character.vitality + character.dexterity + character.intelligence + character.magic + character.charisma) != 70)
-            || character.strength < 10 || character.strength > 14
-            || character.vitality < 10 || character.vitality > 14
-            || character.dexterity < 10 || character.dexterity > 14
-            || character.intelligence < 10 || character.intelligence > 14 ||
-            character.magic < 10 || character.magic > 14 ||
-            character.charisma < 10 || character.charisma > 14
-            )
-        {
-            sw.write_uint32(MSGID_RESPONSE_LOG);
-            sw.write_uint16(DEF_LOGRESMSGTYPE_NEWCHARACTERFAILED);
-            client->write(sw);
-            return;
-        }
-        character.appr1 = (character.hairstyle << 8) | (character.haircolor << 4) | character.underwear;
-        character.hp = (character.vitality * 8) + (character.strength * 2) + (character.intelligence * 2) + 8;
-        character.mp = (character.magic * 3) + (character.intelligence * 2) + 2;
-        character.sp = character.strength + 17;
-
-        character.id = create_db_character(txn, character);
-
-        for (uint16_t s = 0; s < 24; ++s)//24 skills total
-        {
-            if (/*s == 4 ||*/ s == 5 || s == 6 || s == 7 || s == 8 || s == 9 || s == 10 || s == 11 || s == 14 || s == 19 || s == 21)// All attack skills starts at 20%
-                txn.exec_params("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 20, 0)", character.id, s);
-            else if (s == 3 || s == 23) // Magic Res / Poison Res starts at 2%
-                txn.exec_params("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 2, 0)", character.id, s);
-            else// All crafting skills starts at 0% Magic skills starts at 0%
-                txn.exec_params("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 0, 0)", character.id, s);
         }
 
         sw.write_uint32(MSGID_RESPONSE_LOG);
@@ -462,8 +464,8 @@ void CGame::enter_game(CClient * client, stream_read & sr)
 
             client->id = row["id"].as<uint64_t>();
 
-            pqxx::result item_result{ txn.exec_params("SELECT * FROM items WHERE char_id=$1", client->id) };
-            pqxx::result skill_result{ txn.exec_params("SELECT * FROM skills WHERE char_id=$1", client->id) };
+            std::vector<item_db> items{ get_db_items(txn, client->id) };
+            std::vector<skill_db> skills{ get_db_skills(txn, client->id) };
             txn.commit();
 
 
@@ -562,29 +564,35 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             client->m_sType += client->m_cSkin - 1;
             client->m_sAppr1 = (client->m_cHairStyle << 8) | (client->m_cHairColor << 4) | client->m_cUnderwear;
 
-            for (pqxx::row row : item_result)
+            for (item_db & item : items)
             {
-                std::string itemloc = row["itemloc"].as<std::string>();
+                std::string itemloc = item.itemloc;
                 if (itemloc == "bag")
                 {
-                    add_bag_item(client, row);
+                    uint16_t item_index = add_bag_item(client, item);
+                    if (client->m_bIsItemEquipped[item_index] == true)
+                    {
+                        if (bEquipItemHandler(client, item_index, false) == false)
+                            client->m_bIsItemEquipped[item_index] = false;
+                    }
+
                 }
                 else if (itemloc == "bank")
                 {
-                    add_bank_item(client, row);
+                    add_bank_item(client, item);
                 }
                 else if (itemloc == "mail")
                 {
-                    // do mail items with the mail record itself
-                    //add_mail_item(client, row);
+                    // todo: do mail items with the mail record itself
+                    //add_mail_item(client, item);
                 }
             }
-            for (pqxx::row row : skill_result)
+            for (skill_db & skill : skills)
             {
-                int16_t skill_id = row["skill_id"].as<int16_t>();
-                client->m_cSkillId[skill_id] = row["skill_id"].as<uint32_t>();
-                client->m_cSkillMastery[skill_id] = (int8_t)row["mastery"].as<int16_t>();
-                client->m_iSkillSSN[skill_id] = row["experience"].as<int32_t>();
+                int16_t skill_id = skill.skill_id;
+                client->m_cSkillId[skill_id] = skill.skill_id;
+                client->m_cSkillMastery[skill_id] = skill.skill_level;
+                client->m_iSkillSSN[skill_id] = skill.skill_exp;
             }
         }
         catch (pqxx::unexpected_rows &)
@@ -760,117 +768,87 @@ void CGame::enter_game(CClient * client, stream_read & sr)
     }
 }
 
-void CGame::add_bag_item(CClient * client, pqxx::row & row)
+CItem * CGame::fill_item(CClient * player, item_db & item)
 {
-    CItem * item{};
+    CItem * item_ = new CItem();
+    item_->id = item.id;
+    if (_bInitItemAttr(item_, item.item_id) == FALSE)
+    {
+        delete item_;
+        return nullptr;
+    }
+    item_->m_dwCount = item.count;
+    item_->m_sTouchEffectType = item.type;
+    item_->m_sTouchEffectValue1 = item.id1;
+    item_->m_sTouchEffectValue2 = item.id2;
+    item_->m_sTouchEffectValue3 = item.id3;
+    item_->m_cItemColor = item.color;
+    item_->m_sItemSpecEffectValue1 = item.effect1;
+    item_->m_sItemSpecEffectValue2 = item.effect2;
+    item_->m_sItemSpecEffectValue3 = item.effect3;
+    item_->m_wCurLifeSpan = item.durability;
+    item_->m_dwAttribute = item.attribute;
+
+    // todo: do this better
+    if (item_->m_sTouchEffectType == DEF_ITET_UNIQUE_OWNER)
+    {
+        if ((item_->m_sTouchEffectValue1 != player->m_sCharIDnum1) ||
+            (item_->m_sTouchEffectValue2 != player->m_sCharIDnum2) ||
+            (item_->m_sTouchEffectValue3 != player->m_sCharIDnum3))
+        {
+            log->info(
+                std::format("(!) Non-matching IDs for unique item: Player({}) Item({}) {} {} {} - {} {} {}",
+                    player->m_cCharName,
+                    item_->m_cName,
+                    item_->m_sTouchEffectValue1,
+                    item_->m_sTouchEffectValue2,
+                    item_->m_sTouchEffectValue3,
+                    player->m_sCharIDnum1,
+                    player->m_sCharIDnum2,
+                    player->m_sCharIDnum3)
+            );
+        }
+    }
+
+    return item_;
+}
+
+uint16_t CGame::add_bag_item(CClient * client, item_db & item)
+{
     for (int i = 0; i < DEF_MAXITEMS; ++i)
     {
         if (client->m_pItemList[i] == nullptr)
         {
-            item = new CItem();
-            item->id = row["id"].as<uint64_t>();
-            if (_bInitItemAttr(item, row["item_id"].as<int32_t>()) == FALSE)
-            {
-                delete item;
-                break;
-            }
-            item->m_dwCount = row["count"].as<uint32_t>();
-            item->m_sTouchEffectType = row["type"].as<int16_t>();
-            item->m_sTouchEffectValue1 = row["id1"].as<int16_t>();
-            item->m_sTouchEffectValue2 = row["id2"].as<int16_t>();
-            item->m_sTouchEffectValue3 = row["id3"].as<int16_t>();
-            item->m_cItemColor = (int8_t)row["color"].as<int16_t>();
-            item->m_sItemSpecEffectValue1 = row["effect1"].as<int16_t>();
-            item->m_sItemSpecEffectValue2 = row["effect2"].as<int16_t>();
-            item->m_sItemSpecEffectValue3 = row["effect3"].as<int16_t>();
-            item->m_wCurLifeSpan = row["durability"].as<uint16_t>();
-            item->m_dwAttribute = row["attribute"].as<uint32_t>();
-            client->m_bIsItemEquipped[i] = row["equipped"].as<bool>();
-            client->m_ItemPosList[i].x = row["itemposx"].as<int16_t>();
-            client->m_ItemPosList[i].y = row["itemposy"].as<int16_t>();
-
-            if (item->m_sTouchEffectType == DEF_ITET_UNIQUE_OWNER)
-            {
-                if ((item->m_sTouchEffectValue1 != client->m_sCharIDnum1) ||
-                    (item->m_sTouchEffectValue2 != client->m_sCharIDnum2) ||
-                    (item->m_sTouchEffectValue3 != client->m_sCharIDnum3))
-                {
-                    log->info(
-                        std::format("(!) Non-matching IDs for unique item: Player({}) Item({}) {} {} {} - {} {} {}",
-                            client->m_cCharName,
-                            item->m_cName,
-                            item->m_sTouchEffectValue1,
-                            item->m_sTouchEffectValue2,
-                            item->m_sTouchEffectValue3,
-                            client->m_sCharIDnum1,
-                            client->m_sCharIDnum2,
-                            client->m_sCharIDnum3)
-                    );
-                }
-            }
-            client->m_pItemList[i] = item;
-            break;
+            CItem * item_ = fill_item(client, item);
+            if (item_->m_cItemType == DEF_ITEMTYPE_EQUIP && item.equipped)
+                client->m_bIsItemEquipped[i] = item.equipped;
+            
+            client->m_ItemPosList[i].x = item.itemposx;
+            client->m_ItemPosList[i].y = item.itemposy;
+            client->m_pItemList[i] = item_;
+            return i;
         }
     }
+    throw std::runtime_error("Bag is full");
 }
 
-void CGame::add_bank_item(CClient * client, pqxx::row & row)
+uint16_t CGame::add_bank_item(CClient * client, item_db & item)
 {
-    CItem * item{};
     for (int i = 0; i < DEF_MAXBANKITEMS; ++i)
     {
         if (client->m_pItemInBankList[i] == nullptr)
         {
-            item = new CItem();
-            item->id = row["id"].as<uint64_t>();
-            if (_bInitItemAttr(item, row["item_id"].as<int32_t>()) == FALSE)
-            {
-                delete item;
-                break;
-            }
-            item->m_dwCount = row["count"].as<uint32_t>();
-            item->m_sTouchEffectType = row["type"].as<int16_t>();
-            item->m_sTouchEffectValue1 = row["id1"].as<int16_t>();
-            item->m_sTouchEffectValue2 = row["id2"].as<int16_t>();
-            item->m_sTouchEffectValue3 = row["id3"].as<int16_t>();
-            item->m_cItemColor = (int8_t)row["color"].as<int16_t>();
-            item->m_sItemSpecEffectValue1 = row["effect1"].as<int16_t>();
-            item->m_sItemSpecEffectValue2 = row["effect2"].as<int16_t>();
-            item->m_sItemSpecEffectValue3 = row["effect3"].as<int16_t>();
-            item->m_wCurLifeSpan = row["durability"].as<uint16_t>();
-            item->m_dwAttribute = row["attribute"].as<uint32_t>();
-            client->m_ItemPosList[i].x = row["itemposx"].as<int16_t>();
-            client->m_ItemPosList[i].y = row["itemposy"].as<int16_t>();
-
-            if (item->m_sTouchEffectType == DEF_ITET_UNIQUE_OWNER)
-            {
-                if ((item->m_sTouchEffectValue1 != client->m_sCharIDnum1) ||
-                    (item->m_sTouchEffectValue2 != client->m_sCharIDnum2) ||
-                    (item->m_sTouchEffectValue3 != client->m_sCharIDnum3))
-                {
-                    log->info(
-                        std::format("(!) Non-matching IDs for unique item: Player({}) Item({}) {} {} {} - {} {} {}",
-                            client->m_cCharName,
-                            item->m_cName,
-                            item->m_sTouchEffectValue1,
-                            item->m_sTouchEffectValue2,
-                            item->m_sTouchEffectValue3,
-                            client->m_sCharIDnum1,
-                            client->m_sCharIDnum2,
-                            client->m_sCharIDnum3)
-                    );
-                }
-            }
-            client->m_pItemList[i] = item;
-            break;
+            client->m_pItemInBankList[i] = fill_item(client, item);
+            return i;
         }
     }
+    throw std::runtime_error("Bank is full");
 }
 
-void CGame::add_mail_item(CClient * client, pqxx::row & row)
+uint16_t CGame::add_mail_item(CClient * client, item_db & item)
 {
-    CItem * item{};
-
+    // todo
+    return 0;
 }
 
 //how to delete client?
