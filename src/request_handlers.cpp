@@ -5097,6 +5097,12 @@ void CGame::CheckConnectionHandler(int iClientH, char * pData)
             return;
         }
     }
+    stream_write sw;
+
+    sw.write_int32(MSGID_COMMAND_CHECKCONNECTION);
+    sw.write_int16(0);
+    sw.write_int64(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+    m_pClientList[iClientH]->write(sw);
 }
 
 void CGame::SelectCrusadeDutyHandler(int iClientH, int iDuty)
