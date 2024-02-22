@@ -1137,6 +1137,7 @@ private:
 	void _ClearExchangeStatus(int iToH);
 	int _iGetItemSpaceLeft(int iClientH);
 
+    void ScreenSettingsHandler(int iClientH, char * pData, DWORD dwMsgSize);
 public:
 	void AdminOrder_GoTo(int iClientH, char* pData, DWORD dwMsgSize);
 	void AdminOrder_MonsterCount(int iClientH, char* pData, DWORD dwMsgSize);

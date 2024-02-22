@@ -3246,6 +3246,10 @@ void CGame::MsgProcess()
                 ClientCommonHandler(iClientH, pData);
                 break;
 
+            case MSGID_SCREEN_SETTINGS:
+                ScreenSettingsHandler(iClientH, pData, dwMsgSize);
+                break;
+
             case MSGID_COMMAND_MOTION:
                 ClientMotionHandler(iClientH, pData);
                 break;
@@ -12443,6 +12447,25 @@ int CGame::_iGetItemSpaceLeft(int iClientH)
         if (m_pClientList[iClientH]->m_pItemList[i] != NULL) iTotalItem++;
 
     return (DEF_MAXITEMS - iTotalItem);
+}
+
+void CGame::ScreenSettingsHandler(int iClientH, char * pData, DWORD dwMsgSize)
+{
+    if (m_pClientList[iClientH] == NULL) return;
+
+    CClient * client = m_pClientList[iClientH];
+    stream_read sr(pData, dwMsgSize);
+
+    sr.read<uint32_t>();
+
+    client->screenwidth_v = sr.read<uint16_t>();
+    client->screenheight_v = sr.read<uint16_t>();
+    client->screenwidth = sr.read<uint16_t>();
+    client->screenheight = sr.read<uint16_t>();
+    client->screen_size_x = client->screenwidth_v / 32;
+    client->screen_size_y = client->screenheight_v / 32;
+
+    log->info("ScreenSettingsHandler: client {} screenwidth_v {} screenheight_v {} screenwidth {} screenheight {} screen_size_x {} screen_size_y {}", iClientH, client->screenwidth_v, client->screenheight_v, client->screenwidth, client->screenheight, client->screen_size_x, client->screen_size_y);
 }
 
 BOOL CGame::bAddItem(int iClientH, CItem * pItem, char cMode)

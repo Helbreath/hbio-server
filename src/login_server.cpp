@@ -99,6 +99,9 @@ void CGame::handle_login_server_message(socket_message & sm)
             {
                 break;
             }
+            case MSGID_SCREEN_SETTINGS:
+                ScreenSettingsHandler(get_client_handle(client), sr.data, sr.size);
+                break;
             case MSGID_REQUEST_LOGIN:
             {
                 if (!check_login_status()) return;

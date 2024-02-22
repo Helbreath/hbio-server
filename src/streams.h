@@ -103,12 +103,12 @@ public:
 
     void write_string(std::string value)
     {
-        write_int(uint32_t(value.length()));
+        write_uint(uint32_t(value.length()));
         file.write(value.c_str(), value.length());
     }
 };
 
-#define verify_data if (data == 0) throw -192
+#define verify_data if (data == nullptr) throw -192
 #define verify_size(a) if (position+a > size) { std::size_t oldsize = size; if ((std::size_t)(float(size)*1.15) < oldsize+a) { size = (std::size_t)(float(size)*1.15)+a; } else { size = (std::size_t)(float(size)*1.15); } char * temp = new char[size]; memset(temp, 0, size); memcpy(temp, data, oldsize); delete[] data; data = temp; }
 #define verify_length(a) if (position+a > size) { throw -193; }
 class stream_write
@@ -139,6 +139,16 @@ public:
         size = 100;
         data = new char[size];
         position = 0;
+    }
+
+    template<typename T>
+    std::size_t write(const T & value)
+    {
+        verify_data;
+        verify_size(sizeof(T));
+        memcpy(data + position, &value, sizeof(T));
+        position += sizeof(T);
+        return position;
     }
 
     std::size_t write_size()
@@ -421,7 +431,18 @@ public:
         position = 0;
     }
 
-    std::size_t read_size()
+    template<typename T>
+    T read()
+    {
+        verify_data;
+        verify_length(sizeof(T));
+        T p{};
+        memcpy(&p, data + position, sizeof(T));
+        position += sizeof(T);
+        return p;
+    }
+
+    std::size_t read_size() const
     {
         verify_data;
         return *(uint32_t *)(data);
@@ -540,7 +561,7 @@ public:
 
     return_result read_enum()
     {
-        return static_cast<return_result>(read_int32());
+        return static_cast<return_result>(read_uint32());
     }
 
     std::string read_string()

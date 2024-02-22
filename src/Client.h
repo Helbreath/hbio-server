@@ -132,7 +132,7 @@ struct character_db
 
 struct skill_db
 {
-    int32_t id{};
+    int64_t id{};
     int64_t character_id{};
     int64_t skill_id{};
     int32_t skill_level{};
@@ -237,6 +237,13 @@ public:
 
     std::size_t write(stream_write & sw);
 
+    uint32_t screenwidth{};
+    uint32_t screenheight{};
+    uint32_t screenwidth_v{};
+    uint32_t screenheight_v{};
+    uint16_t screen_size_x{};
+    uint16_t screen_size_y{};
+
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -337,6 +344,9 @@ public:
 	CItem * m_pItemList[DEF_MAXITEMS]{};
 	POINT m_ItemPosList[DEF_MAXITEMS]{};
 	CItem * m_pItemInBankList[DEF_MAXBANKITEMS]{};
+
+    // todo: add mail and mail item support
+    //mail m_pMailList[DEF_MAXMAILS]{};
 	
 	BOOL  m_bIsItemEquipped[DEF_MAXITEMS]{};
 	short m_sItemEquipmentStatus[DEF_MAXITEMEQUIPPOS]{};

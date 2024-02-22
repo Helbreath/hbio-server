@@ -31,6 +31,7 @@ static inline constexpr uint32_t MSGID_EVENT_MOTION = 0x0FA314D7;
 static inline constexpr uint32_t MSGID_EVENT_LOG = 0x0FA314D8;
 static inline constexpr uint32_t MSGID_EVENT_COMMON = 0x0FA314DB;
 static inline constexpr uint32_t MSGID_COMMAND_COMMON = 0x0FA314DC;
+static inline constexpr uint32_t MSGID_SCREEN_SETTINGS = 0x0FA314DD;
 
 static inline constexpr uint16_t DEF_COMMONTYPE_ITEMDROP = 0x0A01;
 static inline constexpr uint16_t DEF_COMMONTYPE_EQUIPITEM = 0x0A02;
