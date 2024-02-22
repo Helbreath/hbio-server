@@ -9,6 +9,7 @@
 
 using json = nlohmann::json;
 
+#if defined(HELBREATHX)
 uint64_t CGame::check_account_auth(CClient * client, std::string & account, std::string & pass)
 {
     if (client && client->logged_in == true) return client->account_id;
@@ -86,3 +87,4 @@ uint64_t CGame::check_account_auth(CClient * client, std::string & account, std:
     }
     throw std::exception("Unknown error during login call 2");
 }
+#endif
