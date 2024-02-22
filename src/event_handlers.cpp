@@ -1306,9 +1306,9 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
 
 void CGame::ClientKilledHandler(int iClientH, int iAttackerH, char cAttackerType, short sDamage)
 {
-    char * cp, cAttackerName[30], cData[120];
-    short sAttackerWeapon;
-    int * ip, i, iExH;
+    char * cp, cAttackerName[30]{}, cData[120]{};
+    short sAttackerWeapon{};
+    int * ip, i{}, iExH{};
     BOOL  bIsSAattacked = FALSE;
 
 
@@ -1586,9 +1586,9 @@ void CGame::ClientKilledHandler(int iClientH, int iAttackerH, char cAttackerType
 
 void CGame::ReleaseItemHandler(int iClientH, short sItemIndex, BOOL bNotice)
 {
-    char cEquipPos, cHeroArmorType;
-    short  sTemp;
-    int   iTemp;
+    char cEquipPos{}, cHeroArmorType{};
+    short  sTemp{};
+    int   iTemp{};
 
     if (m_pClientList[iClientH] == NULL) return;
     if ((sItemIndex < 0) || (sItemIndex >= DEF_MAXITEMS)) return;

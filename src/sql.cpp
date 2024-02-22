@@ -14,7 +14,7 @@ int64_t CGame::create_db_character(pqxx::transaction_base & t, character_db & ch
             character.appr1, character.gender, character.skin, character.hairstyle, character.haircolor, character.underwear,
             character.hp, character.mp, character.sp)
     };
-    return r["id"].as<int64_t>();
+    return r["id"].as<uint64_t>();
 }
 
 void CGame::update_db_character(pqxx::transaction_base & t, character_db & character)

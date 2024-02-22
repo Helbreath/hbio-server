@@ -110,18 +110,7 @@ public:
 	CItem();
 	~CItem() = default;
 
-    //todo: fix this dumb shit
-    void * operator new (size_t size)
-    {
-        return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
-    };
-
-    void operator delete(void * mem)
-    {
-        HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, mem);
-    };
-
-	char  m_cName[30];
+    char  m_cName[30]{};
 
     int64_t id{};
 	

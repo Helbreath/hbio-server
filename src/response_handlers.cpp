@@ -31,7 +31,6 @@ int CGame::iComposeInitMapData(short sX, short sY, int iClientH, char * pData)
     for (iy = 0; iy < 16; iy++)
         for (ix = 0; ix < 21; ix++)
         {
-
             if (((sX + ix) == 100) && ((sY + iy) == 100))
                 sX = sX;
 
@@ -325,11 +324,11 @@ int CGame::iComposeInitMapData(short sX, short sY, int iClientH, char * pData)
 
 int CGame::iComposeMoveMapData(short sX, short sY, int iClientH, char cDir, char * pData)
 {
-    int * ip, ix, iy, iSize, iTileExists, iIndex;
+    int * ip, iSize{}, iTileExists{};
     CTile * pTileSrc, * pTile;
-    unsigned char ucHeader;
+    unsigned char ucHeader{};
     short * sp, * pTotal;
-    int iTemp, iTemp2;
+    int iTemp{}, iTemp2{};
     WORD * wp;
     char * cp;
 
@@ -676,11 +675,11 @@ int CGame::iComposeMoveMapData(short sX, short sY, int iClientH, char cDir, char
 
 void CGame::ResponseCreateNewGuildHandler(char * pData, DWORD dwMsgSize)
 {
-    int i;
-    WORD * wp, wResult;
+    int i{};
+    WORD * wp, wResult{};
     DWORD * dwp;
-    char * cp, cCharName[11], cData[100], cTxt[120];
-    int iRet;
+    char * cp, cCharName[11]{}, cData[100]{}, cTxt[120]{};
+    int iRet{};
 
     ZeroMemory(cCharName, sizeof(cCharName));
     cp = (char *)(pData + DEF_INDEX2_MSGTYPE + 2);
@@ -738,11 +737,11 @@ void CGame::ResponseCreateNewGuildHandler(char * pData, DWORD dwMsgSize)
 
 void CGame::ResponseDisbandGuildHandler(char * pData, DWORD dwMsgSize)
 {
-    int i;
-    WORD * wp, wResult;
+    int i{};
+    WORD * wp, wResult{};
     DWORD * dwp;
-    char * cp, cCharName[11], cData[100], cTxt[120];
-    int iRet;
+    char * cp, cCharName[11]{}, cData[100]{}, cTxt[120]{};
+    int iRet{};
 
     ZeroMemory(cCharName, sizeof(cCharName));
     cp = (char *)(pData + DEF_INDEX2_MSGTYPE + 2);
@@ -801,8 +800,8 @@ void CGame::ResponseDisbandGuildHandler(char * pData, DWORD dwMsgSize)
 void CGame::ResponsePlayerDataHandler(char * pData, DWORD dwSize)
 {
     WORD * wp;
-    char * cp, cCharName[11], cTxt[120];
-    int  i;
+    char * cp, cCharName[11]{}, cTxt[120]{};
+    int  i{};
 
     ZeroMemory(cCharName, sizeof(cCharName));
     cp = (char *)(pData + DEF_INDEX2_MSGTYPE + 2);
@@ -843,11 +842,11 @@ void CGame::ResponsePlayerDataHandler(char * pData, DWORD dwSize)
 
 void CGame::InitPlayerData(int iClientH, char * pData, DWORD dwSize)
 {
-    char * cp, cName[11], cData[256], cTxt[256], cGuildStatus, cQuestRemain;
+    char * cp, cName[11]{}, cData[256]{}, cTxt[256]{}, cGuildStatus{}, cQuestRemain{};
     DWORD * dwp;
     WORD * wp;
-    int     iRet, i, iTotalPoints;
-    BOOL    bRet;
+    int     iRet{}, i{}, iTotalPoints{};
+    BOOL    bRet{};
 
     if (m_pClientList[iClientH] == NULL) return;
     if (m_pClientList[iClientH]->m_bIsInitComplete == TRUE) return;

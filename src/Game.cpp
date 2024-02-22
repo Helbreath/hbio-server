@@ -3104,7 +3104,8 @@ int CGame::iGetDangerValue(int iNpcH, short dX, short dY)
 
 void CGame::MsgProcess()
 {
-    char * pData, cFrom{}, cKey{};
+    char * pData{};
+    char cFrom{}, cKey{};
     DWORD    dwMsgSize{}, * dwpMsgID;
     WORD * wpMsgType{}, * wp{};
     int      i;
@@ -3141,9 +3142,6 @@ void CGame::MsgProcess()
 
         return;
     }
-
-    ZeroMemory(m_pMsgBuffer, DEF_MSGBUFFERSIZE + 1);
-    pData = (char *)m_pMsgBuffer;
 
     m_iCurMsgs = 0;
     std::unique_lock<std::mutex> l(packet_mtx, std::defer_lock);
@@ -12475,7 +12473,6 @@ BOOL CGame::bAddItem(int iClientH, CItem * pItem, char cMode)
     WORD * wp;
     short * sp;
     int iRet, iEraseReq;
-
 
     ZeroMemory(cData, sizeof(cData));
     if (_bAddClientItemList(iClientH, pItem, &iEraseReq) == TRUE)
