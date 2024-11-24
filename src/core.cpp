@@ -84,7 +84,31 @@ void CGame::run()
     time_point current_time = now();
     time_point player_timeout_timer = now();
     time_point player_count_report_timer = now();
-    time_point game_timer = now();
+    time_point auto_save_timer = now();
+
+    std::unique_ptr<std::thread> on_timer_thread = std::make_unique<std::thread>([&]()
+        {
+            int32_t error_count = 0;
+            while (get_server_state() == server_status::running)
+            {
+                try
+                {
+                    OnTimer();
+                    std::this_thread::sleep_for(10ms);
+                }
+                catch (std::exception & ex)
+                {
+                    log->error(ex.what());
+                    error_count++;
+
+                    if (error_count > 100)
+                    {
+                        log->error("on_timer error count > 100 - exiting thread");
+                        return;
+                    }
+                }
+            }
+        });
 
     while (get_server_state() == server_status::running)
     {
@@ -92,12 +116,6 @@ void CGame::run()
         using namespace std::chrono_literals;
         std::this_thread::sleep_for(1ms);
         current_time = now();
-
-        if (duration_cast<milliseconds>(current_time - game_timer).count() > 300)
-        {
-            OnTimer();
-            game_timer = now();
-        }
 
 //         if (duration_cast<seconds>(current_time - player_count_report_timer).count() > 5)
 //         {
@@ -177,9 +195,66 @@ void CGame::run()
                 }
             }
             player_timeout_timer = now();
+
+            // other timers
+            if (time_count(now() - auto_save_timer) > 20)
+            {
+                std::vector<character_db> char_data;
+                for (auto & player : client_list)
+                {
+                    char_data.push_back(build_character_data_for_save(player));
+                    player->auto_save_time = now();
+                }
+
+                auto_save(char_data);
+
+                auto_save_timer = now();
+            }
         }
     }
+    on_timer_thread->join();
     Quit();
+}
+
+void CGame::auto_save(std::vector<character_db> char_data)
+{
+    std::unique_lock<std::shared_mutex> l(game_sql_mtx);
+    pqxx::work txn{ *pq_game };
+
+    try
+    {
+        for (auto & character : char_data)
+        {
+            update_db_character(txn, character);
+            for (auto & skill : character.skills)
+            {
+                if (skill.id == 0)
+                    skill.id = create_db_skill(txn, skill);
+                else
+                    update_db_skill(txn, skill);
+            }
+            for (auto & item : character.items)
+            {
+                if (item.id == 0)
+                    item.id = create_db_item(txn, item);
+                else
+                    update_db_item(txn, item);
+            }
+            for (auto & item : character.bank_items)
+            {
+                if (item.id == 0)
+                    item.id = create_db_item(txn, item);
+                else
+                    update_db_item(txn, item);
+            }
+        }
+        txn.commit();
+    }
+    catch (std::exception & e)
+    {
+        // save all or none - store a backup old hb style (text files) in event of failure for inspection?
+        log->error("Error saving character data - {}", e.what());
+    }
 }
 
 // todo - turn into its own request packet instead of part of login

@@ -11,9 +11,47 @@ bool CGame::save_player_data(std::shared_ptr<CClient> client)
     if (!client)
         return false;
 
+    character_db character = build_character_data_for_save(client);
+
     std::shared_lock<std::shared_mutex> l(game_sql_mtx);
     pqxx::work txn{ *pq_game };
 
+    try
+    {
+        update_db_character(txn, character);
+        for (auto & skill : character.skills)
+        {
+            if (skill.id == 0)
+                skill.id = create_db_skill(txn, skill);
+            else
+                update_db_skill(txn, skill);
+        }
+        for (auto & item : character.items)
+        {
+            if (item.id == 0)
+                item.id = create_db_item(txn, item);
+            else
+                update_db_item(txn, item);
+        }
+        for (auto & item : character.bank_items)
+        {
+            if (item.id == 0)
+                item.id = create_db_item(txn, item);
+            else
+                update_db_item(txn, item);
+        }
+        txn.commit();
+    }
+    catch (std::exception & e)
+    {
+        log->error("Error saving character data for character <{}> - <{}>", client->m_cCharName, e.what());
+        return false;
+    }
+    return true;
+}
+
+character_db CGame::build_character_data_for_save(std::shared_ptr<CClient> client)
+{
     character_db character{};
 
     character.id = client->id;
@@ -102,85 +140,70 @@ bool CGame::save_player_data(std::shared_ptr<CClient> client)
     character.luck = client->m_iLuck;
     character.world_name = world_name;
 
-    try
+    for (int i = 0; i < DEF_MAXSKILLTYPE; ++i)
     {
-        update_db_character(txn, character);
-        for (int i = 0; i < DEF_MAXSKILLTYPE; ++i)
-        {
-            skill_db _skill{};
-            _skill.id = client->m_cSkillId[i];
-            _skill.character_id = character.id;
-            _skill.skill_id = i;
-            _skill.skill_level = client->m_cSkillMastery[i];
-            _skill.skill_exp = client->m_iSkillSSN[i];
-            if (_skill.id == 0)
-                _skill.id = create_db_skill(txn, _skill);
-            else
-                update_db_skill(txn, _skill);
-        }
-        for (int i = 0; i < DEF_MAXITEMS; ++i)
-        {
-            CItem * item = client->m_pItemList[i];
-            if (item == nullptr)
-                continue;
-            item_db _item{};
-            _item.id = item->id;
-            _item.item_id = item->m_sIDnum;
-            _item.char_id = character.id;
-            _item.name = item->m_cName;
-            _item.count = item->m_dwCount;
-            _item.color = item->m_cItemColor;
-            _item.type = item->m_sTouchEffectType;
-            _item.id1 = item->m_sTouchEffectValue1;
-            _item.id2 = item->m_sTouchEffectValue2;
-            _item.id3 = item->m_sTouchEffectValue3;
-            _item.effect1 = item->m_sItemEffectType;
-            _item.effect2 = item->m_sItemEffectValue1;
-            _item.effect3 = item->m_sItemEffectValue2;
-            _item.durability = item->m_wCurLifeSpan;
-            _item.attribute = item->m_dwAttribute;
-            _item.equipped = client->m_bIsItemEquipped[i] == true;
-            _item.itemposx = client->m_ItemPosList[i].x;
-            _item.itemposy = client->m_ItemPosList[i].y;
-            _item.itemloc = "bag";
-            if (item->id == 0)
-                _item.id = create_db_item(txn, _item);
-            else
-                update_db_item(txn, _item);
-        }
-        for (int i = 0; i < DEF_MAXBANKITEMS; ++i)
-        {
-            CItem * item = client->m_pItemInBankList[i];
-            if (item == nullptr)
-                continue;
-            item_db _item{};
-            _item.id = item->id;
-            _item.char_id = character.id;
-            _item.name = item->m_cName;
-            _item.count = item->m_dwCount;
-            _item.color = item->m_cItemColor;
-            _item.type = item->m_sTouchEffectType;
-            _item.id1 = item->m_sTouchEffectValue1;
-            _item.id2 = item->m_sTouchEffectValue2;
-            _item.id3 = item->m_sTouchEffectValue3;
-            _item.effect1 = item->m_sItemEffectType;
-            _item.effect2 = item->m_sItemEffectValue1;
-            _item.effect3 = item->m_sItemEffectValue2;
-            _item.durability = item->m_wCurLifeSpan;
-            _item.attribute = item->m_dwAttribute;
-            _item.equipped = false;
-            _item.itemloc = "bank";
-            if (item->id == 0)
-                _item.id = create_db_item(txn, _item);
-            else
-                update_db_item(txn, _item);
-        }
-        txn.commit();
+        skill_db _skill{};
+        _skill.id = client->m_cSkillId[i];
+        _skill.character_id = character.id;
+        _skill.skill_id = i;
+        _skill.skill_level = client->m_cSkillMastery[i];
+        _skill.skill_exp = client->m_iSkillSSN[i];
+
+        character.skills.push_back(_skill);
     }
-    catch (std::exception & e)
+    for (int i = 0; i < DEF_MAXITEMS; ++i)
     {
-        log->error("Error saving character data for character <{}> - <{}>", client->m_cCharName, e.what());
-        return false;
+        CItem * item = client->m_pItemList[i];
+        if (item == nullptr)
+            continue;
+        item_db _item{};
+        _item.id = item->id;
+        _item.item_id = item->m_sIDnum;
+        _item.char_id = character.id;
+        _item.name = item->m_cName;
+        _item.count = item->m_dwCount;
+        _item.color = item->m_cItemColor;
+        _item.type = item->m_sTouchEffectType;
+        _item.id1 = item->m_sTouchEffectValue1;
+        _item.id2 = item->m_sTouchEffectValue2;
+        _item.id3 = item->m_sTouchEffectValue3;
+        _item.effect1 = item->m_sItemEffectType;
+        _item.effect2 = item->m_sItemEffectValue1;
+        _item.effect3 = item->m_sItemEffectValue2;
+        _item.durability = item->m_wCurLifeSpan;
+        _item.attribute = item->m_dwAttribute;
+        _item.equipped = client->m_bIsItemEquipped[i] == true;
+        _item.itemposx = client->m_ItemPosList[i].x;
+        _item.itemposy = client->m_ItemPosList[i].y;
+        _item.itemloc = "bag";
+
+        character.items.push_back(_item);
     }
-    return true;
+    for (int i = 0; i < DEF_MAXBANKITEMS; ++i)
+    {
+        CItem * item = client->m_pItemInBankList[i];
+        if (item == nullptr)
+            continue;
+        item_db _item{};
+        _item.id = item->id;
+        _item.char_id = character.id;
+        _item.name = item->m_cName;
+        _item.count = item->m_dwCount;
+        _item.color = item->m_cItemColor;
+        _item.type = item->m_sTouchEffectType;
+        _item.id1 = item->m_sTouchEffectValue1;
+        _item.id2 = item->m_sTouchEffectValue2;
+        _item.id3 = item->m_sTouchEffectValue3;
+        _item.effect1 = item->m_sItemEffectType;
+        _item.effect2 = item->m_sItemEffectValue1;
+        _item.effect3 = item->m_sItemEffectValue2;
+        _item.durability = item->m_wCurLifeSpan;
+        _item.attribute = item->m_dwAttribute;
+        _item.equipped = false;
+        _item.itemloc = "bank";
+
+        character.bank_items.push_back(_item);
+    }
+
+    return character;
 }

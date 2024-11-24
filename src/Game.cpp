@@ -1546,15 +1546,15 @@ void CGame::CheckClientResponseTime()
                 }
 
 
-                if ((m_pMapList[m_pClientList[i]->m_cMapIndex]->m_bIsFightZone == false) &&
-                    ((dwTime - m_pClientList[i]->m_dwAutoSaveTime) > (DWORD)DEF_AUTOSAVETIME))
-                {
-                    if (!save_player_data(m_pClientList[i]->shared_from_this()))
-                    {
-                        log->error("Autosave player data error for [{}]", m_pClientList[i]->m_cCharName);
-                    }
-                    m_pClientList[i]->m_dwAutoSaveTime = dwTime;
-                }
+                //if ((m_pMapList[m_pClientList[i]->m_cMapIndex]->m_bIsFightZone == false) &&
+                //    ((dwTime - m_pClientList[i]->m_dwAutoSaveTime) > (DWORD)DEF_AUTOSAVETIME))
+                //{
+                //    if (!save_player_data(m_pClientList[i]->shared_from_this()))
+                //    {
+                //        log->error("Autosave player data error for [{}]", m_pClientList[i]->m_cCharName);
+                //    }
+                //    m_pClientList[i]->m_dwAutoSaveTime = dwTime;
+                //}
 
 
                 if ((dwTime - m_pClientList[i]->m_dwExpStockTime) > (DWORD)DEF_EXPSTOCKTIME)

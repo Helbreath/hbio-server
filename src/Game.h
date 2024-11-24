@@ -288,6 +288,8 @@ public:
 
     void load_config();
     void run();
+    void auto_save(std::vector<character_db> char_data);
+    character_db build_character_data_for_save(std::shared_ptr<CClient> client);
 
     server_status get_server_state() const noexcept { return server_status_; }
     void set_server_state(server_status s) noexcept { server_status_ = s; }

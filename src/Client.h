@@ -45,6 +45,15 @@ struct account_db
     int64_t external_member_id{};
 };
 
+struct skill_db
+{
+    int64_t id{};
+    int64_t character_id{};
+    int64_t skill_id{};
+    int32_t skill_level{};
+    int32_t skill_exp{};
+};
+
 struct character_db
 {
     int64_t id{};
@@ -127,15 +136,9 @@ struct character_db
     int64_t gold{};
     int32_t luck{};
     std::string world_name{};
-};
-
-struct skill_db
-{
-    int64_t id{};
-    int64_t character_id{};
-    int64_t skill_id{};
-    int32_t skill_level{};
-    int32_t skill_exp{};
+    std::vector<skill_db> skills{};
+    std::vector<item_db> items{};
+    std::vector<item_db> bank_items{};
 };
 
 enum class client_status
@@ -312,7 +315,9 @@ public:
     int   m_iApprColor;
     int   m_iStatus;
 
-    uint32_t m_dwTime, m_dwHPTime, m_dwMPTime, m_dwSPTime, m_dwAutoSaveTime, m_dwHungerTime;
+    uint64_t m_dwTime, m_dwHPTime, m_dwMPTime, m_dwSPTime, m_dwHungerTime;
+
+    time_point<system_clock> auto_save_time;
 
     char m_cSex, m_cSkin, m_cHairStyle, m_cHairColor, m_cUnderwear;
 

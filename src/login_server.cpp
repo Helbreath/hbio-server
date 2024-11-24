@@ -159,8 +159,9 @@ void CGame::handle_login_server_message(socket_message & sm)
                         m_pClientList[i] = player.get();
                         player->client_handle = i;
                         bAddClientShortCut(i);
+                        m_pClientList[i]->auto_save_time = now();
                         m_pClientList[i]->m_dwSPTime = m_pClientList[i]->m_dwMPTime =
-                            m_pClientList[i]->m_dwHPTime = m_pClientList[i]->m_dwAutoSaveTime =
+                            m_pClientList[i]->m_dwHPTime =
                             m_pClientList[i]->m_dwTime = m_pClientList[i]->m_dwHungerTime = m_pClientList[i]->m_dwExpStockTime =
                             m_pClientList[i]->m_dwRecentAttackTime = m_pClientList[i]->m_dwAutoExpTime = m_pClientList[i]->m_dwSpeedHackCheckTime = timeGetTime();
 
