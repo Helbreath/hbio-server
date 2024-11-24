@@ -8,13 +8,13 @@
 
 #include <windows.h>
 
-class CGuildsMan  
+class CGuildsMan
 {
 public:
-	
-	CGuildsMan() = default;
-	~CGuildsMan() = default;			    
 
-	char m_cName[11];
-	int  m_iRank;
+    CGuildsMan() = default;
+    ~CGuildsMan() = default;
+
+    char m_cName[11];
+    int  m_iRank;
 };

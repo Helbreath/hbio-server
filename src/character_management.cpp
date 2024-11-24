@@ -139,7 +139,7 @@ bool CGame::save_player_data(std::shared_ptr<CClient> client)
             _item.effect3 = item->m_sItemEffectValue2;
             _item.durability = item->m_wCurLifeSpan;
             _item.attribute = item->m_dwAttribute;
-            _item.equipped = client->m_bIsItemEquipped[i] == TRUE;
+            _item.equipped = client->m_bIsItemEquipped[i] == true;
             _item.itemposx = client->m_ItemPosList[i].x;
             _item.itemposy = client->m_ItemPosList[i].y;
             _item.itemloc = "bag";

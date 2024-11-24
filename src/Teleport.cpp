@@ -5,21 +5,21 @@
 //
 
 #include "Teleport.h"
+#include <cstring>
 
 CTeleport::CTeleport()
 {
+    memset(m_cNpcname, 0, sizeof(m_cNpcname));
+    memset(m_cSourceMap, 0, sizeof(m_cSourceMap));
+    memset(m_cTargetMap, 0, sizeof(m_cTargetMap));
 
-	ZeroMemory(m_cTeleportNpcName, sizeof(m_cTeleportNpcName));
-	ZeroMemory(m_cSourceMap, sizeof(m_cSourceMap));
-	ZeroMemory(m_cTargetMap, sizeof(m_cTargetMap));
-	ZeroMemory(m_cTeleportSide, sizeof(m_cTeleportSide));
-
-	m_sDestinationX = -1;
-	m_sDestinationY = -1;
-	m_sTeleportCost = -1;
-	m_sTeleportMinLevel = 0;
-	m_sTeleportMaxLevel = 0;
-	m_bTeleportHunt = FALSE;
-	m_bTeleportNtrl = FALSE;
-	m_bTeleportCrmnl = FALSE;
+    m_iX = m_iY = -5;
+    m_iCost = 0;
+    m_iMinLvl = 0;
+    m_iMaxLvl = 0;
+    m_iSide = 0;
+    m_bHunter = true;
+    m_bNetural = true;
+    m_bCriminal = true;
 }
+

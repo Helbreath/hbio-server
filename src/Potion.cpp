@@ -5,20 +5,14 @@
 //
 
 #include "Potion.h"
+#include <cstring>
 
 CPotion::CPotion()
 {
- int i;
-	
-	ZeroMemory(m_cName, sizeof(m_cName));
-	m_iSkillLimit = 0;
-	m_iDifficulty = 0;
+    memset(m_cName, 0, sizeof(m_cName));
+    m_iSkillLimit = 0;
+    m_iDifficulty = 0;
 
-	for (i = 0; i < 12; i++)
-		m_sArray[i] = -1;
-}
-
-CPotion::~CPotion()
-{
-
+    for (int i = 0; i < 12; i++)
+        m_sArray[i] = -1;
 }

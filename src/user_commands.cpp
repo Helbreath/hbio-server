@@ -6,73 +6,84 @@
 
 #include "Game.h"
 
-void CGame::UserCommand_BanGuildsman(int iClientH, char * pData, DWORD dwMsgSize)
+void CGame::UserCommand_BanGuildsman(int iClientH, char * pData, uint32_t dwMsgSize)
 {
     char   seps[] = "= \t\n";
     char * token, cTargetName[11], cBuff[256];
     CStrTok * pStrTok;
     int i;
 
-    if (m_pClientList[iClientH] == NULL) return;
+    if (m_pClientList[iClientH] == 0) return;
     if ((dwMsgSize) <= 0) return;
 
     if (m_pClientList[iClientH]->m_iGuildRank != 0)
     {
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NOGUILDMASTERLEVEL, NULL, NULL, NULL, NULL);
+
+        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NOGUILDMASTERLEVEL, 0, 0, 0, 0);
         return;
     }
 
-    ZeroMemory(cTargetName, sizeof(cTargetName));
-    ZeroMemory(cBuff, sizeof(cBuff));
+    memset(cTargetName, 0, sizeof(cTargetName));
+    memset(cBuff, 0, sizeof(cBuff));
     memcpy(cBuff, pData, dwMsgSize);
 
     pStrTok = new CStrTok(cBuff, seps);
     token = pStrTok->pGet();
     token = pStrTok->pGet();
 
-    if (token != NULL)
+    if (token != 0)
     {
+
         if (strlen(token) > 10)
             memcpy(cTargetName, token, 10);
         else memcpy(cTargetName, token, strlen(token));
 
         for (i = 1; i < DEF_MAXCLIENTS; i++)
-            if ((m_pClientList[i] != NULL) && (memcmp(m_pClientList[i]->m_cCharName, cTargetName, 10) == 0))
+            if ((m_pClientList[i] != 0) && (memcmp(m_pClientList[i]->m_cCharName, cTargetName, 10) == 0))
             {
+
 
                 if (memcmp(m_pClientList[iClientH]->m_cGuildName, m_pClientList[i]->m_cGuildName, 20) != 0)
                 {
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CANNOTBANGUILDMAN, NULL, NULL, NULL, NULL);
+
+                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CANNOTBANGUILDMAN, 0, 0, 0, 0);
                     delete pStrTok;
                     return;
                 }
-                //bSendMsgToLS(MSGID_REQUEST_UPDATEGUILDINFO_DELGUILDSMAN, i);
 
-                SendGuildMsg(i, DEF_NOTIFY_DISMISSGUILDSMAN, NULL, NULL, NULL);
+                SendGuildMsg(i, DEF_NOTIFY_DISMISSGUILDSMAN, 0, 0, 0);
 
-                ZeroMemory(m_pClientList[i]->m_cGuildName, sizeof(m_pClientList[i]->m_cGuildName));
+
+                memset(m_pClientList[i]->m_cGuildName, 0, sizeof(m_pClientList[i]->m_cGuildName));
                 strcpy(m_pClientList[i]->m_cGuildName, "NONE");
                 m_pClientList[i]->m_iGuildRank = -1;
                 m_pClientList[i]->m_iGuildGUID = -1;
 
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SUCCESSBANGUILDMAN, NULL, NULL, NULL, NULL);
 
-                SendNotifyMsg(iClientH, i, DEF_COMMONTYPE_BANGUILD, NULL, NULL, NULL, NULL);
+                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SUCCESSBANGUILDMAN, 0, 0, 0, 0);
 
-                SendEventToNearClient_TypeA(i, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
+
+                SendNotifyMsg(iClientH, i, DEF_COMMONTYPE_BANGUILD, 0, 0, 0, 0);
+
+
+                SendEventToNearClient_TypeA(i, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, 0, 0, 0);
+                SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_CLEARGUILDNAME, m_pClientList[i]->m_cMapIndex, m_pClientList[i]->m_sX, m_pClientList[i]->m_sY, 0, 0, 0);
 
                 delete pStrTok;
                 return;
             }
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PLAYERNOTONGAME, NULL, NULL, NULL, cTargetName);
+
+        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PLAYERNOTONGAME, 0, 0, 0, cTargetName);
     }
 
     delete pStrTok;
     return;
 }
 
-void CGame::UserCommand_DissmissGuild(int iClientH, char * pData, DWORD dwMsgSize)
+
+
+void CGame::UserCommand_DissmissGuild(int iClientH, char * pData, uint32_t dwMsgSize)
 {
 
 }

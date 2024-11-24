@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <windows.h>
+#include <cstdint>
 
 #define DEF_DELAYEVENTTYPE_DAMAGEOBJECT				1
 #define DEF_DELAYEVENTTYPE_MAGICRELEASE				2
@@ -16,21 +16,21 @@
 #define DEF_DELAYEVENTTYPE_CALCMETEORSTRIKEEFFECT	6
 #define DEF_DELAYEVENTTYPE_ANCIENT_TABLET			7
 
-class CDelayEvent  
-{										  
+class CDelayEvent
+{
 public:
-	CDelayEvent() = default;
-	~CDelayEvent() = default;
+    CDelayEvent() = default;
+    ~CDelayEvent() = default;
 
-	int m_iDelayType;
-	int m_iEffectType;
+    int m_iDelayType;
+    int m_iEffectType;
 
-	char m_cMapIndex;
-	int m_dX, m_dY;
+    char m_cMapIndex;
+    int m_dX, m_dY;
 
-	int  m_iTargetH;
-	char m_cTargetType;
-	int m_iV1, m_iV2, m_iV3;
+    int  m_iTargetH;
+    char m_cTargetType;
+    int m_iV1, m_iV2, m_iV3;
 
-	DWORD m_dwTriggerTime;
+    uint32_t m_dwTriggerTime;
 };

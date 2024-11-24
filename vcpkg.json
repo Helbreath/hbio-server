@@ -7,7 +7,6 @@
     "ixwebsocket",
     "openssl",
     "zlib",
-    "fmt",
     "libsodium",
     "libpqxx",
     "nlohmann-json",

@@ -15,14 +15,7 @@ void CGame::handle_login_server_message(socket_message & sm)
         stream_write sw{};
         stream_read & sr{ *sm.sr };
 
-        if (sm.connection_state == nullptr)
-        {
-            log->critical("login_server.cpp # Connection state is null for unknown connection");
-            sm.websocket.close();
-            return;
-        }
-
-        CClient * client = sm.connection_state->client.get();
+        auto & player = sm.player;
 
 //         if (client == nullptr)
 //         {
@@ -30,7 +23,7 @@ void CGame::handle_login_server_message(socket_message & sm)
 //             return;
 //         }
 
-        int client_handle = sm.connection_state->client_handle;
+        int client_handle = player->client_handle;
 
         uint32_t msgid = sr.read_uint32();
         sr.read_uint16();
@@ -45,7 +38,7 @@ void CGame::handle_login_server_message(socket_message & sm)
                     sw.write_uint16(DEF_LOGRESMSGTYPE_REJECT);
                     sw.write_string("Not logged in");
                     client->write(sw);
-                    log->info("Player object does not exist for <{}>", sm.connection_state->getRemoteIp());
+                    log->info("Player object does not exist for <{}>", player->getRemoteIp());
                     return false;
                 }
                 if (!client->logged_in)
@@ -54,7 +47,7 @@ void CGame::handle_login_server_message(socket_message & sm)
                     sw.write_uint16(DEF_LOGRESMSGTYPE_REJECT);
                     sw.write_string("Not logged in");
                     client->write(sw);
-                    log->info("Player trying to send messages prior to login <{}> for account <{}>", sm.connection_state->getRemoteIp(), client->account);
+                    log->info("Player trying to send messages prior to login <{}> for account <{}>", player->getRemoteIp(), client->account);
                     //if (client) delete_client_lock(client);
                     if (client) DeleteClient(client_handle, false, false);
                     return false;
@@ -100,19 +93,19 @@ void CGame::handle_login_server_message(socket_message & sm)
                 break;
             }
             case MSGID_SCREEN_SETTINGS:
-                ScreenSettingsHandler(get_client_handle(client), sr.data, sr.size);
+                ScreenSettingsHandler(player, sr.data, sr.size);
                 break;
             case MSGID_REQUEST_LOGIN:
             {
                 if (!check_login_status()) return;
 
-                if (client && client->logged_in)
+                if (player && player->logged_in)
                 {
                     sw.write_uint32(MSGID_RESPONSE_LOG);
                     sw.write_uint16(DEF_LOGRESMSGTYPE_REJECT);
                     sw.write_string("Invalid access");
                     auto data = ix::IXWebSocketSendData{ sw.data, sw.position };
-                    log->warn("Player trying to login twice <{}> for account <{}>", sm.connection_state->getRemoteIp(), client->account);
+                    log->warn("Player trying to login twice <{}> for account <{}>", player->getRemoteIp(), player->account);
                     sm.websocket.sendBinary(data);
                     return;
                 }
@@ -134,12 +127,12 @@ void CGame::handle_login_server_message(socket_message & sm)
                 uint64_t account_id{};
                 try
                 {
-                    account_id = check_account_auth(client, account, password);
+                    account_id = check_account_auth(player, account, password);
                 }
                 catch (std::exception & ex)
                 {
                     // login failed
-                    log->info("Failed login from <{}> for account <{}> - <{}>", sm.connection_state->getRemoteIp(), account, ex.what());
+                    log->info("Failed login from <{}> for account <{}> - <{}>", player->getRemoteIp(), account, ex.what());
                     // todo - add login spam protection
 
                     sw.write_uint32(MSGID_RESPONSE_LOG);
@@ -149,26 +142,22 @@ void CGame::handle_login_server_message(socket_message & sm)
                     return;
                 }
 
-                sm.connection_state->client = std::make_shared<CClient>();
-
-                client = sm.connection_state->client.get();
-                client->connection_state = sm.ixconnstate;
-                client->account_id = account_id;
-                client->account = account;
+                player->account_id = account_id;
+                player->account = account;
                 std::lock_guard<std::recursive_mutex> lock(client_list_mtx);
-                client_list.insert(sm.connection_state->client);
-                client->address = sm.connection_state->getRemoteIp();
+                player->address = player->getRemoteIp();
+                player->set_connect_time(now());
+                player->set_last_packet_time(now());
 
-                client->set_connect_time(now());
-                client->set_last_packet_time(now());
+                client_list.insert(player);
 
                 // todo: fix this client list system
                 for (int i = 1; i < DEF_MAXCLIENTS; i++)
                 {
                     if (m_pClientList[i] == nullptr)
                     {
-                        m_pClientList[i] = client;
-                        sm.connection_state->client_handle = i;
+                        m_pClientList[i] = player.get();
+                        player->client_handle = i;
                         bAddClientShortCut(i);
                         m_pClientList[i]->m_dwSPTime = m_pClientList[i]->m_dwMPTime =
                             m_pClientList[i]->m_dwHPTime = m_pClientList[i]->m_dwAutoSaveTime =
@@ -180,8 +169,8 @@ void CGame::handle_login_server_message(socket_message & sm)
                     }
                 }
 
-                client->logged_in = true;
-                client->currentstatus = client_status::login_screen;
+                player->logged_in = true;
+                player->currentstatus = client_status::login_screen;
 
                 sw.write_uint32(MSGID_RESPONSE_LOG);
                 sw.write_int16(DEF_MSGTYPE_CONFIRM);
@@ -196,24 +185,24 @@ void CGame::handle_login_server_message(socket_message & sm)
                 sw.write_int16(0);
                 sw.write_int16(0);//dates /\
 
-                build_character_list(client, sw);
+                build_character_list(player.get(), sw);
                 sw.write_int32(500);
                 sw.write_int32(500);
                 sw.write_string("\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 32);
-                client->write(sw);
+                player->write(sw);
             }
             break;
             case MSGID_REQUEST_CREATENEWCHARACTER:
-                if (!check_login_status() || !check_login(client)) return;
-                create_character(client, sr);
+                if (!check_login_status() || !check_login(player.get())) return;
+                create_character(player.get(), sr);
                 break;
             case MSGID_REQUEST_DELETECHARACTER:
-                if (!check_login_status() || !check_login(client)) return;
-                delete_character(client, sr);
+                if (!check_login_status() || !check_login(player.get())) return;
+                delete_character(player.get(), sr);
                 break;
             case MSGID_REQUEST_ENTERGAME:
-                if (!check_login_status() || !check_login(client)) return;
-                enter_game(client, sr);
+                if (!check_login_status() || !check_login(player.get())) return;
+                enter_game(player.get(), sr);
                 break;
             default:
                 log->error("Unknown packet received from client - {:X}", msgid);

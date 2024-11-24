@@ -10,9 +10,9 @@
 using json = nlohmann::json;
 
 #if defined(HELBREATHX)
-uint64_t CGame::check_account_auth(CClient * client, std::string & account, std::string & pass)
+uint64_t CGame::check_account_auth(std::shared_ptr<CClient> player, std::string & account, std::string & pass)
 {
-    if (client && client->logged_in == true) return client->account_id;
+    if (player && player->logged_in == true) return player->account_id;
     try
     {
         ix::HttpClient httpClient;

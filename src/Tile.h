@@ -6,45 +6,39 @@
 
 #pragma once
 
-#include <windows.h>
+#include <cstdint>
 #include "Item.h"
 
 #define DEF_TILE_PER_ITEMS	12
 
-class CTile  
-{												  
+class CTile
+{
 public:
-	CTile();
-	~CTile();
+    CTile();
+    ~CTile();
 
-    //todo: fix this dumb shit
-    void * operator new (size_t size)
-    {
-        return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
-    };
+    char m_cOwnerClass{};		// DEF_OT_PLAYER / DEF_OT_NPC
+    short m_sOwner{};
 
-    void operator delete(void * mem)
-    {
-        HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, mem);
-    };
+    char m_cDeadOwnerClass{};
+    short m_sDeadOwner{};
 
-	char  m_cOwnerClass{};
-	short m_sOwner{};
+    CItem * m_pItem[DEF_TILE_PER_ITEMS]{};
+    char m_cTotalItem{};
 
-	char  m_cDeadOwnerClass{};
-	short m_sDeadOwner{};
+    uint16_t m_wDynamicObjectID{};
+    short m_sDynamicObjectType{};
+    uint32_t m_dwDynamicObjectRegisterTime{};
 
-	CItem * m_pItem[DEF_TILE_PER_ITEMS]{};
-	char  m_cTotalItem{};
+    bool m_bIsMoveAllowed{}, m_bIsTeleport{}, m_bIsWater{}, m_bIsTempMoveAllowed{};
+    bool m_bIsFarmingAllowed{};
 
-	WORD  m_wDynamicObjectID{};
-	short m_sDynamicObjectType{};
-	DWORD m_dwDynamicObjectRegisterTime{};
 
-	BOOL  m_bIsMoveAllowed{}, m_bIsTeleport{}, m_bIsWater{}, m_bIsFarm{}, m_bIsTempMoveAllowed{};
+    int m_iOccupyStatus{};
+    int m_iOccupyFlagIndex{};
 
-	int   m_iOccupyStatus{};
-	int   m_iOccupyFlagIndex{};
+    // Crusade
+    int m_iAttribute{};
 
-	int	  m_iAttribute{};
+
 };

@@ -5,84 +5,75 @@
 //
 
 #include "Game.h"
+#include "Tile.h"
+#include "Map.h"
 
-int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDir, char cMoveType)
+int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDir, bool bIsRun)
 {
     char * cp, cData[3000]{};
     CTile * pTile;
-    DWORD * dwp, dwTime;
-    WORD * wp, wObjectID;
-    short * sp, dX, dY, sTemp, sTemp2, sDOtype, pTopItem;
-    int * ip, iSize, iDamage;
-    std::size_t iRet;
-    BOOL  bRet, bIsBlocked = FALSE;
+    uint32_t * dwp, dwTime;
+    uint16_t * wp, wObjectID;
+    short * sp, dX, dY, sDOtype;
+    int	 iTemp, iTemp2;
+    int * ip, iRet, iSize, iDamage;
+    bool  bRet;
 
-    if (m_pClientList[iClientH] == NULL) return 0;
+    if (m_pClientList[iClientH] == 0) return 0;
     if ((cDir <= 0) || (cDir > 8))       return 0;
-    if (m_pClientList[iClientH]->m_bIsKilled == TRUE) return 0;
-    if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return 0;
+    if (m_pClientList[iClientH]->m_bIsKilled == true) return 0;
+    if (m_pClientList[iClientH]->m_bIsInitComplete == false) return 0;
+
 
     if ((sX != m_pClientList[iClientH]->m_sX) || (sY != m_pClientList[iClientH]->m_sY)) return 2;
 
     dwTime = timeGetTime();
-    /*m_pClientList[iClientH]->m_dwLastActionTime = dwTime;
-    if (cMoveType == 2) {
-        if (m_pClientList[iClientH]->m_iRecentWalkTime > dwTime) {
-            m_pClientList[iClientH]->m_iRecentWalkTime = dwTime;
-            if (m_pClientList[iClientH]->m_sV1 < 1) {
-                if (m_pClientList[iClientH]->m_iRecentWalkTime < dwTime) {
-                    m_pClientList[iClientH]->m_sV1++;
-                }
-                else {
-                    bIsBlocked = TRUE;
-                    m_pClientList[iClientH]->m_sV1 = 0;
-                }
-            }
-        m_pClientList[iClientH]->m_iRecentWalkTime = dwTime;
-        }
-        if (bIsBlocked == FALSE) m_pClientList[iClientH]->m_iMoveMsgRecvCount++;
-        if (m_pClientList[iClientH]->m_iMoveMsgRecvCount >= 3) {
-            if (m_pClientList[iClientH]->m_dwMoveLAT != 0) {
-                if ((dwTime - m_pClientList[iClientH]->m_dwMoveLAT) < (590)) {
-                    //wsprintf(G_cTxt, "3.51 Walk Speeder: (%s) Player: (%s) walk difference: %d. Speed Hack?", m_pClientList[iClientH]->m_cIPaddress, m_pClientList[iClientH]->m_cCharName, dwTime - m_pClientList[iClientH]->m_dwMoveLAT);
-                    //log->info(G_cTxt);
-                    bIsBlocked = TRUE;
-                }
-            }
-            m_pClientList[iClientH]->m_dwMoveLAT = dwTime;
-            m_pClientList[iClientH]->m_iMoveMsgRecvCount = 0;
-        }
-    }
-    else if (cMoveType == 1) {
-        if (m_pClientList[iClientH]->m_iRecentRunTime > dwTime) {
-            m_pClientList[iClientH]->m_iRecentRunTime = dwTime;
-            if (m_pClientList[iClientH]->m_sV1 < 1) {
-                if (m_pClientList[iClientH]->m_iRecentRunTime < dwTime) {
-                    m_pClientList[iClientH]->m_sV1++;
-                }
-                else {
-                    bIsBlocked = TRUE;
-                    m_pClientList[iClientH]->m_sV1 = 0;
-                }
-            }
-        m_pClientList[iClientH]->m_iRecentRunTime = dwTime;
-        }
-        if (bIsBlocked == FALSE) m_pClientList[iClientH]->m_iRunMsgRecvCount++;
-        if (m_pClientList[iClientH]->m_iRunMsgRecvCount >= 3) {
-            if (m_pClientList[iClientH]->m_dwRunLAT != 0) {
-                if ((dwTime - m_pClientList[iClientH]->m_dwRunLAT) < (290)) {
-                    //wsprintf(G_cTxt, "3.51 Run Speeder: (%s) Player: (%s) run difference: %d. Speed Hack?", m_pClientList[iClientH]->m_cIPaddress, m_pClientList[iClientH]->m_cCharName, dwTime - m_pClientList[iClientH]->m_dwRunLAT);
-                    //log->info(G_cTxt);
-                    bIsBlocked = TRUE;
-                }
-            }
-            m_pClientList[iClientH]->m_dwRunLAT	= dwTime;
-            m_pClientList[iClientH]->m_iRunMsgRecvCount = 0;
-        }
-    }*/
+    m_pClientList[iClientH]->m_dwLastActionTime = dwTime;
+
+// #ifndef NO_MSGSPEEDCHECK
+//     if (bIsRun == false)
+//     {
+//         m_pClientList[iClientH]->m_iMoveMsgRecvCount++;
+// 
+//         if (m_pClientList[iClientH]->m_iMoveMsgRecvCount >= 7)
+//         {
+//             if (m_pClientList[iClientH]->m_dwMoveLAT != 0)
+//             {
+// 
+//                 if ((dwTime - m_pClientList[iClientH]->m_dwMoveLAT) < (72 * 8 * 7 - 3000))
+//                 {
+//                     DeleteClient(iClientH, true, true);
+//                     return 0;
+//                 }
+//             }
+//             m_pClientList[iClientH]->m_dwMoveLAT = dwTime;
+//             m_pClientList[iClientH]->m_iMoveMsgRecvCount = 0;
+//         }
+//     }
+//     else
+//     {
+//         m_pClientList[iClientH]->m_iRunMsgRecvCount++;
+// 
+//         if (m_pClientList[iClientH]->m_iRunMsgRecvCount >= 7)
+//         {
+//             if (m_pClientList[iClientH]->m_dwRunLAT != 0)
+//             {
+// 
+//                 if ((dwTime - m_pClientList[iClientH]->m_dwRunLAT) < (43 * 8 * 7 - 1500))
+//                 {
+//                     DeleteClient(iClientH, true, true);
+//                     return 0;
+//                 }
+//             }
+//             m_pClientList[iClientH]->m_dwRunLAT = dwTime;
+//             m_pClientList[iClientH]->m_iRunMsgRecvCount = 0;
+//         }
+//     }
+// #endif
+
 
     int iStX, iStY;
-    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != NULL)
+    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != 0)
     {
         iStX = m_pClientList[iClientH]->m_sX / 20;
         iStY = m_pClientList[iClientH]->m_sY / 20;
@@ -95,6 +86,7 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
             case 2: m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_stTempSectorInfo[iStX][iStY].iElvineActivity++;  break;
         }
     }
+
 
     ClearSkillUsingStatus(iClientH);
 
@@ -113,15 +105,21 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
         case 8:	dX--; dY--;	break;
     }
 
-    pTopItem = 0;
-    bRet = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->bGetMoveable(dX, dY, &sDOtype, &pTopItem);
+    CItem * pTopItem = 0;
+
+    bRet = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->bGetMoveable(dX, dY, &sDOtype, pTopItem);
+
 
     if (m_pClientList[iClientH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] != 0)
-        bRet = FALSE;
+        bRet = false;
 
-    if ((bRet == TRUE) && (bIsBlocked == FALSE))
+    if (bRet == true)
     {
-        if (m_pClientList[iClientH]->m_iQuest != NULL) _bCheckIsQuestCompleted(iClientH);
+
+
+        if (m_pClientList[iClientH]->m_iQuest != 0) _bCheckIsQuestCompleted(iClientH);
+
+
 
         m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->ClearOwner(1, iClientH, DEF_OWNERTYPE_PLAYER, m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY);
 
@@ -129,13 +127,11 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
         m_pClientList[iClientH]->m_sY = dY;
         m_pClientList[iClientH]->m_cDir = cDir;
 
-        m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->SetOwner((short)iClientH,
-            DEF_OWNERTYPE_PLAYER,
-            dX, dY);
+        m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->SetOwner((short)iClientH, DEF_OWNERTYPE_PLAYER, dX, dY);
 
         if (sDOtype == DEF_DYNAMICOBJECT_SPIKE)
         {
-            if ((m_pClientList[iClientH]->m_bIsNeutral == TRUE) && ((m_pClientList[iClientH]->m_sAppr2 & 0xF000) == 0))
+            if ((m_pClientList[iClientH]->m_bIsNeutral == true) && ((m_pClientList[iClientH]->m_sAppr2 & 0xF000) == 0))
             {
 
             }
@@ -148,27 +144,85 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
             }
         }
 
+        /*
+        // v2.172
+        short sRemainItemSprite, sRemainItemSpriteFrame;
+        char cRemainItemColor;
+
+        switch (pTopItem->m_sIDnum) {
+        case 540:
+        if (m_pClientList[iClientH]->m_cSide == 2) {
+
+        if ((m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS] != -1) &&
+        (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS]] != 0) &&
+        (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS]]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_DEFENSE_ANTIMINE)) {
+
+        }
+        else {
+
+
+        SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_MAGIC, m_pClientList[iClientH]->m_cMapIndex,
+        m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY, m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY, (61+100), m_pClientList[iClientH]->m_sType);
+        }
+
+
+        pTopItem = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->pGetItem(m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY, &sRemainItemSprite, &sRemainItemSpriteFrame, &cRemainItemColor);
+
+        SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_SETITEM, m_pClientList[iClientH]->m_cMapIndex,
+        m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY,
+        sRemainItemSprite, sRemainItemSpriteFrame, cRemainItemColor);
+        delete pTopItem;
+        }
+        break;
+        case 541:
+        if (m_pClientList[iClientH]->m_cSide == 1) {
+
+        if ((m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS] != -1) &&
+        (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS]] != 0) &&
+        (m_pClientList[iClientH]->m_pItemList[m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_LEGGINGS]]->m_sItemEffectType == DEF_ITEMEFFECTTYPE_DEFENSE_ANTIMINE)) {
+
+        }
+        else {
+
+
+        SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_MAGIC, m_pClientList[iClientH]->m_cMapIndex,
+        m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY, m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY, (61+100), m_pClientList[iClientH]->m_sType);
+        }
+
+
+        pTopItem = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->pGetItem(m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY, &sRemainItemSprite, &sRemainItemSpriteFrame, &cRemainItemColor);
+
+        SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_SETITEM, m_pClientList[iClientH]->m_cMapIndex,
+        m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY,
+        sRemainItemSprite, sRemainItemSpriteFrame, cRemainItemColor);
+        delete pTopItem;
+        }
+        break;
+        }
+        //
+        */
+
         if (m_pClientList[iClientH]->m_iHP <= 0) m_pClientList[iClientH]->m_iHP = 0;
 
-        dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
+        dwp = (uint32_t *)(cData + DEF_INDEX4_MSGID);
         *dwp = MSGID_RESPONSE_MOTION;
-        wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
+        wp = (uint16_t *)(cData + DEF_INDEX2_MSGTYPE);
         *wp = DEF_OBJECTMOVE_CONFIRM;
 
         cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
 
         sp = (short *)cp;
-        *sp = (short)(dX);
+        *sp = (short)(dX - 10);
         cp += 2;
 
         sp = (short *)cp;
-        *sp = (short)(dY);
+        *sp = (short)(dY - 7);
         cp += 2;
 
         *cp = cDir;
         cp++;
 
-        if (cMoveType == 1)
+        if (bIsRun == true)
         {
             if (m_pClientList[iClientH]->m_iSP > 0)
             {
@@ -189,8 +243,10 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
                 }
                 if (m_pClientList[iClientH]->m_iSP < -10)
                 {
+
+
                     m_pClientList[iClientH]->m_iSP = 0;
-                    DeleteClient(iClientH, TRUE, TRUE);
+                    DeleteClient(iClientH, true, true);
                     return 0;
                 }
             }
@@ -206,7 +262,7 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
         *ip = m_pClientList[iClientH]->m_iHP;
         cp += 4;
 
-        iSize = iComposeMoveMapData(dX, dY, iClientH, cDir, cp);
+        iSize = iComposeMoveMapData((short)(dX - 10), (short)(dY - 7), iClientH, cDir, cp);
 
         iRet = m_pClientList[iClientH]->iSendMsg(cData, iSize + 12 + 1 + 4);
         switch (iRet)
@@ -215,151 +271,179 @@ int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDi
             case DEF_XSOCKEVENT_SOCKETERROR:
             case DEF_XSOCKEVENT_CRITICALERROR:
             case DEF_XSOCKEVENT_SOCKETCLOSED:
-                DeleteClient(iClientH, TRUE, TRUE);
+
+                DeleteClient(iClientH, true, true);
                 return 0;
         }
-
-        /*if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->3CA18h == TRUE) {
-
-            .text:00406037                 mov     [ebp+var_C1C], 0
-            .text:0040603E                 xor     edx, edx
-            .text:00406040                 mov     [ebp+var_C1B], edx
-            .text:00406046                 mov     [ebp+var_C17], edx
-            .text:0040604C                 mov     [ebp+var_C13], dx
-
-            bRet = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->sub_4C0F20(dX, dY, cTemp, wV1, wV2);
-            if (bRet == 1) {
-                RequestTeleportHandler(iClientH, "2   ", cTemp, wV1, wV2);
-            }
-        }*/
     }
     else
     {
-        m_pClientList[iClientH]->m_bIsMoveBlocked = TRUE;
+        m_pClientList[iClientH]->m_bIsMoveBlocked = true;
 
-        dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
+        dwp = (uint32_t *)(cData + DEF_INDEX4_MSGID);
         *dwp = MSGID_RESPONSE_MOTION;
-        wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
+        wp = (uint16_t *)(cData + DEF_INDEX2_MSGTYPE);
         *wp = DEF_OBJECTMOVE_REJECT;
-        if (bIsBlocked == TRUE)
-        {
-            m_pClientList[iClientH]->m_dwAttackLAT = 1050;
-        }
-        m_pClientList[iClientH]->m_dwAttackLAT = 1010;
 
         wObjectID = (WORD)iClientH;
 
         cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
 
-        wp = (WORD *)cp;
+        wp = (uint16_t *)cp;
         *wp = wObjectID;
         cp += 2;
-
         sp = (short *)cp;
         sX = m_pClientList[wObjectID]->m_sX;
         *sp = sX;
         cp += 2;
-
         sp = (short *)cp;
         sY = m_pClientList[wObjectID]->m_sY;
         *sp = sY;
         cp += 2;
-
         sp = (short *)cp;
         *sp = m_pClientList[wObjectID]->m_sType;
         cp += 2;
-
         *cp = m_pClientList[wObjectID]->m_cDir;
         cp++;
-
         memcpy(cp, m_pClientList[wObjectID]->m_cCharName, 10);
         cp += 10;
-
         sp = (short *)cp;
         *sp = m_pClientList[wObjectID]->m_sAppr1;
         cp += 2;
-
         sp = (short *)cp;
         *sp = m_pClientList[wObjectID]->m_sAppr2;
         cp += 2;
-
         sp = (short *)cp;
         *sp = m_pClientList[wObjectID]->m_sAppr3;
         cp += 2;
-
         sp = (short *)cp;
         *sp = m_pClientList[wObjectID]->m_sAppr4;
         cp += 2;
-
         ip = (int *)cp;
         *ip = m_pClientList[wObjectID]->m_iApprColor;
         cp += 4;
 
         ip = (int *)cp;
-        sTemp = m_pClientList[wObjectID]->m_iStatus;
-        sTemp = 0x0FFFFFFF & sTemp;
-        sTemp2 = iGetPlayerABSStatus(wObjectID, iClientH);
-        sTemp = (sTemp | (sTemp2 << 28));
-        *ip = sTemp;
+
+
+
+        iTemp = m_pClientList[wObjectID]->m_iStatus;
+        iTemp = 0x0FFFFFFF & iTemp;
+
+        iTemp2 = (short)iGetPlayerABSStatus(wObjectID, iClientH);
+        iTemp = (iTemp | (iTemp2 << 28));
+        *ip = iTemp;
         cp += 4;
 
-        iRet = m_pClientList[iClientH]->iSendMsg(cData, 42);
+        /*
+        if (m_pClientList[iClientH]->m_iPKCount != 0) {
+
+        sTemp = sTemp | ((2) << 12);
+        }
+        else if (m_pClientList[wObjectID]->m_iPKCount != 0) {
+
+        sTemp = sTemp | ((2) << 12);
+        }
+        else {
+        if (m_pClientList[iClientH]->m_cSide != m_pClientList[wObjectID]->m_cSide) {
+        if ( (m_pClientList[iClientH]->m_cSide != 0) && (m_pClientList[wObjectID]->m_cSide != 0) ) {
+
+        sTemp = sTemp | ((2) << 12);
+        }
+        else {
+        sTemp = sTemp | ((0) << 12);
+        }
+        }
+        else {
+
+        if ( (memcmp(m_pClientList[wObjectID]->m_cGuildName, m_pClientList[iClientH]->m_cGuildName, 20) == 0) &&
+        (memcmp(m_pClientList[wObjectID]->m_cGuildName, "NONE", 4) != 0) ) {
+
+        if (m_pClientList[wObjectID]->m_iGuildRank == 0)
+        sTemp = sTemp | ((5) << 12);
+        else sTemp = sTemp | ((3) << 12);
+        }
+        else
+        if ( (memcmp(m_pClientList[iClientH]->m_cLocation, m_pClientList[wObjectID]->m_cLocation, 10) == 0) &&
+        (memcmp(m_pClientList[iClientH]->m_cGuildName, "NONE", 4) != 0) &&
+        (memcmp(m_pClientList[wObjectID]->m_cGuildName, "NONE", 4) != 0) &&
+        (memcmp(m_pClientList[iClientH]->m_cGuildName, m_pClientList[wObjectID]->m_cGuildName, 20) != 0) ) {
+
+        sTemp = sTemp | ((4) << 12);
+        }
+        else sTemp = sTemp | ((1) << 12);
+        }
+        }
+
+        *sp = sTemp;
+        cp += 2;
+        */
+
+        iRet = m_pClientList[iClientH]->iSendMsg(cData, 40 + 2);
+
         switch (iRet)
         {
             case DEF_XSOCKEVENT_QUENEFULL:
             case DEF_XSOCKEVENT_SOCKETERROR:
             case DEF_XSOCKEVENT_CRITICALERROR:
             case DEF_XSOCKEVENT_SOCKETCLOSED:
-                DeleteClient(iClientH, TRUE, TRUE);
+
+                DeleteClient(iClientH, true, true);
                 return 0;
         }
-
-        SendEventToNearClient_TypeA(iClientH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, NULL, NULL, NULL);
         return 0;
     }
 
     return 1;
 }
 
-int CGame::iClientMotion_Attack_Handler(int iClientH, short sX, short sY, short dX, short dY, short wType, char cDir, WORD wTargetObjectID, BOOL bResponse, BOOL bIsDash)
+int CGame::iClientMotion_Attack_Handler(int iClientH, short sX, short sY, short dX, short dY, short wType, char cDir, uint16_t wTargetObjectID, bool bResponse, bool bIsDash)
 {
     char cData[100]{};
-    DWORD * dwp, dwTime;
-    WORD * wp;
-    int     iRet, iExp, tdX = 0, tdY = 0, i;
+    uint32_t * dwp, dwTime;
+    uint16_t * wp;
+    int     iRet, iExp, tdX, tdY;
     short   sOwner, sAbsX, sAbsY;
     char    cOwnerType;
-    BOOL    bNearAttack = FALSE, var_AC = FALSE;
-    short sItemIndex;
-    int tX, tY, iErr, iStX, iStY;
+    bool    bNearAttack = false;
 
-    if (m_pClientList[iClientH] == NULL) return 0;
+
+    if (m_pClientList[iClientH] == 0) return 0;
     if ((cDir <= 0) || (cDir > 8))       return 0;
-    if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return 0;
-    if (m_pClientList[iClientH]->m_bIsKilled == TRUE) return 0;
+    if (m_pClientList[iClientH]->m_bIsInitComplete == false) return 0;
+    if (m_pClientList[iClientH]->m_bIsKilled == true) return 0;
 
     dwTime = timeGetTime();
     m_pClientList[iClientH]->m_dwLastActionTime = dwTime;
+
+#ifndef NO_MSGSPEEDCHECK	
     m_pClientList[iClientH]->m_iAttackMsgRecvCount++;
     if (m_pClientList[iClientH]->m_iAttackMsgRecvCount >= 7)
     {
         if (m_pClientList[iClientH]->m_dwAttackLAT != 0)
         {
-            if ((dwTime - m_pClientList[iClientH]->m_dwAttackLAT) < (3500))
+
+            if ((dwTime - m_pClientList[iClientH]->m_dwAttackLAT) < (80 * 8 * 7 - 3000))
             {
-                DeleteClient(iClientH, TRUE, TRUE, TRUE);
+
+                DeleteClient(iClientH, true, true);
                 return 0;
             }
         }
         m_pClientList[iClientH]->m_dwAttackLAT = dwTime;
         m_pClientList[iClientH]->m_iAttackMsgRecvCount = 0;
     }
+#endif
 
-    if ((wTargetObjectID != NULL) && (wType != 2))
+    if ((wTargetObjectID != 0) && (wType != 2))
     {
+
+        tdX = 0;
+        tdY = 0;
+
         if (wTargetObjectID < DEF_MAXCLIENTS)
         {
-            if (m_pClientList[wTargetObjectID] != NULL)
+            if (m_pClientList[wTargetObjectID] != 0)
             {
                 tdX = m_pClientList[wTargetObjectID]->m_sX;
                 tdY = m_pClientList[wTargetObjectID]->m_sY;
@@ -367,44 +451,36 @@ int CGame::iClientMotion_Attack_Handler(int iClientH, short sX, short sY, short 
         }
         else if ((wTargetObjectID > 10000) && (wTargetObjectID < (10000 + DEF_MAXNPCS)))
         {
-            if (m_pNpcList[wTargetObjectID - 10000] != NULL)
+            if (m_pNpcList[wTargetObjectID - 10000] != 0)
             {
                 tdX = m_pNpcList[wTargetObjectID - 10000]->m_sX;
                 tdY = m_pNpcList[wTargetObjectID - 10000]->m_sY;
             }
         }
 
-        m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->GetOwner(&sOwner, &cOwnerType, dX, dY);
-        if (sOwner == (wTargetObjectID - 10000))
+
+        if ((tdX == dX) && (tdY == dY))
         {
-            tdX = m_pNpcList[sOwner]->m_sX;
-            dX = tdX;
-            tdY = m_pNpcList[sOwner]->m_sY;
-            dY = tdY;
-            bNearAttack = FALSE;
-            var_AC = TRUE;
+
+            bNearAttack = false;
         }
-        if (var_AC != TRUE)
+        else if ((abs(tdX - dX) <= 1) && (abs(tdY - dY) <= 1))
         {
-            if ((tdX == dX) && (tdY == dY))
-            {
-                bNearAttack = FALSE;
-            }
-            else if ((abs(tdX - dX) <= 1) && (abs(tdY - dY) <= 1))
-            {
-                dX = tdX;
-                dY = tdY;
-                bNearAttack = TRUE;
-            }
+            dX = tdX;
+            dY = tdY;
+            bNearAttack = true;
         }
     }
 
     if ((dX < 0) || (dX >= m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_sSizeX) ||
         (dY < 0) || (dY >= m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_sSizeY)) return 0;
 
+
     if ((sX != m_pClientList[iClientH]->m_sX) || (sY != m_pClientList[iClientH]->m_sY)) return 2;
 
-    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != NULL)
+
+    int iStX, iStY;
+    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != 0)
     {
         iStX = m_pClientList[iClientH]->m_sX / 20;
         iStY = m_pClientList[iClientH]->m_sY / 20;
@@ -418,98 +494,36 @@ int CGame::iClientMotion_Attack_Handler(int iClientH, short sX, short sY, short 
         }
     }
 
+
     sAbsX = abs(sX - dX);
     sAbsY = abs(sY - dY);
     if ((wType != 2) && (wType < 20))
     {
-        if (var_AC == FALSE)
-        {
-            sItemIndex = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND];
-            if (sItemIndex != -1)
-            {
-                if (m_pClientList[iClientH]->m_pItemList[sItemIndex] == NULL) return 0;
-                if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sIDnum == 845)
-                {
-                    if ((sAbsX > 4) || (sAbsY > 4)) wType = 0;
-                }
-                else
-                {
-                    if ((sAbsX > 1) || (sAbsY > 1)) wType = 0;
-                }
-            }
-            else
-            {
-                if ((sAbsX > 1) || (sAbsY > 1)) wType = 0;
-            }
-        }
-        else
-        {
-            cDir = m_Misc.cGetNextMoveDir(sX, sY, dX, dY);
-            if ((m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->bCheckFlySpaceAvailable(sX, sY, cDir, sOwner)) != FALSE)
-                wType = 0;
-        }
+        if ((sAbsX > 1) || (sAbsY > 1)) wType = 0;
     }
 
+
     ClearSkillUsingStatus(iClientH);
+
+
     m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->ClearOwner(0, iClientH, DEF_OWNERTYPE_PLAYER, sX, sY);
+
     m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->SetOwner(iClientH, DEF_OWNERTYPE_PLAYER, sX, sY);
 
     m_pClientList[iClientH]->m_cDir = cDir;
 
     iExp = 0;
+
     m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->GetOwner(&sOwner, &cOwnerType, dX, dY);
 
-    if (sOwner != NULL)
+    if (sOwner != 0)
     {
+
         if ((wType != 0) && ((dwTime - m_pClientList[iClientH]->m_dwRecentAttackTime) > 100))
         {
-            if ((m_pClientList[iClientH]->m_pIsProcessingAllowed == FALSE) && (m_pClientList[iClientH]->m_bIsInsideWarehouse == FALSE)
-                && (m_pClientList[iClientH]->m_bIsInsideWizardTower == FALSE) && (m_pClientList[iClientH]->m_bIsInsideOwnTown == FALSE))
-            {
-                sItemIndex = m_pClientList[iClientH]->m_sItemEquipmentStatus[DEF_EQUIPPOS_TWOHAND];
-                if (sItemIndex != -1 && m_pClientList[iClientH]->m_pItemList[sItemIndex] != NULL)
-                {
-                    if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sIDnum == 874)
-                    {
-                        for (i = 2; i < 10; i++)
-                        {
-                            iErr = 0;
-                            m_Misc.GetPoint2(sX, sY, dX, dY, &tX, &tY, &iErr, i);
-                            m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->GetOwner(&sOwner, &cOwnerType, tX, tY);
-                            //iExp += iCalculateAttackEffect(sOwner, cOwnerType, iClientH, DEF_OWNERTYPE_PLAYER, tX, tY, wType, bNearAttack, bIsDash, TRUE);
-                            if ((abs(tdX - dX) <= 1) && (abs(tdY - dY) <= 1))
-                            {
-                                m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->GetOwner(&sOwner, &cOwnerType, dX, dY);
-                                //iExp += iCalculateAttackEffect(sOwner, cOwnerType, iClientH, DEF_OWNERTYPE_PLAYER, dX, dY, wType, bNearAttack, bIsDash, FALSE);
-                            }
-                        }
-                    }
-                    else if (m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sIDnum == 873)
-                    {
-                        if ((m_pClientList[iClientH]->m_sAppr2 & 0xF000) != 0)
-                        {
-                            if (m_bHeldenianInitiated != 1)
-                            {
-                                iAddDynamicObjectList(iClientH, DEF_OWNERTYPE_PLAYER_INDIRECT, DEF_DYNAMICOBJECT_FIRE3, m_pClientList[iClientH]->m_cMapIndex, dX, dY, (iDice(1, 7) + 3) * 1000, 8);
-                            }
-                            iExp += iCalculateAttackEffect(sOwner, cOwnerType, iClientH, DEF_OWNERTYPE_PLAYER, dX, dY, wType, bNearAttack, bIsDash, FALSE);
-                        }
-                    }
-                    else
-                    {
-                        iExp += iCalculateAttackEffect(sOwner, cOwnerType, iClientH, DEF_OWNERTYPE_PLAYER, dX, dY, wType, bNearAttack, bIsDash, FALSE);
-                    }
-                }
-                else
-                {
-                    iExp += iCalculateAttackEffect(sOwner, cOwnerType, iClientH, DEF_OWNERTYPE_PLAYER, dX, dY, wType, bNearAttack, bIsDash, FALSE);
-                }
-            }
-            else
-            {
-                iExp += iCalculateAttackEffect(sOwner, cOwnerType, iClientH, DEF_OWNERTYPE_PLAYER, dX, dY, wType, bNearAttack, bIsDash, FALSE);
-            }
-            if (m_pClientList[iClientH] == NULL) return 0;
+            iExp = iCalculateAttackEffect(sOwner, cOwnerType, iClientH, DEF_OWNERTYPE_PLAYER, dX, dY, wType, bNearAttack, bIsDash);
+
+            if (m_pClientList[iClientH] == 0) return 0;
             m_pClientList[iClientH]->m_dwRecentAttackTime = dwTime;
         }
     }
@@ -517,14 +531,15 @@ int CGame::iClientMotion_Attack_Handler(int iClientH, short sX, short sY, short 
 
     if (iExp != 0)
     {
-        GetExp(iClientH, iExp, TRUE);
+        GetExp(iClientH, iExp, true);
     }
 
-    if (bResponse == TRUE)
+
+    if (bResponse == true)
     {
-        dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
+        dwp = (uint32_t *)(cData + DEF_INDEX4_MSGID);
         *dwp = MSGID_RESPONSE_MOTION;
-        wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
+        wp = (uint16_t *)(cData + DEF_INDEX2_MSGTYPE);
         *wp = DEF_OBJECTMOTION_ATTACK_CONFIRM;
 
         iRet = m_pClientList[iClientH]->iSendMsg(cData, 6);
@@ -534,7 +549,8 @@ int CGame::iClientMotion_Attack_Handler(int iClientH, short sX, short sY, short 
             case DEF_XSOCKEVENT_SOCKETERROR:
             case DEF_XSOCKEVENT_CRITICALERROR:
             case DEF_XSOCKEVENT_SOCKETCLOSED:
-                DeleteClient(iClientH, TRUE, TRUE);
+
+                DeleteClient(iClientH, true, true);
                 return 0;
         }
     }
@@ -544,23 +560,25 @@ int CGame::iClientMotion_Attack_Handler(int iClientH, short sX, short sY, short 
 
 int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char cDir)
 {
-    DWORD * dwp;
-    WORD * wp;
+    uint32_t * dwp;
+    uint16_t * wp;
     char * cp;
     short * sp, sRemainItemSprite, sRemainItemSpriteFrame;
     char  cRemainItemColor, cData[100]{};
     int   iRet, iEraseReq;
     CItem * pItem;
 
-    if (m_pClientList[iClientH] == NULL) return 0;
+    if (m_pClientList[iClientH] == 0) return 0;
     if ((cDir <= 0) || (cDir > 8))       return 0;
-    if (m_pClientList[iClientH]->m_bIsKilled == TRUE) return 0;
-    if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return 0;
+    if (m_pClientList[iClientH]->m_bIsKilled == true) return 0;
+    if (m_pClientList[iClientH]->m_bIsInitComplete == false) return 0;
+
 
     if ((sX != m_pClientList[iClientH]->m_sX) || (sY != m_pClientList[iClientH]->m_sY)) return 2;
 
+
     int iStX, iStY;
-    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != NULL)
+    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != 0)
     {
         iStX = m_pClientList[iClientH]->m_sX / 20;
         iStY = m_pClientList[iClientH]->m_sY / 20;
@@ -577,19 +595,19 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
     ClearSkillUsingStatus(iClientH);
 
     m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->ClearOwner(0, iClientH, DEF_OWNERTYPE_PLAYER, sX, sY);
+
     m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->SetOwner(iClientH, DEF_OWNERTYPE_PLAYER, sX, sY);
 
     pItem = m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->pGetItem(sX, sY, &sRemainItemSprite, &sRemainItemSpriteFrame, &cRemainItemColor);
-    if (pItem != NULL)
+    if (pItem != 0)
     {
-        if (_bAddClientItemList(iClientH, pItem, &iEraseReq) == TRUE)
+        if (_bAddClientItemList(iClientH, pItem, &iEraseReq) == true)
         {
+            _bItemLog(DEF_ITEMLOG_GET, iClientH, (int)-1, pItem);
 
-            _bItemLog(DEF_ITEMLOG_GET, iClientH, NULL, pItem);
-
-            dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
+            dwp = (uint32_t *)(cData + DEF_INDEX4_MSGID);
             *dwp = MSGID_NOTIFY;
-            wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
+            wp = (uint16_t *)(cData + DEF_INDEX2_MSGTYPE);
             *wp = DEF_NOTIFY_ITEMOBTAINED;
 
             cp = (char *)(cData + DEF_INDEX2_MSGTYPE + 2);
@@ -600,7 +618,7 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
             memcpy(cp, pItem->m_cName, 20);
             cp += 20;
 
-            dwp = (DWORD *)cp;
+            dwp = (uint32_t *)cp;
             *dwp = pItem->m_dwCount;
             cp += 4;
 
@@ -620,11 +638,11 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
             *cp = pItem->m_cGenderLimit;
             cp++;
 
-            wp = (WORD *)cp;
+            wp = (uint16_t *)cp;
             *wp = pItem->m_wCurLifeSpan;
             cp += 2;
 
-            wp = (WORD *)cp;
+            wp = (uint16_t *)cp;
             *wp = pItem->m_wWeight;
             cp += 2;
 
@@ -642,7 +660,7 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
             *cp = (char)pItem->m_sItemSpecEffectValue2;
             cp++;
 
-            dwp = (DWORD *)cp;
+            dwp = (uint32_t *)cp;
             *dwp = pItem->m_dwAttribute;
             cp += 4;
 
@@ -653,13 +671,15 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
                 sRemainItemSprite, sRemainItemSpriteFrame, cRemainItemColor);
 
             iRet = m_pClientList[iClientH]->iSendMsg(cData, 53);
+
             switch (iRet)
             {
                 case DEF_XSOCKEVENT_QUENEFULL:
                 case DEF_XSOCKEVENT_SOCKETERROR:
                 case DEF_XSOCKEVENT_CRITICALERROR:
                 case DEF_XSOCKEVENT_SOCKETCLOSED:
-                    DeleteClient(iClientH, TRUE, TRUE);
+
+                    DeleteClient(iClientH, true, true);
                     return 0;
             }
         }
@@ -667,9 +687,9 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
         {
             m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->bSetItem(sX, sY, pItem);
 
-            dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
+            dwp = (uint32_t *)(cData + DEF_INDEX4_MSGID);
             *dwp = MSGID_NOTIFY;
-            wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
+            wp = (uint16_t *)(cData + DEF_INDEX2_MSGTYPE);
             *wp = DEF_NOTIFY_CANNOTCARRYMOREITEM;
 
             iRet = m_pClientList[iClientH]->iSendMsg(cData, 6);
@@ -679,15 +699,16 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
                 case DEF_XSOCKEVENT_SOCKETERROR:
                 case DEF_XSOCKEVENT_CRITICALERROR:
                 case DEF_XSOCKEVENT_SOCKETCLOSED:
-                    DeleteClient(iClientH, TRUE, TRUE);
+
+                    DeleteClient(iClientH, true, true);
                     return 0;
             }
         }
     }
 
-    dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
+    dwp = (uint32_t *)(cData + DEF_INDEX4_MSGID);
     *dwp = MSGID_RESPONSE_MOTION;
-    wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
+    wp = (uint16_t *)(cData + DEF_INDEX2_MSGTYPE);
     *wp = DEF_OBJECTMOTION_CONFIRM;
 
     iRet = m_pClientList[iClientH]->iSendMsg(cData, 6);
@@ -697,7 +718,8 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
         case DEF_XSOCKEVENT_SOCKETERROR:
         case DEF_XSOCKEVENT_CRITICALERROR:
         case DEF_XSOCKEVENT_SOCKETCLOSED:
-            DeleteClient(iClientH, TRUE, TRUE);
+
+            DeleteClient(iClientH, true, true);
             return 0;
     }
 
@@ -707,33 +729,37 @@ int CGame::iClientMotion_GetItem_Handler(int iClientH, short sX, short sY, char 
 int CGame::iClientMotion_Stop_Handler(int iClientH, short sX, short sY, char cDir)
 {
     char cData[100]{};
-    DWORD * dwp;
-    WORD * wp;
+    uint32_t * dwp;
+    uint16_t * wp;
     int     iRet;
     short   sOwnerH;
     char    cOwnerType;
 
-    if (m_pClientList[iClientH] == NULL) return 0;
+    if (m_pClientList[iClientH] == 0) return 0;
     if ((cDir <= 0) || (cDir > 8))       return 0;
-    if (m_pClientList[iClientH]->m_bIsKilled == TRUE) return 0;
-    if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return 0;
+    if (m_pClientList[iClientH]->m_bIsKilled == true) return 0;
+    if (m_pClientList[iClientH]->m_bIsInitComplete == false) return 0;
+
 
     if ((sX != m_pClientList[iClientH]->m_sX) || (sY != m_pClientList[iClientH]->m_sY)) return 2;
 
-    if (m_pClientList[iClientH]->m_bSkillUsingStatus[19] == TRUE)
+
+    if (m_pClientList[iClientH]->m_bSkillUsingStatus[19] == true)
     {
         m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->GetOwner(&sOwnerH, &cOwnerType, sX, sY);
-        if (sOwnerH != NULL)
+        if (sOwnerH != 0)
         {
-            DeleteClient(iClientH, TRUE, TRUE);
+            DeleteClient(iClientH, true, true);
             return 0;
         }
     }
 
+
     ClearSkillUsingStatus(iClientH);
 
+
     int iStX, iStY;
-    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != NULL)
+    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != 0)
     {
         iStX = m_pClientList[iClientH]->m_sX / 20;
         iStY = m_pClientList[iClientH]->m_sY / 20;
@@ -747,14 +773,19 @@ int CGame::iClientMotion_Stop_Handler(int iClientH, short sX, short sY, char cDi
         }
     }
 
+
     m_pClientList[iClientH]->m_cDir = cDir;
 
+
     m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->ClearOwner(0, iClientH, DEF_OWNERTYPE_PLAYER, sX, sY);
+
     m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->SetOwner(iClientH, DEF_OWNERTYPE_PLAYER, sX, sY);
 
-    dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
+
+
+    dwp = (uint32_t *)(cData + DEF_INDEX4_MSGID);
     *dwp = MSGID_RESPONSE_MOTION;
-    wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
+    wp = (uint16_t *)(cData + DEF_INDEX2_MSGTYPE);
     *wp = DEF_OBJECTMOTION_CONFIRM;
 
     iRet = m_pClientList[iClientH]->iSendMsg(cData, 6);
@@ -764,7 +795,8 @@ int CGame::iClientMotion_Stop_Handler(int iClientH, short sX, short sY, char cDi
         case DEF_XSOCKEVENT_SOCKETERROR:
         case DEF_XSOCKEVENT_CRITICALERROR:
         case DEF_XSOCKEVENT_SOCKETCLOSED:
-            DeleteClient(iClientH, TRUE, TRUE);
+
+            DeleteClient(iClientH, true, true);
             return 0;
     }
 
@@ -773,19 +805,21 @@ int CGame::iClientMotion_Stop_Handler(int iClientH, short sX, short sY, char cDi
 
 int CGame::iClientMotion_Magic_Handler(int iClientH, short sX, short sY, char cDir)
 {
-    char  cData[100]{};
-    DWORD * dwp;
-    WORD * wp;
+    char cData[100]{};
+    uint32_t * dwp;
+    uint16_t * wp;
     int     iRet;
 
-    if (m_pClientList[iClientH] == NULL) return 0;
-    if (m_pClientList[iClientH]->m_bIsKilled == TRUE) return 0;
-    if (m_pClientList[iClientH]->m_bIsInitComplete == FALSE) return 0;
+    if (m_pClientList[iClientH] == 0) return 0;
+    if (m_pClientList[iClientH]->m_bIsKilled == true) return 0;
+    if (m_pClientList[iClientH]->m_bIsInitComplete == false) return 0;
+
 
     if ((sX != m_pClientList[iClientH]->m_sX) || (sY != m_pClientList[iClientH]->m_sY)) return 2;
 
+
     int iStX, iStY;
-    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != NULL)
+    if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex] != 0)
     {
         iStX = m_pClientList[iClientH]->m_sX / 20;
         iStY = m_pClientList[iClientH]->m_sY / 20;
@@ -799,23 +833,29 @@ int CGame::iClientMotion_Magic_Handler(int iClientH, short sX, short sY, char cD
         }
     }
 
+
     ClearSkillUsingStatus(iClientH);
 
+
     m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->ClearOwner(0, iClientH, DEF_OWNERTYPE_PLAYER, sX, sY);
+
     m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->SetOwner(iClientH, DEF_OWNERTYPE_PLAYER, sX, sY);
+
 
     if ((m_pClientList[iClientH]->m_iStatus & 0x10) != 0)
     {
-        SetInvisibilityFlag(iClientH, DEF_OWNERTYPE_PLAYER, FALSE);
+        SetInvisibilityFlag(iClientH, DEF_OWNERTYPE_PLAYER, false);
+
         bRemoveFromDelayEventList(iClientH, DEF_OWNERTYPE_PLAYER, DEF_MAGICTYPE_INVISIBILITY);
-        m_pClientList[iClientH]->m_cMagicEffectStatus[DEF_MAGICTYPE_INVISIBILITY] = NULL;
+        m_pClientList[iClientH]->m_cMagicEffectStatus[DEF_MAGICTYPE_INVISIBILITY] = 0;
     }
 
     m_pClientList[iClientH]->m_cDir = cDir;
 
-    dwp = (DWORD *)(cData + DEF_INDEX4_MSGID);
+
+    dwp = (uint32_t *)(cData + DEF_INDEX4_MSGID);
     *dwp = MSGID_RESPONSE_MOTION;
-    wp = (WORD *)(cData + DEF_INDEX2_MSGTYPE);
+    wp = (uint16_t *)(cData + DEF_INDEX2_MSGTYPE);
     *wp = DEF_OBJECTMOTION_CONFIRM;
 
     iRet = m_pClientList[iClientH]->iSendMsg(cData, 6);
@@ -825,9 +865,11 @@ int CGame::iClientMotion_Magic_Handler(int iClientH, short sX, short sY, char cD
         case DEF_XSOCKEVENT_SOCKETERROR:
         case DEF_XSOCKEVENT_CRITICALERROR:
         case DEF_XSOCKEVENT_SOCKETCLOSED:
-            DeleteClient(iClientH, TRUE, TRUE);
+
+            DeleteClient(iClientH, true, true);
             return 0;
     }
 
     return 1;
 }
+

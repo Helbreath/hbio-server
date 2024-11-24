@@ -11,9 +11,7 @@
 
 static inline constexpr uint16_t DEF_NOTIFY_SPAWNEVENT = 0x0BAA;
 static inline constexpr uint16_t DEF_NOTIFY_QUESTCOUNTER = 0x0BE2;
-static inline constexpr uint16_t DEF_NOTIFY_HELDENIANSTART = 0x0BEA;
-static inline constexpr uint16_t DEF_NOTIFY_HELDENIANCOUNT = 0x0BEC;
-static inline constexpr uint16_t DEF_NOTIFY_HELDENIANEND = 0x0BE7;
+
 // NetMessages.h
 
 static inline constexpr uint16_t DEF_MSGTYPE_CONFIRM = 0x0F14;
@@ -57,7 +55,7 @@ static inline constexpr uint16_t DEF_COMMONTYPE_REQ_SELLITEMCONFIRM = 0x0A15;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQ_REPAIRITEMCONFIRM = 0x0A16;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQ_GETFISHTHISTIME = 0x0A17;
 static inline constexpr uint16_t DEF_COMMONTYPE_TOGGLESAFEATTACKMODE = 0x0A18;
-static inline constexpr uint16_t DEF_COMMONTYPE_REQ_CREATEPORTION = 0x0A19;
+static inline constexpr uint16_t DEF_COMMONTYPE_REQ_CREATEPOTION = 0x0A19;
 static inline constexpr uint16_t DEF_COMMONTYPE_TALKTONPC = 0x0A1A;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQ_SETDOWNSKILLINDEX = 0x0A1B;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQ_GETOCCUPYFLAG = 0x0A1C;
@@ -70,9 +68,11 @@ static inline constexpr uint16_t DEF_COMMONTYPE_CANCELEXCHANGEITEM = 0x0A21;
 static inline constexpr uint16_t DEF_COMMONTYPE_QUESTACCEPTED = 0x0A22;
 static inline constexpr uint16_t DEF_COMMONTYPE_BUILDITEM = 0x0A23;
 static inline constexpr uint16_t DEF_COMMONTYPE_GETMAGICABILITY = 0x0A24;
-
+static inline constexpr uint16_t DEF_COMMONTYPE_CLEARGUILDNAME = 0x0A25;
+static inline constexpr uint16_t DEF_COMMONTYPE_REQ_GETDARKITEM = 0x0A26;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQ_GETOCCUPYFIGHTZONETICKET = 0x0A25;
 static inline constexpr uint16_t DEF_COMMONTYPE_BANGUILD = 0x0A26;
+static inline constexpr uint16_t DEF_COMMONTYPE_CRAFTITEM = 0x0A28; // Craft item
 
 static inline constexpr uint16_t DEF_COMMONTYPE_REQUEST_ACCEPTJOINPARTY = 0x0A30;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQUEST_JOINPARTY = 0x0A31;
@@ -166,10 +166,10 @@ static inline constexpr uint16_t DEF_NOTIFY_REWARDGOLD = 0x0B4F;
 static inline constexpr uint16_t DEF_NOTIFY_IPACCOUNTINFO = 0x0B50;
 static inline constexpr uint16_t DEF_NOTIFY_SAFEATTACKMODE = 0x0B51;
 static inline constexpr uint16_t DEF_NOTIFY_SUPERATTACKLEFT = 0x0B52;
-static inline constexpr uint16_t DEF_NOTIFY_NOMATCHINGPORTION = 0x0B53;
-static inline constexpr uint16_t DEF_NOTIFY_LOWPORTIONSKILL = 0x0B54;
-static inline constexpr uint16_t DEF_NOTIFY_PORTIONFAIL = 0x0B55;
-static inline constexpr uint16_t DEF_NOTIFY_PORTIONSUCCESS = 0x0B56;
+static inline constexpr uint16_t DEF_NOTIFY_NOMATCHINGPOTION = 0x0B53;
+static inline constexpr uint16_t DEF_NOTIFY_LOWPOTIONSKILL = 0x0B54;
+static inline constexpr uint16_t DEF_NOTIFY_POTIONFAIL = 0x0B55;
+static inline constexpr uint16_t DEF_NOTIFY_POTIONSUCCESS = 0x0B56;
 static inline constexpr uint16_t DEF_NOTIFY_NPCTALK = 0x0B57;
 static inline constexpr uint16_t DEF_NOTIFY_ADMINIFO = 0x0B58;
 static inline constexpr uint16_t DEF_NOTIFY_DOWNSKILLINDEXSET = 0x0B59;
@@ -229,11 +229,14 @@ static inline constexpr uint16_t DEF_NOTIFY_CANNOTCONSTRUCT = 0x0BA1;
 static inline constexpr uint16_t DEF_NOTIFY_PARTY = 0x0BA2;
 static inline constexpr uint16_t DEF_NOTIFY_ITEMATTRIBUTECHANGE = 0x0BA3;
 static inline constexpr uint16_t DEF_NOTIFY_GIZONITEMUPGRADELEFT = 0x0BA4;
-static inline constexpr uint16_t DEF_NOTIFY_GIZONITEMCANGE = 0x0BA5;
+static inline constexpr uint16_t DEF_NOTIFY_GIZONITEMCHANGE = 0x0BA5;
 static inline constexpr uint16_t DEF_NOTIFY_REQGUILDNAMEANSWER = 0x0BA6;
+static inline constexpr uint16_t DEF_NOTIFY_REQPLAYERNAMEANSWER = 0x0BFE;
 static inline constexpr uint16_t DEF_NOTIFY_FORCERECALLTIME = 0x0BA7;
 static inline constexpr uint16_t DEF_NOTIFY_ITEMUPGRADEFAIL = 0x0BA8;
+static inline constexpr uint16_t DEF_NOTIFY_RESPONSE_HUNTMODE = 0x0BA9;
 
+static inline constexpr uint16_t DEF_NOTIFY_MONSTEREVENT_POSITION = 0x0BAA;
 static inline constexpr uint16_t DEF_NOTIFY_NOMOREAGRICULTURE = 0x0BB0;
 static inline constexpr uint16_t DEF_NOTIFY_AGRICULTURESKILLLIMIT = 0x0BB1;
 static inline constexpr uint16_t DEF_NOTIFY_AGRICULTURENOAREA = 0x0BB2;
@@ -267,7 +270,7 @@ static inline constexpr uint32_t MSGID_NPCCONFIGURATIONCONTENTS = 0x0FA314DA;
 static inline constexpr uint32_t MSGID_MAGICCONFIGURATIONCONTENTS = 0x0FA314DB;
 static inline constexpr uint32_t MSGID_SKILLCONFIGURATIONCONTENTS = 0x0FA314DC;
 static inline constexpr uint32_t MSGID_PLAYERITEMLISTCONTENTS = 0x0FA314DD;
-static inline constexpr uint32_t MSGID_PORTIONCONFIGURATIONCONTENTS = 0x0FA314DE;
+static inline constexpr uint32_t MSGID_POTIONCONFIGURATIONCONTENTS = 0x0FA314DE;
 static inline constexpr uint32_t MSGID_PLAYERCHARACTERCONTENTS = 0x0FA40000;
 static inline constexpr uint32_t MSGID_QUESTCONFIGURATIONCONTENTS = 0x0FA40001;
 static inline constexpr uint32_t MSGID_BUILDITEMCONFIGURATIONCONTENTS = 0x0FA40002;
@@ -282,6 +285,19 @@ static inline constexpr uint32_t MSGID_NPCITEMCONFIGCONTENTS = 0x0FA40006;
 
 static inline constexpr uint32_t MSGID_COMMAND_CHECKCONNECTION = 0x03203203;
 static inline constexpr uint32_t MSGID_COMMAND_CHATMSG = 0x03203204;
+
+static inline constexpr uint32_t MSGID_REQUEST_PING = 0x0FFAACCA;
+static inline constexpr uint32_t MSGID_RESPONSE_PING = 0x0FFAACCB;
+static inline constexpr uint32_t MSGID_REQUEST_FLOORSTATS = 0x0FFAACCC;
+static inline constexpr uint32_t MSGID_RESPONSE_FLOORSTATS = 0x0FFAACCD;
+static inline constexpr uint32_t MSGID_REQUEST_CHARLIST = 0x0FFAACCE;
+static inline constexpr uint32_t MSGID_RESPONSE_CHARLIST = 0x0FFAACCF;
+static inline constexpr uint32_t MSGID_REQUEST_FRIENDSLIST = 0x0FFAACD1;
+static inline constexpr uint32_t MSGID_RESPONSE_FRIENDSLIST = 0x0FFAACD2;
+static inline constexpr uint32_t MSGID_REQUEST_REGISTER = 0x0FFAACD3;
+static inline constexpr uint32_t MSGID_RESPONSE_REGISTER = 0x0FFAACD4;
+static inline constexpr uint32_t MSGID_REQUEST_PKLIST = 0x0FFAACD5;
+static inline constexpr uint32_t MSGID_RESPONSE_PKLIST = 0x0FFAACD6;
 
 static inline constexpr uint32_t MSGID_REQUEST_REGISTERGAMESERVER = 0x0512A3F4;
 static inline constexpr uint32_t MSGID_RESPONSE_REGISTERGAMESERVER = 0x0512A3F5;
@@ -361,6 +377,7 @@ static inline constexpr uint32_t MSGID_REQUEST_CITYHALLTELEPORT = 0x0EA03202;
 static inline constexpr uint32_t MSGID_REQUEST_HELDENIANTELEPORT = 0x0EA03206;
 
 static inline constexpr uint32_t MSGID_LEVELUPSETTINGS = 0x11A01000;
+static inline constexpr uint32_t MSGID_STATECHANGEPOINT = 0x11A01001;
 static inline constexpr uint32_t MSGID_DYNAMICOBJECT = 0x12A01001;
 
 static inline constexpr uint32_t MSGID_GAMESERVERALIVE = 0x12A01002;
@@ -489,6 +506,9 @@ static inline constexpr uint16_t DEF_COMMONTYPE_UPGRADEITEM = 0x0A58;
 static inline constexpr uint16_t DEF_ITEMLOG_UPGRADESUCCESS = 30;
 static inline constexpr uint16_t DEF_ITEMLOG_UPGRADEFAIL = 29;
 static inline constexpr uint16_t DEF_COMMONTYPE_REQGUILDNAME = 0x0A59;
+static inline constexpr uint16_t DEF_COMMONTYPE_REQPLAYERNAME = 0x0AEF;
+static inline constexpr uint16_t DEF_COMMONTYPE_REQUEST_HUNTMODE = 0x0A60;
+static inline constexpr uint16_t DEF_COMMONTYPE_REQ_CREATESLATE = 0x0A61;
 
 static inline constexpr uint32_t MSGID_GAMEITEMLOG = 0x210A914F;
 
@@ -500,9 +520,8 @@ static inline constexpr uint32_t MSGID_GAMECRUSADELOG = 0x210A914F;
 
 static inline constexpr uint16_t DEF_ITEMSPREAD_RANDOM = 1;
 static inline constexpr uint16_t DEF_ITEMSPREAD_FIXED = 2;
-static inline constexpr uint16_t MAX_NPCITEMDROP = 25;
+static inline constexpr uint16_t MAX_NPCITEMDROP = 95;
 
-static inline constexpr uint16_t DEF_COMMONTYPE_REQ_CREATESLATE = 0x0A61;
 static inline constexpr uint16_t DEF_NOTIFY_SLATECLEAR = 99;
 
 static inline constexpr uint16_t DEF_PKLOG_REDUCECRIMINAL = 1;
@@ -514,3 +533,54 @@ static inline constexpr uint16_t DEF_PKLOG_BYOTHER = 6;
 
 static inline constexpr uint32_t DEF_REQUEST_RESURRECTPLAYER_NO = 0x0FC94215;
 static inline constexpr uint32_t DEF_REQUEST_RESURRECTPLAYER_YES = 0x0FC94214;
+
+static inline constexpr uint16_t DEF_NOTIFY_HELDENIANEND = 0x0BE7; // Heldenian holy war has been closed.
+static inline constexpr uint16_t DEF_NOTIFY_HELDENIANSTART = 0x0BEA; // Heldenian real battle has been started form now on.
+static inline constexpr uint16_t DEF_NOTIFY_HELDENIANVICTORY = 0x0BEB; // HELDENIAN FINISHED FOR Elvine/aresden
+static inline constexpr uint16_t DEF_NOTIFY_HELDENIANCOUNT = 0x0BEC; // Sends client number of destroyed towers, deaths....
+
+static inline constexpr uint16_t DEF_NOTIFY_SLATE_BERSERK = 0x0BED; // Berserk magic casted!
+static inline constexpr uint16_t DEF_NOTIFY_LOTERY_LOST = 0x0BEE; // You draw a blank. Please try again next time..
+static inline constexpr uint16_t DEF_NOTIFY_0BEF = 0x0BEF; // Strange behavior, exits client?
+static inline constexpr uint16_t DEF_NOTIFY_CRAFTING_SUCCESS = 0x0BF0; // Crafting ok
+static inline constexpr uint16_t DEF_NOTIFY_CRAFTING_FAIL = 0x0BF1; // Crafting failed
+
+static inline constexpr uint16_t DEF_NOTIFY_ANGELIC_STATS = 0x0BF2; // Sends m_iAngelicStr, Int, Dex, Mag to client
+static inline constexpr uint16_t DEF_NOTIFY_ITEM_CANT_RELEASE = 0x0BF3; // "Item cannot be released"
+static inline constexpr uint16_t DEF_NOTIFY_ANGEL_FAILED = 0x0BF4; // Failed receiving an Angel pendent
+static inline constexpr uint16_t DEF_NOTIFY_ANGEL_RECEIVED = 0x0BF5; // "You have received the Tutelary Angel"
+
+static inline constexpr uint32_t MSGID_REQUEST_TELEPORT_LIST = 0x0EA03202;
+static inline constexpr uint32_t MSGID_RESPONSE_TELEPORT_LIST = 0x0EA03203;
+static inline constexpr uint32_t MSGID_REQUEST_CHARGED_TELEPORT = 0x0EA03204;
+static inline constexpr uint32_t MSGID_RESPONSE_CHARGED_TELEPORT = 0x0EA03205;
+
+static inline constexpr uint16_t DEF_NOTIFY_SPELL_SKILL = 0x0BF6;
+static inline constexpr uint16_t MSGID_GMLIST = 0x0BFC;
+static inline constexpr uint16_t DEF_NOTIFY_CHANGEVALUE = 0x0BFD;
+static inline constexpr uint16_t DEF_NOTIFY_SERVERCHAT = 0x0BFE;
+static inline constexpr uint16_t DEF_NOTIFY_CONTRIBUTION = 0x0BFF;
+
+
+static inline constexpr uint16_t DEF_CV_HP = 0x0001;
+static inline constexpr uint16_t DEF_CV_MP = 0x0002;
+static inline constexpr uint16_t DEF_CV_SP = 0x0003;
+static inline constexpr uint16_t DEF_CV_EK = 0x0004;
+static inline constexpr uint16_t DEF_CV_PK = 0x0005;
+static inline constexpr uint16_t DEF_CV_REP = 0x0006;
+
+static inline constexpr uint32_t MSGID_REQUEST_HELDENIAN_TP_LIST = 0x0EA03206;
+static inline constexpr uint32_t MSGID_RESPONSE_HELDENIAN_TP_LIST = 0x0EA03207;
+static inline constexpr uint32_t MSGID_REQUEST_HELDENIAN_TP = 0x0EA03208;
+static inline constexpr uint32_t MSGID_REQUEST_HELDENIAN_SCROLL = 0x3D001244;
+
+static inline constexpr uint32_t DEF_REQUEST_ANGEL = 0x0FC9421E;
+
+static inline constexpr uint16_t DEF_STR = 0x01;
+static inline constexpr uint16_t DEF_DEX = 0x03;
+static inline constexpr uint16_t DEF_INT = 0x04;
+static inline constexpr uint16_t DEF_VIT = 0x02;
+static inline constexpr uint16_t DEF_MAG = 0x05;
+static inline constexpr uint16_t DEF_CHR = 0x06;
+
+static inline constexpr uint32_t MSGID_FRIENDSLIST = 0x12345678;

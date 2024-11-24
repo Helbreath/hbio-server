@@ -10,94 +10,51 @@ extern char G_cTxt[512];
 
 /*void CGame::OpenApocalypseGate(int iClientH)
 {
-    if (m_pClientList[iClientH] == NULL) return;
+    if (m_pClientList[iClientH] == 0) return;
 
     //m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_iTotalAliveObject;
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_APOCGATEOPEN, 95, 31, NULL, m_pClientList[iClientH]->m_cMapName);
+    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_APOCGATEOPEN, 95, 31, 0, m_pClientList[iClientH]->m_cMapName);
 }*/
 
 void CGame::GlobalEndApocalypseMode()
 {
     char * cp, cData[120];
 
-    if (m_bIsApocalypseMode == FALSE) return;
+    if (m_bIsApocalypseMode == false) return;
 
-    ZeroMemory(cData, sizeof(cData));
+    memset(cData, 0, sizeof(cData));
     cp = (char *)cData;
     *cp = GSM_ENDAPOCALYPSE;
     cp++;
 
     LocalEndApocalypse();
-
-    bStockMsgToGateServer(cData, 5);
-}
-
-void CGame::GlobalUpdateConfigs(char cConfigType)
-{
-    char * cp, cData[120];
-
-    ZeroMemory(cData, sizeof(cData));
-    cp = (char *)cData;
-    *cp = GSM_UPDATECONFIGS;
-    cp++;
-
-    *cp = (char)cConfigType;
-    cp++;
-
-    LocalUpdateConfigs(cConfigType);
-
-    bStockMsgToGateServer(cData, 5);
-}
-
-void CGame::LocalUpdateConfigs(char cConfigType)
-{
-    if (cConfigType == 1)
-    {
-        bReadSettingsConfigFile("..\\GameConfigs\\Settings.cfg");
-        log->info("(!!!) Settings.cfg updated successfully!");
-    }
-    if (cConfigType == 2)
-    {
-        bReadAdminListConfigFile("..\\GameConfigs\\AdminList.cfg");
-        log->info("(!!!) AdminList.cfg updated successfully!");
-    }
-    if (cConfigType == 3)
-    {
-        bReadBannedListConfigFile("..\\GameConfigs\\BannedList.cfg");
-        log->info("(!!!) BannedList.cfg updated successfully!");
-    }
-    if (cConfigType == 4)
-    {
-        bReadAdminSetConfigFile("..\\GameConfigs\\AdminSettings.cfg");
-        log->info("(!!!) AdminSettings.cfg updated successfully!");
-    }
 }
 
 void CGame::LocalEndApocalypse()
 {
     int i;
 
-    m_bIsApocalypseMode = FALSE;
+    m_bIsApocalypseMode = false;
 
     for (i = 1; i < DEF_MAXCLIENTS; i++)
     {
-        if (m_pClientList[i] != NULL)
+        if (m_pClientList[i] != 0)
         {
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_APOCGATEENDMSG, NULL, NULL, NULL, NULL);
+            SendNotifyMsg(NULL, i, DEF_NOTIFY_APOCGATEENDMSG, 0, 0, 0, 0);
         }
     }
     wsprintf(G_cTxt, "(!)Apocalypse Mode OFF.");
     log->info(G_cTxt);
 }
 
-void CGame::LocalStartApocalypse(DWORD dwApocalypseGUID)
+void CGame::LocalStartApocalypse(uint32_t dwApocalypseGUID)
 {
     int i;
-    //DWORD dwApocalypse;
+    //uint32_t dwApocalypse;
 
-    m_bIsApocalypseMode = TRUE;
+    m_bIsApocalypseMode = true;
 
-    if (dwApocalypseGUID != NULL)
+    if (dwApocalypseGUID != 0)
     {
         _CreateApocalypseGUID(dwApocalypseGUID);
         //m_dwApocalypseGUID = dwApocalypse;
@@ -105,24 +62,24 @@ void CGame::LocalStartApocalypse(DWORD dwApocalypseGUID)
 
     for (i = 1; i < DEF_MAXCLIENTS; i++)
     {
-        if (m_pClientList[i] != NULL)
+        if (m_pClientList[i] != 0)
         {
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_APOCGATESTARTMSG, NULL, NULL, NULL, NULL);
+            SendNotifyMsg(NULL, i, DEF_NOTIFY_APOCGATESTARTMSG, 0, 0, 0, 0);
             //RequestTeleportHandler(i, "0   ");
-            //SendNotifyMsg(NULL, i, DEF_NOTIFY_APOCFORCERECALLPLAYERS, NULL, NULL, NULL, NULL);
+            //SendNotifyMsg(NULL, i, DEF_NOTIFY_APOCFORCERECALLPLAYERS, 0, 0, 0, 0);
         }
     }
     wsprintf(G_cTxt, "(!)Apocalypse Mode ON.");
     log->info(G_cTxt);
 }
 
-void CGame::_CreateApocalypseGUID(DWORD dwApocalypseGUID)
+void CGame::_CreateApocalypseGUID(uint32_t dwApocalypseGUID)
 {
     char * cp, cTxt[256], cFn[256], cTemp[1024];
     FILE * pFile;
 
     _mkdir("GameData");
-    ZeroMemory(cFn, sizeof(cFn));
+    memset(cFn, 0, sizeof(cFn));
 
     strcat(cFn, "GameData");
     strcat(cFn, "\\");
@@ -130,16 +87,16 @@ void CGame::_CreateApocalypseGUID(DWORD dwApocalypseGUID)
     strcat(cFn, "ApocalypseGUID.Txt");
 
     pFile = fopen(cFn, "wt");
-    if (pFile == NULL)
+    if (pFile == 0)
     {
         wsprintf(cTxt, "(!) Cannot create ApocalypseGUID(%d) file", dwApocalypseGUID);
         log->info(cTxt);
     }
     else
     {
-        ZeroMemory(cTemp, sizeof(cTemp));
+        memset(cTemp, 0, sizeof(cTemp));
 
-        ZeroMemory(cTxt, sizeof(cTxt));
+        memset(cTxt, 0, sizeof(cTxt));
         wsprintf(cTxt, "ApocalypseGUID = %d\n", dwApocalypseGUID);
         strcat(cTemp, cTxt);
 
@@ -149,7 +106,7 @@ void CGame::_CreateApocalypseGUID(DWORD dwApocalypseGUID)
         wsprintf(cTxt, "(O) ApocalypseGUID(%d) file created", dwApocalypseGUID);
         log->info(cTxt);
     }
-    if (pFile != NULL) fclose(pFile);
+    if (pFile != 0) fclose(pFile);
 }
 
 /*void CGame::ApocalypseStarter()
@@ -157,8 +114,8 @@ void CGame::_CreateApocalypseGUID(DWORD dwApocalypseGUID)
  SYSTEMTIME SysTime;
  int i;
 
-    if (m_bIsApocalypseMode == TRUE) return;
-    if (m_bIsApocalypseStarter == FALSE) return;
+    if (m_bIsApocalypseMode == true) return;
+    if (m_bIsApocalypseStarter == false) return;
 
     GetLocalTime(&SysTime);
 
@@ -177,8 +134,8 @@ void CGame::ApocalypseEnder()
     SYSTEMTIME SysTime;
     int i;
 
-    if (m_bIsApocalypseMode == FALSE) return;
-    if (m_bIsApocalypseStarter == FALSE) return;
+    if (m_bIsApocalypseMode == false) return;
+    if (m_bIsApocalypseStarter == false) return;
 
     GetLocalTime(&SysTime);
 
@@ -193,28 +150,28 @@ void CGame::ApocalypseEnder()
         }
 }
 
-/*void CGame::GlobalStartApocalypseMode(int iClientH, char *pData, DWORD dwMsgSize)
+/*void CGame::GlobalStartApocalypseMode(int iClientH, char *pData, uint32_t dwMsgSize)
 {
  char * cp, cData[120], cBuff[256];
- DWORD * dwp, dwApocalypseGUID;
+ uint32_t * dwp, dwApocalypseGUID;
  SYSTEMTIME SysTime;
 
     if (m_pClientList[iClientH]->m_iAdminUserLevel < 3) {
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ADMINUSERLEVELLOW, NULL, NULL, NULL, NULL);
+        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ADMINUSERLEVELLOW, 0, 0, 0, 0);
     }
-    if (m_bIsApocalypseMode == TRUE) return;
-    if (m_bIsHeldenianMode == TRUE) return;
-    if (m_bIsCrusadeMode == TRUE) return;
-    if (dwMsgSize != NULL) && (pData != NULL) {
-        m_bIsApocalypseGateOpen = TRUE;
+    if (m_bIsApocalypseMode == true) return;
+    if (m_bIsHeldenianMode == true) return;
+    if (m_bIsCrusadeMode == true) return;
+    if (dwMsgSize != 0) && (pData != 0) {
+        m_bIsApocalypseGateOpen = true;
         GetLocalTime(&SysTime);
-        ZeroMemory(cBuff, sizeof(cBuff));
+        memset(cBuff, 0, sizeof(cBuff));
         memcpy(cBuff, pData, dwMsgSize);
 
         pStrTok = new CStrTok(cBuff, seps);
         token = pStrTok->pGet();
         token = pStrTok->pGet();
-        if (token != NULL) {
+        if (token != 0) {
             var_124 = atoi(token);
             m_dwApocalypseStartHour = SysTime.wHour;
             m_dwApocalypseStartMinute = SysTime.wMinute;
@@ -225,6 +182,6 @@ void CGame::ApocalypseEnder()
     }
     sub_4AD0E0();
     wsprintf(cTemp, "(%s) GM Order(%s): beginapocalypse", m_pClientList[iClientH]->m_cIPaddress, m_pClientList[iClientH]->m_cCharName);
-    //bSendMsgToLS(MSGID_GAMEMASTERLOG, iClientH, FALSE, cTemp);
+    //bSendMsgToLS(MSGID_GAMEMASTERLOG, iClientH, false, cTemp);
     delete pStrTok;
 }*/

@@ -6,16 +6,13 @@
 
 #pragma once
 
-#include <windows.h>
-
-
-class CStrategicPoint  
+class CStrategicPoint
 {
 public:
-	CStrategicPoint() = default;
-	~CStrategicPoint() = default;
+    CStrategicPoint() = default;
+    ~CStrategicPoint() = default;
 
-	int		m_iSide;
-	int     m_iValue;
-	int		m_iX, m_iY;
+    int m_iSide{};
+    int m_iValue{};
+    int m_iX{}, m_iY{};
 };

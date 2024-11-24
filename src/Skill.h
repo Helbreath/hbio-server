@@ -6,20 +6,18 @@
 
 #pragma once
 
-#include <windows.h>
-
 #define DEF_SKILLEFFECTTYPE_GET			    1
 #define DEF_SKILLEFFECTTYPE_PRETEND			2
 #define DEF_SKILLEFFECTTYPE_TAMING			3
 
-class CSkill  
+class CSkill
 {
 public:
-	CSkill() = default;
-	~CSkill() = default;
+    CSkill() = default;
+    ~CSkill() = default;
 
-	char m_cName[30];
+    char m_cName[30]{};
 
-	short m_sType;
-	short m_sValue1, m_sValue2, m_sValue3, m_sValue4, m_sValue5, m_sValue6;
+    short m_sType{};
+    short m_sValue1{}, m_sValue2{}, m_sValue3{}, m_sValue4{}, m_sValue5{}, m_sValue6{};
 };

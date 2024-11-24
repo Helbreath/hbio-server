@@ -6,24 +6,36 @@
 
 #pragma once
 
-#include <windows.h>
+/*
+[CONFIG]
 
-class CTeleport  
+//---------NUM--NPC_NAME--------SOURCE_MAP------TARGET_MAP------X-------Y-------COST----MinLvl--MaxLvl--Side----bHunt---bNtrl---bCrmnl--
+teleport = 1	William		cityhall_1	middleland	200	200	10000	30	100	aresden	1	1	0
+teleport = 2	William		cityhall_2	middleland	200	200	10000	30	100	elvine	1	1	0
+
+[END]
+
+Side   : all, aresden, elvine
+bHunt  : (0,1)
+bNtrl  : (0,1)
+bCrmnl : (0,1)
+*/
+
+class CTeleport
 {
 public:
-	CTeleport(); 
-	~CTeleport() = default;
+    CTeleport();
+    ~CTeleport() = default;
 
-	char  m_cTeleportNum;
-	char  m_cTeleportNpcName[30]; // The npc with teleport ability.
-	char  m_cSourceMap[10]; // The map the teleport npc is located in.
-	char  m_cTargetMap[10]; // The map the player will be teleported to.
-	short m_sDestinationX, m_sDestinationY; // The destination coordinates on the map.
-	short m_sTeleportCost; // The amount of gold paid to teleport.
-	short m_sTeleportMinLevel, m_sTeleportMaxLevel; // The required level range for the player.
-	char  m_cTeleportSide[7]; // The side the player must be for a successful teleport.
-			// both
-			// elvine
-			// aresden
-	BOOL m_bTeleportHunt, m_bTeleportNtrl, m_bTeleportCrmnl; // Check if player is a Civilian, Neutral, or Criminal.
+    char m_cNpcname[21]{};
+    char m_cSourceMap[11]{};
+    char m_cTargetMap[11]{};
+    int m_iX{}, m_iY{};
+    int m_iCost{};
+    int m_iMinLvl{};
+    int m_iMaxLvl{};
+    int m_iSide{};
+    bool m_bHunter{};
+    bool m_bNetural{};
+    bool m_bCriminal{};
 };

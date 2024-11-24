@@ -5,15 +5,7 @@
 //
 
 #include "Misc.h"
-
-void CMisc::GetMyCursorPos(short * pX, short * pY)
-{
-    POINT point;
-
-    GetCursorPos(&point);
-    *pX = (short)point.x;
-    *pY = (short)point.y;
-}
+#include <cstring>
 
 char CMisc::cGetNextMoveDir(short sX, short sY, short dX, short dY)
 {
@@ -217,37 +209,17 @@ void CMisc::GetDirPoint(char cDir, int * pX, int * pY)
 
 }
 
-BOOL CMisc::bEncode(char cKey, char * pStr)
+bool CMisc::bEncode(char cKey, char * pStr)
 {
-    int i, iLen;
-
-    return TRUE;
-
-    iLen = strlen(pStr);
-    for (i = 0; i <= iLen - 1; i++)
-    {
-        pStr[i] = pStr[i] ^ (cKey);
-    }
-
-    return TRUE;
+    return true;
 }
 
-BOOL CMisc::bDecode(char cKey, char * pStr)
+bool CMisc::bDecode(char cKey, char * pStr)
 {
-    int i, iLen;
-
-    return TRUE;
-
-    iLen = strlen(pStr);
-    for (i = 0; i <= iLen - 1; i++)
-    {
-        pStr[i] = pStr[i] ^ (cKey);
-    }
-
-    return TRUE;
+    return true;
 }
 
-BOOL CMisc::bCheckValidName(char * pStr)
+bool CMisc::bCheckValidName(char * pStr)
 {
     int i, iLen;
 
@@ -258,7 +230,7 @@ BOOL CMisc::bCheckValidName(char * pStr)
             (pStr[i] == '\n') || (pStr[i] == '\t') || /*(pStr[i] == '.') ||*/
             (pStr[i] == '\\') || (pStr[i] == '/') || (pStr[i] == ':') ||
             (pStr[i] == '*') || (pStr[i] == '?') || (pStr[i] == '<') ||
-            (pStr[i] == '>') || (pStr[i] == '|') || (pStr[i] == '"')) return FALSE;
+            (pStr[i] == '>') || (pStr[i] == '|') || (pStr[i] == '"')) return false;
 
         if ((i <= iLen - 2) && ((unsigned char)pStr[i] >= 128))
         {
@@ -271,80 +243,10 @@ BOOL CMisc::bCheckValidName(char * pStr)
                     ((unsigned char)pStr[i + 1] >= 161) && ((unsigned char)pStr[i + 1] <= 254))
                 {
                 }
-                else return FALSE;
+                else return false;
             i++;
         }
     }
 
-    return TRUE;
-}
-
-
-void CMisc::Temp()
-{
-    FILE * pSrcFile, * pDestFile, * pSrcFileA, * pSrcFileB;
-    int i;
-    char cTemp[100000];
-
-    pSrcFile = fopen("middleland.amd", "rb");
-    pDestFile = fopen("middleland.amd.result", "wb");
-
-    pSrcFileA = fopen("middleland1.amd", "rb");
-    pSrcFileB = fopen("middleland2.amd", "rb");
-
-    fread(cTemp, 1, 256, pSrcFile);
-    fread(cTemp, 1, 256, pSrcFileA);
-    fread(cTemp, 1, 256, pSrcFileB);
-    for (i = 1; i <= 444; i++)
-        fread(cTemp, 1, 5240, pSrcFileB);
-
-    ZeroMemory(cTemp, sizeof(cTemp));
-    strcpy(cTemp, "MAPSIZEX = 824 MAPSIZEY = 824 TILESIZE = 10");
-
-    fwrite(cTemp, 1, 256, pDestFile);
-
-    for (i = 1; i <= 80; i++)
-    {
-        ZeroMemory(cTemp, sizeof(cTemp));
-        fread((cTemp + 1500), 1, 5240, pSrcFileA);
-        fwrite(cTemp, 1, 824 * 10, pDestFile);
-    }
-
-    ZeroMemory(cTemp, sizeof(cTemp));
-    for (i = 1; i <= 68; i++) fwrite(cTemp, 1, 824 * 10, pDestFile);
-
-    /*
-    ZeroMemory(cTemp, sizeof(cTemp));
-    for (i = 1; i <= 150; i++) fwrite(cTemp, 1, 824*10, pDestFile);
-    */
-
-    for (i = 1; i <= 524; i++)
-    {
-        ZeroMemory(cTemp, sizeof(cTemp));
-        fread((cTemp + 1500), 1, 5240, pSrcFile);
-        fwrite(cTemp, 1, 824 * 10, pDestFile);
-    }
-
-    ZeroMemory(cTemp, sizeof(cTemp));
-    for (i = 1; i <= 68; i++) fwrite(cTemp, 1, 824 * 10, pDestFile);
-
-    for (i = 1; i <= 80; i++)
-    {
-        ZeroMemory(cTemp, sizeof(cTemp));
-        fread((cTemp + 1500), 1, 5240, pSrcFileB);
-        fwrite(cTemp, 1, 824 * 10, pDestFile);
-    }
-
-    ZeroMemory(cTemp, sizeof(cTemp));
-    for (i = 1; i <= 2; i++) fwrite(cTemp, 1, 824 * 10, pDestFile);
-
-    /*
-    ZeroMemory(cTemp, sizeof(cTemp));
-    for (i = 1; i <= 150; i++) fwrite(cTemp, 1, 824*10, pDestFile);
-    */
-
-    fclose(pSrcFile);
-    fclose(pDestFile);
-    fclose(pSrcFileA);
-    fclose(pSrcFileB);
+    return true;
 }

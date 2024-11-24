@@ -6,12 +6,6 @@
 
 #pragma once
 
-#include <windows.h>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <memory.h>
-
 #define DEF_QUESTTYPE_MONSTERHUNT				1
 #define DEF_QUESTTYPE_MONSTERHUNT_TIMELIMIT		2
 #define DEF_QUESTTYPE_ASSASSINATION 			3
@@ -25,44 +19,41 @@
 #define DEF_QUESTTYPE_SENDTOBATTLE				11
 #define DEF_QUESTTYPE_SETOCCUPYFLAG				12
 
-class CQuest  
+class CQuest
 {
 public:
-	
-	char m_cSide;
-	
-	int m_iType;
-	int m_iTargetType;
-	int m_iMaxCount;
+    CQuest() = default;
+    ~CQuest() = default;
 
-	int m_iFrom;
-	
-	int m_iMinLevel;
-	int m_iMaxLevel;
+    char m_cSide;
 
-	int m_iRequiredSkillNum;
-	int m_iRequiredSkillLevel;
+    int m_iType;
+    int m_iTargetType;
+    int m_iMaxCount;
 
-	int m_iTimeLimit;
-	int m_iAssignType;
+    int m_iFrom;
 
-	int m_iRewardType[4]; 
-	int m_iRewardAmount[4];
+    int m_iMinLevel;
+    int m_iMaxLevel;
 
-	int m_iContribution;
-	int m_iContributionLimit;
+    int m_iRequiredSkillNum;
+    int m_iRequiredSkillLevel;
 
-	int m_iResponseMode;
+    int m_iTimeLimit;
+    int m_iAssignType;
 
-	char m_cTargetName[30];
-	int  m_sX, m_sY, m_iRange;
+    int m_iRewardType[4];
+    int m_iRewardAmount[4];
 
-	int  m_iQuestID;
+    int m_iContribution;
+    int m_iContributionLimit;
 
-	int  m_iReqContribution;
+    int m_iResponseMode;
 
+    char m_cTargetName[30];
+    int  m_sX, m_sY, m_iRange;
 
-	CQuest() = default;
-	~CQuest() = default;
+    int  m_iQuestID;
 
+    int  m_iReqContribution;
 };

@@ -86,9 +86,6 @@
     <ClInclude Include="src\NetMessages.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Npc.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\OccupyFlag.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -131,14 +128,17 @@
     <ClInclude Include="src\socket_defines.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\connection_state_hb.h">
-      <Filter>src\sockets</Filter>
-    </ClInclude>
     <ClInclude Include="src\streams.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\time_utils.h">
       <Filter>src\utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Npc.h">
+      <Filter>src\units</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Msg.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -163,9 +163,6 @@
     <ClCompile Include="src\Misc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Npc.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\OccupyFlag.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -183,9 +180,6 @@
     </ClCompile>
     <ClCompile Include="src\Tile.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\connection_state_hb.cpp">
-      <Filter>src\sockets</Filter>
     </ClCompile>
     <ClCompile Include="src\sockets.cpp">
       <Filter>src\sockets</Filter>
@@ -232,32 +226,11 @@
     <ClCompile Include="src\config_parsing.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\npc_talking.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\admin_commands.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\effect_handlers.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\npc_behaviors.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\party_operations.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\request_handlers.cpp">
       <Filter>src\sockets</Filter>
     </ClCompile>
     <ClCompile Include="src\response_handlers.cpp">
       <Filter>src\sockets</Filter>
-    </ClCompile>
-    <ClCompile Include="src\user_commands.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\event_handlers.cpp">
-      <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\apocalypse.cpp">
       <Filter>src</Filter>
@@ -273,6 +246,39 @@
     </ClCompile>
     <ClCompile Include="src\client_motion_handlers.cpp">
       <Filter>src\sockets</Filter>
+    </ClCompile>
+    <ClCompile Include="src\set_status_flags.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\npc_interactions.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\npc_behaviors.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\party.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\user_commands.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\admin_commands.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\effect_handlers.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\event_handlers.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\timed_events.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Npc.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Msg.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

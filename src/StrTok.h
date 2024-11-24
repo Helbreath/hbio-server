@@ -6,18 +6,17 @@
 
 #pragma once
 
-#include <windows.h>
-
-class CStrTok  
+// todo: replace with stdlib tokenizer
+class CStrTok
 {
 public:
-	char * pGet();
-	CStrTok(char * pData, char * pSeps);
-	~CStrTok() = default;
+    char * pGet();
+    CStrTok(char * pData, char * pSeps);
+    ~CStrTok() = default;
 
-	char * m_pData, * m_pSeps, m_cToken[1024];
-	int    m_iDataLength, m_iCurLoc;
-	
+    char * m_pData{}, * m_pSeps{}, m_cToken[1024]{};
+    int m_iDataLength{}, m_iCurLoc{};
+
 private:
-	BOOL _bIsSeperator(char cData, char cNextData);
+    bool _bIsSeperator(char cData, char cNextData);
 };

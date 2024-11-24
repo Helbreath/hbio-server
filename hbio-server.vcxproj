@@ -22,7 +22,6 @@
     <ClInclude Include="src\ActionID.h" />
     <ClInclude Include="src\BuildItem.h" />
     <ClInclude Include="src\Client.h" />
-    <ClInclude Include="src\connection_state_hb.h" />
     <ClInclude Include="src\defines.h" />
     <ClInclude Include="src\DelayEvent.h" />
     <ClInclude Include="src\DynamicObject.h" />
@@ -36,6 +35,7 @@
     <ClInclude Include="src\MessageIndex.h" />
     <ClInclude Include="src\Mineral.h" />
     <ClInclude Include="src\Misc.h" />
+    <ClInclude Include="src\Msg.h" />
     <ClInclude Include="src\NetMessages.h" />
     <ClInclude Include="src\Npc.h" />
     <ClInclude Include="src\OccupyFlag.h" />
@@ -65,7 +65,6 @@
     <ClCompile Include="src\client_motion_handlers.cpp" />
     <ClCompile Include="src\config_loader.cpp" />
     <ClCompile Include="src\config_parsing.cpp" />
-    <ClCompile Include="src\connection_state_hb.cpp" />
     <ClCompile Include="src\core.cpp" />
     <ClCompile Include="src\crusade.cpp" />
     <ClCompile Include="src\DynamicObject.cpp" />
@@ -81,21 +80,24 @@
     <ClCompile Include="src\Map.cpp" />
     <ClCompile Include="src\Mineral.cpp" />
     <ClCompile Include="src\Misc.cpp" />
+    <ClCompile Include="src\Msg.cpp" />
     <ClCompile Include="src\Npc.cpp" />
     <ClCompile Include="src\npc_behaviors.cpp" />
     <ClCompile Include="src\npc_dead_item_generator.cpp" />
-    <ClCompile Include="src\npc_talking.cpp" />
+    <ClCompile Include="src\npc_interactions.cpp" />
     <ClCompile Include="src\OccupyFlag.cpp" />
-    <ClCompile Include="src\party_operations.cpp" />
+    <ClCompile Include="src\party.cpp" />
     <ClCompile Include="src\Potion.cpp" />
     <ClCompile Include="src\request_handlers.cpp" />
     <ClCompile Include="src\response_handlers.cpp" />
+    <ClCompile Include="src\set_status_flags.cpp" />
     <ClCompile Include="src\sockets.cpp" />
     <ClCompile Include="src\sql.cpp" />
     <ClCompile Include="src\StrTok.cpp" />
     <ClCompile Include="src\Teleport.cpp" />
     <ClCompile Include="src\TeleportLoc.cpp" />
     <ClCompile Include="src\Tile.cpp" />
+    <ClCompile Include="src\timed_events.cpp" />
     <ClCompile Include="src\user_commands.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -153,7 +155,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
-    <EnableASAN>false</EnableASAN>
+    <EnableASAN>true</EnableASAN>
     <EnableFuzzer>false</EnableFuzzer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -161,7 +163,7 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -230,7 +232,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>CREATE_ACCOUNT;_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS;_SILENCE_CXX20_CISO646_REMOVED_WARNING;NOMINMAX;WIN32_LEAN_AND_MEAN;FMT_HEADER_ONLY;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;WIN32;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DISABLE_VECTOR_ANNOTATION ;_DISABLE_STRING_ANNOTATION;HELBREATHX;_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS;_SILENCE_CXX20_CISO646_REMOVED_WARNING;NOMINMAX;WIN32_LEAN_AND_MEAN;FMT_HEADER_ONLY;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;WIN32;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -240,6 +242,8 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>vcpkg_installed\x64-windows\x64-windows\include</AdditionalIncludeDirectories>
+      <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+      <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -254,13 +258,15 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>HELBREATHX;_SILENCE_CXX20_CISO646_REMOVED_WARNING;NOMINMAX;WIN32_LEAN_AND_MEAN;FMT_HEADER_ONLY;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;WIN32;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
+      <ConformanceMode>false</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <StringPooling>true</StringPooling>
       <AdditionalIncludeDirectories>vcpkg_installed\x64-windows\x64-windows\include</AdditionalIncludeDirectories>
+      <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+      <DisableAnalyzeExternal>true</DisableAnalyzeExternal>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

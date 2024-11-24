@@ -6,34 +6,22 @@
 
 #pragma once
 
-#include <windows.h>
 #include "item.h"
 
-class CFish  
+class CFish
 {
 public:
-	CFish(char cMapIndex, short sX, short sY, short sType, CItem * pItem, int iDifficulty);
-	~CFish();
+    CFish(char cMapIndex, short sX, short sY, short sType, CItem * pItem, int iDifficulty);
+    ~CFish();
 
-    //todo: fix this dumb shit
-    void * operator new (size_t size)
-    {
-        return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
-    };
+    char  m_cMapIndex;
+    short m_sX, m_sY;
 
-    void operator delete(void * mem)
-    {
-        HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, mem);
-    };
+    short m_sType;
+    CItem * m_pItem;
 
-	char  m_cMapIndex;
-	short m_sX, m_sY;
+    short m_sDynamicObjectHandle;
 
-	short m_sType;
-	CItem * m_pItem;
-
-	short m_sDynamicObjectHandle;
-
-	short m_sEngagingCount;
-	int   m_iDifficulty;
+    short m_sEngagingCount;
+    int   m_iDifficulty;
 };

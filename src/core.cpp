@@ -5,6 +5,8 @@
 //
 
 #include "Game.h"
+#include "Map.h"
+#include "time_utils.h"
 
 void CGame::run()
 {
@@ -47,25 +49,19 @@ void CGame::run()
 
     server = std::make_unique<ix::WebSocketServer>(bindport, bindip);
 
-    auto res = server->listen();
-    if (!res.first)
-        throw std::runtime_error(res.second);
-
-    log->info(fmt::format("Listening on {}:{}", bindip, bindport));
-
     server->setConnectionStateFactory([&]()
         {
-            return std::make_shared<connection_state_hb>();
+            return std::make_shared<CClient>();
         });
 
     server->setOnClientMessageCallback(
         [&](std::shared_ptr<ix::ConnectionState> connection_state, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message)
         {
-            on_message(connection_state, websocket, message);
+            on_message((reinterpret_cast<CClient *>(connection_state.get()))->shared_from_this(), websocket, message);
         }
     );
 
-    if (bInit() == FALSE)
+    if (bInit() == false)
     {
         log->critical("Server failed to start");
         return;
@@ -78,6 +74,12 @@ void CGame::run()
     log->info("Server started");
 
     OnStartGameSignal();
+
+    auto res = server->listen();
+    if (!res.first)
+        throw std::runtime_error(res.second);
+
+    log->info(fmt::format("Listening on {}:{}", bindip, bindport));
 
     time_point current_time = now();
     time_point player_timeout_timer = now();
@@ -121,14 +123,13 @@ void CGame::run()
                 {
                     continue;
                 }
-                connection_state_hb * connection_state = reinterpret_cast<connection_state_hb *>(connstate.get());
-                auto & player = connection_state->client;
+                auto & player = wspair.second;
 
                 if (!player)
                 {
-                    if (time_count(current_time - connection_state->get_connect_time()) > 5)
+                    if (time_count(current_time - player->get_connect_time()) > 5)
                     {
-                        log->info(std::format("Disconnecting socket - no client - timed out 20s [{}] account [{}]", connection_state->getId(), connection_state->getRemoteIp()));
+                        log->info(std::format("Disconnecting socket - no client - timed out 20s [{}] account [{}]", player->getId(), player->getRemoteIp()));
                         ws->close();
                         websocket_clients.erase(wspair);
                     }
@@ -153,8 +154,6 @@ void CGame::run()
             }
             for (auto & player : client_list)
             {
-                auto connection_state = player->get_connection_state();
-
                 if (std::chrono::duration_cast<seconds>(current_time - player->get_last_packet_time()).count() > 20)
                 {
                     log->info(std::format("Disconnecting player packet timed out 20s [{}] account [{}] - [{}]", player->m_cCharName, player->account, player->address));
@@ -162,13 +161,11 @@ void CGame::run()
                     break;
                 }
 
-                if (connection_state == nullptr && !player->logged_in)
+                if (!player->logged_in)
                 {
                     delete_client_nolock(player, true, true);
                     break;
                 }
-
-                if (!connection_state) continue;
 
                 if (time_count(current_time - player->get_last_check_time()) < 5) continue;
 
@@ -482,7 +479,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             {
                 client->m_cMagicMastery[i] = (temp[i] == '1') ? 1 : 0;
             }
-            ZeroMemory(client->m_cLocation, sizeof(client->m_cLocation));
+            memset(client->m_cLocation, 0, sizeof(client->m_cLocation));
             memcpy(client->m_cLocation, row["nation"].as<std::string>().c_str(), 10);
             if (strcmp(client->m_cLocation, "Aresden") == 0)
                 client->m_cSide = Side::ARESDEN;
@@ -491,16 +488,18 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             else
                 client->m_cSide = Side::NEUTRAL;
 
-            ZeroMemory(client->m_cMapName, sizeof(client->m_cMapName));
+            memset(client->m_cMapName, 0, sizeof(client->m_cMapName));
             memcpy(client->m_cMapName, row["maploc"].as<std::string>().c_str(), 10);
+
+            client->m_cMapIndex = get_map_index(client->m_cMapName);
 
             if (!row["lockmapname"].is_null())
             {
-                ZeroMemory(client->m_cLockedMapName, sizeof(client->m_cLockedMapName));
+                memset(client->m_cLockedMapName, 0, sizeof(client->m_cLockedMapName));
                 memcpy(client->m_cLockedMapName, row["lockmapname"].as<std::string>().c_str(), 10);
             }
             client->m_iLockedMapTime = row["lockmaptime"].as<int32_t>();
-            ZeroMemory(client->m_cProfile, sizeof(client->m_cProfile));
+            memset(client->m_cProfile, 0, sizeof(client->m_cProfile));
             memcpy(client->m_cProfile, row["profile"].as<std::string>().c_str(), 10);
             //client->m_iGuildRank = (int8_t)row["guildrank"].as<int16_t>();
             client->m_iHP = row["hp"].as<int32_t>();
@@ -628,7 +627,8 @@ void CGame::enter_game(CClient * client, stream_read & sr)
                 // this also lets the account have multiple connections to the character select screen as a side-effect
                 // todo - allow this?
                 if (
-                    clnt->account_id == client->account_id
+                    client != clnt.get()
+                    && clnt->account_id == client->account_id
                     && clnt->m_cMapIndex > 0
                     && (clnt->currentstatus == client_status::dead || clnt->currentstatus == client_status::in_game)
                     )
@@ -652,6 +652,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             if (map != nullptr && std::string(map->m_cName) == client->m_cMapName)
                 client->m_cMapIndex = map->m_cMapIndex;
 
+/*
         if (clientfound && clientfound->get_connected())
         {
             //client has recently disconnected
@@ -662,7 +663,6 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             // - objects in mapdata - also needs a case in GServer to not reject another initdata
             // - from an already connected client (used to be the cause of item duping on Int'l)
             // - and will need code in place to handle this specific case
-            auto connection_state = clientfound->get_connection_state();
             auto websocket = clientfound->get_websocket();
             if (websocket && websocket->getReadyState() == ix::ReadyState::Open)
             {
@@ -673,17 +673,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             else
             {
                 clientfound->set_disconnect_time(system_clock::time_point());
-                clientfound->connection_state = client->connection_state;
-                auto connstate = clientfound->get_connection_state();
-                if (connstate)
-                {
-                    connstate->client = clientfound;
-                }
-                else
-                {
-                    // error .. connection state should exist
-                    log->critical(fmt::format("Connection state invalid when resuming client connection - account: [{}]", clientfound->account));
-                }
+                clientfound->set_websocket(client->get_websocket());
                 client->connection_state.reset();
 
                 //since nothing is technically associated with this client, just remove it from the list to force it to delete
@@ -719,7 +709,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
                 }
             }
         }
-        else if (accountfound)
+        else*/ if (accountfound)
         {
             //account already logged in and not resuming object
             sw.write_uint32(MSGID_RESPONSE_ENTERGAME);
@@ -772,7 +762,7 @@ CItem * CGame::fill_item(CClient * player, item_db & item)
 {
     CItem * item_ = new CItem();
     item_->id = item.id;
-    if (_bInitItemAttr(item_, item.item_id) == FALSE)
+    if (_bInitItemAttr(item_, item.item_id) == false)
     {
         delete item_;
         return nullptr;
@@ -866,57 +856,76 @@ uint16_t CGame::add_mail_item(CClient * client, item_db & item)
 // 
 // originally Gate server code - moved to login server functionality
 
-void CGame::delete_client_nolock(std::shared_ptr<CClient> client, bool save /*= false*/, bool deleteobj /*= false*/)
+void CGame::delete_client_nolock(std::shared_ptr<CClient> player, bool save /*= false*/, bool deleteobj /*= false*/)
 {
-    if (!client) return;
+    if (!player) return;
 
-    std::shared_ptr<ix::ConnectionState> ixconnstate = client->connection_state;
-    connection_state_hb * connection_state = reinterpret_cast<connection_state_hb *>(ixconnstate.get());
-    if (connection_state)
-    {
-        for (auto & wspair : websocket_clients)
-            if (wspair.second == ixconnstate)
-            {
-                wspair.first->close();
-                break;
-            }
+    for (auto & wspair : websocket_clients)
+        if (wspair.second == player)
+        {
+            wspair.first->close();
+            break;
+        }
 
-        DeleteClient(connection_state->client_handle, save, deleteobj);
-        client->connection_state.reset();
-    }
-    else
-    {
-        client_list.erase(client);
-    }
-    // else // already closed?
+    DeleteClient(player->client_handle, save, deleteobj);
 
     //delete_client(client, save, deleteobj);
 }
 
-void CGame::delete_client_lock(std::shared_ptr<CClient> client, bool save /*= false*/, bool deleteobj /*= false*/)
+void CGame::delete_client_lock(std::shared_ptr<CClient> player, bool save /*= false*/, bool deleteobj /*= false*/)
 {
-    if (!client) return;
+    if (!player) return;
 
-    std::shared_ptr<ix::ConnectionState> ixconnstate = client->connection_state;
-    connection_state_hb * connection_state = reinterpret_cast<connection_state_hb *>(ixconnstate.get());
-    if (connection_state)
+
+    std::lock_guard<std::recursive_mutex> l(websocket_list);
+
+    for (auto & wspair : websocket_clients)
+        if (wspair.second == player)
+            wspair.first->close();
+
     {
-        std::lock_guard<std::recursive_mutex> l(websocket_list);
+        std::lock_guard<std::recursive_mutex> l2(client_list_mtx);
+        //delete_client(client, save, deleteobj);
+        DeleteClient(player->client_handle, save, deleteobj);
+    }
+}
 
-        for (auto & wspair : websocket_clients)
-            if (wspair.second == ixconnstate)
-                wspair.first->close();
+int16_t CGame::get_map_index(std::string_view mapname)
+{
+    for (int i = 0; i < DEF_MAXMAPS; i++)
+        if (m_pMapList[i] && !strcmp(m_pMapList[i]->m_cName, mapname.data()))
+            return i;
+    throw std::runtime_error("map not found");
+}
 
-        {
-            std::lock_guard<std::recursive_mutex> l2(client_list_mtx);
-            //delete_client(client, save, deleteobj);
-            DeleteClient(connection_state->client_handle, save, deleteobj);
-            client->connection_state.reset();
-        }
+void CGame::CheckConnectionHandler(int iClientH, char * pData)
+{
+    char * cp;
+    DWORD * dwp, dwTimeRcv, dwTime, dwTimeGapClient, dwTimeGapServer;
+
+    if (m_pClientList[iClientH] == NULL) return;
+    //m_pClientList[iClientH]->m_cConnectionCheck = 0;
+
+    dwTime = timeGetTime();
+    cp = (char *)(pData + DEF_INDEX2_MSGTYPE + 2);
+    dwp = (DWORD *)cp;
+    dwTimeRcv = *dwp;
+
+    if (m_pClientList[iClientH]->m_dwInitCCTimeRcv == NULL)
+    {
+        m_pClientList[iClientH]->m_dwInitCCTimeRcv = dwTimeRcv;
+        m_pClientList[iClientH]->m_dwInitCCTime = dwTime;
     }
     else
     {
-        client_list.erase(client);
+        dwTimeGapClient = (dwTimeRcv - m_pClientList[iClientH]->m_dwInitCCTimeRcv);
+        dwTimeGapServer = (dwTime - m_pClientList[iClientH]->m_dwInitCCTime);
+
+        if (dwTimeGapClient < dwTimeGapServer) return;
+        if ((abs((long long)(dwTimeGapClient - dwTimeGapServer))) >= (DEF_CLIENTTIMEOUT))
+        {
+            DeleteClient(iClientH, TRUE, TRUE);
+            return;
+        }
     }
-    // else // already closed?
 }

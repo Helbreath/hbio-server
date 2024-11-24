@@ -7,7 +7,7 @@
 #include "Game.h"
 
 #if !defined(HELBREATHX)
-uint64_t CGame::check_account_auth(CClient * client, std::string & account, std::string & pass)
+uint64_t CGame::check_account_auth(std::shared_ptr<CClient> player, std::string & account, std::string & pass)
 {
     try
     {

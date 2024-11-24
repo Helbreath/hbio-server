@@ -5,30 +5,25 @@
 //
 
 #include "BuildItem.h"
+#include <cstring>
 
 CBuildItem::CBuildItem()
 {
- int i;
+    memset(m_cName, 0, sizeof(m_cName));
+    m_sItemID = -1;
 
-	ZeroMemory(m_cName, sizeof(m_cName));
-	m_sItemID = -1;
+    m_iSkillLimit = 0;
 
-	m_iSkillLimit = 0;
-	
-	for (i = 0; i < 6; i++) {
-		m_iMaterialItemID[i]    = NULL;
-		m_iMaterialItemCount[i] = NULL;
-		m_iMaterialItemValue[i] = NULL;
-		m_iIndex[i]            = -1;
-	}
+    for (int i = 0; i < 6; i++)
+    {
+        m_iMaterialItemID[i] = 0;
+        m_iMaterialItemCount[i] = 0;
+        m_iMaterialItemValue[i] = 0;
+        m_iIndex[i] = -1;
+    }
 
-	m_iMaxValue     = 0;
-	m_iAverageValue = 0;
-	m_iMaxSkill     = 0;
-	m_wAttribute    = 0;
-}
-
-CBuildItem::~CBuildItem()
-{
-
+    m_iMaxValue = 0;
+    m_iAverageValue = 0;
+    m_iMaxSkill = 0;
+    m_wAttribute = 0;
 }

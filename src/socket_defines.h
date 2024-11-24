@@ -8,12 +8,13 @@
 
 #include <memory>
 #include "streams.h"
-#include "connection_state_hb.h"
+#include <ixwebsocket/IXWebSocket.h>
+
+class CClient;
 
 struct socket_message
 {
-    std::shared_ptr<ix::ConnectionState> ixconnstate;
-    connection_state_hb * connection_state;
+    std::shared_ptr<CClient> player;
     ix::WebSocket & websocket;
     std::unique_ptr<stream_read> sr;
 };

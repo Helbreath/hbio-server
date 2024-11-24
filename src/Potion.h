@@ -6,17 +6,15 @@
 
 #pragma once
 
-#include <windows.h>
-
-class CPotion  
+class CPotion
 {
 public:
-	CPotion();
-	~CPotion();
+    CPotion();
+    ~CPotion() = default;
 
-	char  m_cName[30];
-	short m_sArray[12];
+    char  m_cName[30];
+    short m_sArray[12];
 
-	int   m_iSkillLimit, m_iDifficulty;
+    int   m_iSkillLimit, m_iDifficulty;
 
 };

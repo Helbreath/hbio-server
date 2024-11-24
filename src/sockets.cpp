@@ -13,16 +13,8 @@
 #include "streams.h"
 #include "socket_defines.h"
 
-void CGame::on_message(std::shared_ptr<ix::ConnectionState> ixconnstate, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message)
+void CGame::on_message(std::shared_ptr<CClient> player, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message)
 {
-    connection_state_hb * connection_state = reinterpret_cast<connection_state_hb *>(ixconnstate.get());
-    if (!connection_state)
-    {
-        log->critical("sockets.cpp # Connection state is null for unknown connection");
-        websocket.close();
-        return;
-    }
-
     if (message->type == ix::WebSocketMessageType::Open)
     {
         log->info("Connection opened");
@@ -33,38 +25,38 @@ void CGame::on_message(std::shared_ptr<ix::ConnectionState> ixconnstate, ix::Web
         for (auto & ws : server->getClients())
             if (ws.get() == &websocket)
             {
-                websocket_clients.insert(std::make_pair(ws, ixconnstate));
-                connection_state->websocket = ws;
-                connection_state->set_connect_time(now());
-                connection_state->set_last_packet_time(now());
+                websocket_clients.insert(std::make_pair(ws, player));
+                player->set_websocket(ws);
+                player->set_connect_time(now());
+                player->set_last_packet_time(now());
                 log->info("Pair added to internal list");
                 break;
             }
     }
     else if (message->type == ix::WebSocketMessageType::Close)
     {
-        log->info("Connection closed");
+        log->info("Connection closed - {}", message->closeInfo.reason);
         std::lock_guard<std::recursive_mutex> l(websocket_list);
         for (auto & wspair : websocket_clients)
             if (wspair.first.get() == &websocket)
             {
                 websocket_clients.erase(wspair);
-                log->info("Pair cleared from internal list");
-                connection_state->set_connected(false);
+                log->info("Pair cleared from internal list - Closed");
+                player->set_connected(false);
                 // do logout stuff
                 break;
             }
     }
     else if (message->type == ix::WebSocketMessageType::Error)
     {
-        log->error("Error on websocket");
+        log->error("Error on websocket - {}", message->errorInfo.reason);
         std::lock_guard<std::recursive_mutex> l(websocket_list);
         for (auto & wspair : websocket_clients)
             if (wspair.first.get() == &websocket)
             {
                 websocket_clients.erase(wspair);
-                log->info("Pair cleared from internal list");
-                connection_state->set_connected(false);
+                log->info("Pair cleared from internal list - Error");
+                player->set_connected(false);
                 break;
             }
     }
@@ -74,9 +66,9 @@ void CGame::on_message(std::shared_ptr<ix::ConnectionState> ixconnstate, ix::Web
 
         std::unique_ptr<stream_read> sr = std::make_unique<stream_read>(message->str.c_str(), static_cast<uint32_t>(message->str.length()));
 
-        connection_state->set_last_packet_time(now());
+        player->set_last_packet_time(now());
 
-        socket_message sm{ ixconnstate, connection_state, websocket, std::move(sr) };
+        socket_message sm{ player, websocket, std::move(sr) };
 
         process_binary_message(std::move(sm));
 
