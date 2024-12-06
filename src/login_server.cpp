@@ -149,6 +149,21 @@ void CGame::handle_login_server_message(socket_message & sm)
                 player->set_connect_time(now());
                 player->set_last_packet_time(now());
 
+                {
+                    std::unique_lock<std::recursive_mutex> l(websocket_list);
+                    for (auto & wspair : websocket_clients)
+                    {
+                        if (wspair.second->account_id == player->account_id && wspair.first.get() != &sm.websocket)
+                        {
+                            delete_client_nolock(wspair.second, true, true);
+                            websocket_clients.erase(wspair);
+                            client_list.erase(wspair.second);
+                            log->info("Removed duplicate websocket client during second login <{}>", player->account);
+                            break;
+                        }
+                    }
+                }
+
                 client_list.insert(player);
 
                 // todo: fix this client list system
