@@ -44,6 +44,7 @@ void CGame::on_message(std::shared_ptr<CClient> player, ix::WebSocket & websocke
                 log->info("Pair cleared from internal list - Closed");
                 player->set_connected(false);
                 // do logout stuff
+                DeleteClient(player->client_handle, true, false, false, false);
                 break;
             }
     }
@@ -57,6 +58,7 @@ void CGame::on_message(std::shared_ptr<CClient> player, ix::WebSocket & websocke
                 websocket_clients.erase(wspair);
                 log->info("Pair cleared from internal list - Error");
                 player->set_connected(false);
+                DeleteClient(player->client_handle, true, false, false, false);
                 break;
             }
     }

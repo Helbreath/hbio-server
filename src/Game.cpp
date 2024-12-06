@@ -494,6 +494,7 @@ bool CGame::bInit()
 
 void CGame::DeleteClient(int iClientH, bool bSave, bool bNotify, bool bCountLogout, bool bForceCloseConn)
 {
+    std::lock_guard<std::recursive_mutex> lock(client_list_mtx);
     int i, iExH;
     char cTmpMap[30];
 
