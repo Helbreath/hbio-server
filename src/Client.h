@@ -402,13 +402,13 @@ public:
     bool  m_bIsOnServerChange;
 
     int   m_iExpStock;
-    uint32_t m_dwExpStockTime;
+    uint64_t m_dwExpStockTime;
 
     int   m_iAutoExpAmount;
-    uint32_t m_dwAutoExpTime;
+    uint64_t m_dwAutoExpTime;
 
-    uint32_t m_dwRecentAttackTime;
-    uint32_t m_dwLastActionTime;
+    uint64_t m_dwRecentAttackTime;
+    uint64_t m_dwLastActionTime;
 
     int   m_iAllocatedFish;
     int   m_iFishChance;
@@ -533,7 +533,7 @@ public:
 
     int   m_iWarContribution;
 
-    uint32_t m_dwSpeedHackCheckTime;
+    uint64_t m_dwSpeedHackCheckTime;
     int   m_iSpeedHackCheckExp;
 
     uint32_t m_dwInitCCTimeRcv;

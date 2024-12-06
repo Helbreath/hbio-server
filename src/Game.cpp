@@ -1440,7 +1440,7 @@ void CGame::CheckClientResponseTime()
     int i, iPlusTime, iMaxSuperAttack, iValue, iMapSide{};
 
     short sTemp;
-    uint32_t dwTime;
+    uint64_t dwTime;
     //SYSTEMTIME SysTime;
 
     /*
