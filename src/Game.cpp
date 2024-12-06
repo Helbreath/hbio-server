@@ -5063,6 +5063,7 @@ void CGame::MsgProcess()
         {
             // ???
             log->warn("Socket message is empty??");
+            packet_queue.pop_front();
             l.unlock();
             continue;
         }
