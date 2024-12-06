@@ -202,8 +202,11 @@ void CGame::run()
                 std::vector<character_db> char_data;
                 for (auto & player : client_list)
                 {
-                    char_data.push_back(build_character_data_for_save(player));
-                    player->auto_save_time = now();
+                    if (player->m_bInitComplete)
+                    {
+                        char_data.push_back(build_character_data_for_save(player));
+                        player->auto_save_time = now();
+                    }
                 }
 
                 auto_save(char_data);
