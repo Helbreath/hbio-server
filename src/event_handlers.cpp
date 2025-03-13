@@ -4,8 +4,8 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
+#include "game.h"
+#include "map.h"
 
 extern char G_cTxt[512];
 
@@ -314,7 +314,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
 
 
                     if (cOwnerType == DEF_OWNERTYPE_PLAYER)
-                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_POLYMORPH, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
+                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_POLYMORPH, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
                 }
                 break;
 
@@ -497,7 +497,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                             sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                     }
                                 }
                                 break;
@@ -543,7 +543,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                             bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                                 sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                         }
                                     }
                                     break;
@@ -586,7 +586,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                             sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                     }
                                 }
                                 break;
@@ -632,7 +632,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                             bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                                 sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                         }
                                     }
                                     break;
@@ -675,7 +675,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                             sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                     }
                                 }
                                 break;
@@ -721,7 +721,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                             bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                                 sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                         }
                                     }
                                     break;
@@ -764,7 +764,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                             sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                     }
                                 }
                                 break;
@@ -810,7 +810,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                             bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                                 sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                         }
                                     }
                                     break;
@@ -853,7 +853,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                             sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                     }
                                 }
                                 break;
@@ -899,7 +899,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                             bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                                 sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                         }
                                     }
                                     break;
@@ -950,7 +950,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                             bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                                 sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                         }
                                     }
                                     break;
@@ -996,7 +996,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                                 bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                                     sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                                SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                                SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                             }
                                         }
                                         break;
@@ -1040,7 +1040,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                     bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                         sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                    SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                    SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                 }
                             }
                             break;
@@ -1086,7 +1086,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                             sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                     }
                                 }
                                 break;
@@ -1366,7 +1366,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                             }
                             bSetNpcFollowMode(cName, cName_Master, cOwnerType);
 #ifdef DEF_TAIWANLOG
-                            _bItemLog(DEF_ITEMLOG_SUMMONMONSTER, iClientH, cNpcName, NULL);
+                            _bItemLog(DEF_ITEMLOG_SUMMONMONSTER, iClientH, cNpcName, 0);
 #endif
                         }
                     }
@@ -1472,7 +1472,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
 
 
                 if (cOwnerType == DEF_OWNERTYPE_PLAYER)
-                    SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_PROTECT, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
+                    SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_PROTECT, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
                 break;
 
             case DEF_MAGICTYPE_HOLDOBJECT:
@@ -1520,7 +1520,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
 
 
                     if (cOwnerType == DEF_OWNERTYPE_PLAYER)
-                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_HOLDOBJECT, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
+                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_HOLDOBJECT, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
                 }
                 break;
 
@@ -1565,7 +1565,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                             sOwnerH, cOwnerType, 0, 0, 0, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
 
                         if (cOwnerType == DEF_OWNERTYPE_PLAYER)
-                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_INVISIBILITY, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
+                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_INVISIBILITY, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
                         break;
 
                     case 2:
@@ -1638,7 +1638,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                         m_pClientList[iClientH]->m_sX = dX;
                         m_pClientList[iClientH]->m_sY = dY;
 
-                        _bItemLog(DEF_ITEMLOG_SPELLFIELD, iClientH, m_pMagicConfigList[sType]->m_cName, NULL);
+                        _bItemLog(DEF_ITEMLOG_SPELLFIELD, iClientH, m_pMagicConfigList[sType]->m_cName, 0);
 
                         m_pClientList[iClientH]->m_sX = sTemp_X;
                         m_pClientList[iClientH]->m_sY = sTemp_Y;
@@ -1712,7 +1712,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                         m_pClientList[iClientH]->m_sX = dX;
                         m_pClientList[iClientH]->m_sY = dY;
 
-                        _bItemLog(DEF_ITEMLOG_SPELLFIELD, iClientH, m_pMagicConfigList[sType]->m_cName, NULL);
+                        _bItemLog(DEF_ITEMLOG_SPELLFIELD, iClientH, m_pMagicConfigList[sType]->m_cName, 0);
 
                         m_pClientList[iClientH]->m_sX = sTemp_X;
                         m_pClientList[iClientH]->m_sY = sTemp_Y;
@@ -1875,7 +1875,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                             sOwnerH, cOwnerType, 0, 0, 0, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
 
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_CONFUSE, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_CONFUSE, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
                                     }
                                 }
 
@@ -1909,7 +1909,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                             sOwnerH, cOwnerType, 0, 0, 0, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
 
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_CONFUSE, m_pMagicConfigList[sType]->m_sValue4, iClientH, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_CONFUSE, m_pMagicConfigList[sType]->m_sValue4, iClientH, 0);
                                     }
                                 }
                             }
@@ -1950,9 +1950,9 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                     m_pClientList[sOwnerH]->m_dwPoisonTime = dwTime;
                                     SetPoisonFlag(sOwnerH, cOwnerType, true);
 
-                                    SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_POISON, m_pMagicConfigList[sType]->m_sValue5, 0, 0);
+                                    SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_POISON, m_pMagicConfigList[sType]->m_sValue5, 0, 0);
 #ifdef DEF_TAIWANLOG
-                                    _bItemLog(DEF_ITEMLOG_POISONED, sOwnerH, (char *)0, NULL);
+                                    _bItemLog(DEF_ITEMLOG_POISONED, sOwnerH, (char *)0, 0);
 #endif
                                 }
                             }
@@ -1986,7 +1986,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                 m_pClientList[sOwnerH]->m_bIsPoisoned = false;
                                 SetPoisonFlag(sOwnerH, cOwnerType, false);
 
-                                SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_POISON, 0, 0, 0);
+                                SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_POISON, 0, 0, 0);
                             }
                             break;
 
@@ -2031,7 +2031,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                             sOwnerH, cOwnerType, 0, 0, 0, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
 
                         if (cOwnerType == DEF_OWNERTYPE_PLAYER)
-                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_BERSERK, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
+                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_BERSERK, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
                         break;
                 }
                 break;
@@ -2099,7 +2099,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                             bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                                 sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                         }
                                     }
                                     break;
@@ -2143,7 +2143,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                             sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                     }
                                 }
                             }
@@ -2172,7 +2172,7 @@ void CGame::PlayerMagicHandler(int iClientH, int dX, int dY, short sType, bool b
 
     CalculateSSN_SkillIndex(iClientH, 4, 1);
 
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MP, 0, 0, 0, 0);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_MP, 0, 0, 0, 0);
 
 
     SendEventToNearClient_TypeB(MSGID_EVENT_COMMON, DEF_COMMONTYPE_MAGIC, m_pClientList[iClientH]->m_cMapIndex,
@@ -2244,7 +2244,7 @@ void CGame::NpcMagicHandler(int iNpcH, short dX, short dY, short sType)
                             sOwnerH, cOwnerType, 0, 0, 0, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
 
                         if (cOwnerType == DEF_OWNERTYPE_PLAYER)
-                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_INVISIBILITY, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
+                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_INVISIBILITY, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
                         break;
 
                     case 2:
@@ -2312,7 +2312,7 @@ void CGame::NpcMagicHandler(int iNpcH, short dX, short dY, short sType)
 
 
                     if (cOwnerType == DEF_OWNERTYPE_PLAYER)
-                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_HOLDOBJECT, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
+                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_HOLDOBJECT, m_pMagicConfigList[sType]->m_sValue4, 0, 0);
                 }
                 break;
 
@@ -2571,7 +2571,7 @@ void CGame::NpcMagicHandler(int iNpcH, short dX, short dY, short sType)
                                             bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                                 sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                            SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                            SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                         }
                                     }
                                     break;
@@ -2613,7 +2613,7 @@ void CGame::NpcMagicHandler(int iNpcH, short dX, short dY, short sType)
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (m_pMagicConfigList[sType]->m_sValue10 * 1000),
                                             sOwnerH, cOwnerType, 0, 0, 0, 1, 0, 0);
 
-                                        SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                        SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                     }
                                 }
                             }
@@ -2817,7 +2817,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
                     }
 
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_GIVEITEMFIN_COUNTCHANGED, sItemIndex, iAmount, 0, cCharName);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_GIVEITEMFIN_COUNTCHANGED, sItemIndex, iAmount, 0, cCharName);
                 }
                 else
                 {
@@ -2850,7 +2850,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
                             break;
                     }
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CANNOTGIVEITEM, sItemIndex, iAmount, 0, cCharName);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_CANNOTGIVEITEM, sItemIndex, iAmount, 0, cCharName);
                 }
 
             }
@@ -2865,7 +2865,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
                     if (bSetItemToBankItem(iClientH, pItem) == false)
                     {
 
-                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CANNOTITEMTOBANK, 0, 0, 0, 0);
+                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_CANNOTITEMTOBANK, 0, 0, 0, 0);
 
 
                         m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->bSetItem(m_pClientList[iClientH]->m_sX, m_pClientList[iClientH]->m_sY, pItem);
@@ -2945,7 +2945,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
                 m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sSpriteFrame,
                 m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_cItemColor);
 
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_DROPITEMFIN_ERASEITEM, sItemIndex, iAmount, 0, 0);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_DROPITEMFIN_ERASEITEM, sItemIndex, iAmount, 0, 0);
         }
         else
         {
@@ -2963,7 +2963,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
                     {
                         SendNotifyMsg(iClientH, sOwnerH, DEF_NOTIFY_QUERY_JOINGUILDREQPERMISSION, 0, 0, 0, 0);
 
-                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_GIVEITEMFIN_ERASEITEM, sItemIndex, 1, 0, cCharName);
+                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_GIVEITEMFIN_ERASEITEM, sItemIndex, 1, 0, cCharName);
 
                         _bItemLog(DEF_ITEMLOG_DEPLETE, iClientH, (int)-1, pItem);
 
@@ -2979,7 +2979,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
                     {
                         SendNotifyMsg(iClientH, sOwnerH, DEF_NOTIFY_QUERY_DISMISSGUILDREQPERMISSION, 0, 0, 0, 0);
 
-                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_GIVEITEMFIN_ERASEITEM, sItemIndex, 1, 0, cCharName);
+                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_GIVEITEMFIN_ERASEITEM, sItemIndex, 1, 0, cCharName);
 
                         _bItemLog(DEF_ITEMLOG_DEPLETE, iClientH, (int)-1, pItem);
 
@@ -3112,7 +3112,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
                     if (bSetItemToBankItem(iClientH, sItemIndex) == false)
                     {
 
-                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CANNOTITEMTOBANK, 0, 0, 0, 0);
+                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_CANNOTITEMTOBANK, 0, 0, 0, 0);
 
 
                         m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->bSetItem(m_pClientList[iClientH]->m_sX,
@@ -3143,7 +3143,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
                             SendNotifyMsg(iClientH, iClientH, DEF_COMMONTYPE_DISMISSGUILDAPPROVE, 0, 0, 0, 0);
 
 #ifdef DEF_TAIWANLOG
-                            _bItemLog(DEF_ITEMLOG_BANGUILD, iClientH, (char *)NULL, NULL);
+                            _bItemLog(DEF_ITEMLOG_BANGUILD, iClientH, (char *)0, 0);
 #endif
 
                             memset(m_pClientList[iClientH]->m_cGuildName, 0, sizeof(m_pClientList[iClientH]->m_cGuildName));
@@ -3157,7 +3157,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
 
                             m_pClientList[iClientH]->m_iExp -= 300;
                             if (m_pClientList[iClientH]->m_iExp < 0) m_pClientList[iClientH]->m_iExp = 0;
-                            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
+                            SendNotifyMsg(0, iClientH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
                         }
 
 
@@ -3209,7 +3209,7 @@ void CGame::GiveItemHandler(int iClientH, short sItemIndex, int iAmount, short d
             }
 
 
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_GIVEITEMFIN_ERASEITEM, sItemIndex, iAmount, 0, cCharName);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_GIVEITEMFIN_ERASEITEM, sItemIndex, iAmount, 0, cCharName);
         }
 
         REMOVE_ITEM_PROCEDURE:;
@@ -3284,7 +3284,7 @@ void CGame::ClientKilledHandler(int iClientH, int iAttackerH, char cAttackerType
             break;
     }
 
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_KILLED, 0, 0, 0, cAttackerName);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_KILLED, 0, 0, 0, cAttackerName);
 
     if (cAttackerType == DEF_OWNERTYPE_PLAYER)
     {
@@ -3430,7 +3430,7 @@ void CGame::ClientKilledHandler(int iClientH, int iAttackerH, char cAttackerType
                 //PK?çÇßÀ??Ç?Î ?æÇèÄ??? ÁÙÁö ?Ê?Â?Ù.
                 //m_pClientList[iClientH]->m_iExp -= iDice(1, 100);
                 //if (m_pClientList[iClientH]->m_iExp < 0) m_pClientList[iClientH]->m_iExp = 0;
-                //SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
+                //SendNotifyMsg(0, iClientH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
             }
             else
             {
@@ -3440,7 +3440,7 @@ void CGame::ClientKilledHandler(int iClientH, int iAttackerH, char cAttackerType
                     //PK´çÇßÀ¸¹Ç·Î °æÇèÁö°¡ ÁÙÁö ¾Ê´Â´Ù. 
                     //m_pClientList[iClientH]->m_iExp -= iDice(1, 100);
                     //if (m_pClientList[iClientH]->m_iExp < 0) m_pClientList[iClientH]->m_iExp = 0;
-                    //SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
+                    //SendNotifyMsg(0, iClientH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
                 }
                 else
                 {
@@ -3512,7 +3512,7 @@ void CGame::ClientKilledHandler(int iClientH, int iAttackerH, char cAttackerType
                         wsprintf(G_cTxt, "Enemy Player Killed by Npc! Construction +%d", (m_pClientList[iClientH]->m_iLevel / 2));
                         log->info(G_cTxt);
 
-                        SendNotifyMsg(NULL, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, 0, 0);
+                        SendNotifyMsg(0, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, 0, 0);
                         return;
                     }
             }
@@ -3520,12 +3520,12 @@ void CGame::ClientKilledHandler(int iClientH, int iAttackerH, char cAttackerType
     }
     else if (cAttackerType == DEF_OWNERTYPE_PLAYER_INDIRECT)
     {
-        _bPKLog(DEF_PKLOG_BYOTHER, (int)-1, iClientH, NULL);
+        _bPKLog(DEF_PKLOG_BYOTHER, (int)-1, iClientH, 0);
 
         // m_pClientList[iClientH]->m_iExp -= iDice(1, 50);
         // if (m_pClientList[iClientH]->m_iExp < 0) m_pClientList[iClientH]->m_iExp = 0;
 
-        // SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
+        // SendNotifyMsg(0, iClientH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
     }
 }
 
@@ -3690,7 +3690,7 @@ void CGame::PK_KillRewardHandler(short sAttackerH, short sVictumH)
     if (m_pClientList[sAttackerH] == 0) return;
     if (m_pClientList[sVictumH] == 0)   return;
 
-    _bPKLog(DEF_PKLOG_BYPLAYER, sAttackerH, sVictumH, NULL);
+    _bPKLog(DEF_PKLOG_BYPLAYER, sAttackerH, sVictumH, 0);
 
     if (m_pClientList[sAttackerH]->m_iPKCount != 0)
     {
@@ -3708,7 +3708,7 @@ void CGame::PK_KillRewardHandler(short sAttackerH, short sVictumH)
         if (m_pClientList[sAttackerH]->m_iRewardGold < 0)
             m_pClientList[sAttackerH]->m_iRewardGold = 0;
 
-        SendNotifyMsg(NULL, sAttackerH, DEF_NOTIFY_PKCAPTURED, m_pClientList[sVictumH]->m_iPKCount, m_pClientList[sVictumH]->m_iLevel, 0, m_pClientList[sVictumH]->m_cCharName);
+        SendNotifyMsg(0, sAttackerH, DEF_NOTIFY_PKCAPTURED, m_pClientList[sVictumH]->m_iPKCount, m_pClientList[sVictumH]->m_iLevel, 0, m_pClientList[sVictumH]->m_cCharName);
     }
 }
 
@@ -3719,7 +3719,7 @@ void CGame::EnemyKillRewardHandler(int iAttackerH, int iClientH)
     if (m_pClientList[iAttackerH] == 0) return;
     if (m_pClientList[iClientH] == 0)   return;
 
-    _bPKLog(DEF_PKLOG_BYENERMY, iAttackerH, iClientH, NULL);
+    _bPKLog(DEF_PKLOG_BYENERMY, iAttackerH, iClientH, 0);
 
     iEK_Level = 30;
     if (m_pClientList[iAttackerH]->m_iLevel >= 80) iEK_Level = 80;
@@ -3742,7 +3742,7 @@ void CGame::EnemyKillRewardHandler(int iAttackerH, int iClientH)
     m_pClientList[iAttackerH]->m_iRewardGold = 0;
 
 
-    SendNotifyMsg(NULL, iAttackerH, DEF_NOTIFY_ENEMYKILLREWARD, iClientH, 0, 0, 0);
+    SendNotifyMsg(0, iAttackerH, DEF_NOTIFY_ENEMYKILLREWARD, iClientH, 0, 0, 0);
     return;
     } */
 
@@ -3778,7 +3778,7 @@ void CGame::EnemyKillRewardHandler(int iAttackerH, int iClientH)
                 log->info(G_cTxt);
 
 
-                SendNotifyMsg(NULL, iAttackerH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[iAttackerH]->m_iConstructionPoint, m_pClientList[iAttackerH]->m_iWarContribution, 0, 0);
+                SendNotifyMsg(0, iAttackerH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[iAttackerH]->m_iConstructionPoint, m_pClientList[iAttackerH]->m_iWarContribution, 0, 0);
 
 
                 if (iGetExpLevel(m_pClientList[iClientH]->m_iExp) >= iEK_Level)
@@ -3847,7 +3847,7 @@ void CGame::EnemyKillRewardHandler(int iAttackerH, int iClientH)
                 log->info(G_cTxt);
 
 
-                SendNotifyMsg(NULL, iAttackerH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[iAttackerH]->m_iConstructionPoint, m_pClientList[iAttackerH]->m_iWarContribution, 0, 0);
+                SendNotifyMsg(0, iAttackerH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[iAttackerH]->m_iConstructionPoint, m_pClientList[iAttackerH]->m_iWarContribution, 0, 0);
 
 
                 if (iGetExpLevel(m_pClientList[iClientH]->m_iExp) >= iEK_Level)
@@ -3893,12 +3893,12 @@ void CGame::EnemyKillRewardHandler(int iAttackerH, int iClientH)
         }
 
 
-        SendNotifyMsg(NULL, iAttackerH, DEF_NOTIFY_ENEMYKILLREWARD, iClientH, 0, 0, 0);
+        SendNotifyMsg(0, iAttackerH, DEF_NOTIFY_ENEMYKILLREWARD, iClientH, 0, 0, 0);
 
         if (bCheckLimitedUser(iAttackerH) == false)
         {
 
-            SendNotifyMsg(NULL, iAttackerH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
+            SendNotifyMsg(0, iAttackerH, DEF_NOTIFY_EXP, 0, 0, 0, 0);
         }
 
         bCheckLevelUp(iAttackerH);
@@ -3932,7 +3932,7 @@ void CGame::ItemDepleteHandler(int iClientH, short sItemIndex, bool bIsUseItemRe
     ReleaseItemHandler(iClientH, sItemIndex, true);
 
 
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMDEPLETED_ERASEITEM, sItemIndex, (int)bIsUseItemResult, 0, 0);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_ITEMDEPLETED_ERASEITEM, sItemIndex, (int)bIsUseItemResult, 0, 0);
 
 
     delete m_pClientList[iClientH]->m_pItemList[sItemIndex];
@@ -3993,7 +3993,7 @@ void CGame::UseItemHandler(int iClientH, short sItemIndex, short dX, short dY, s
                         iClientH, DEF_OWNERTYPE_PLAYER, 0, 0, 0, 1, 0, 0);
 
 
-                    //				SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_ICE, 0, 0, 0);
+                    //				SendNotifyMsg(0, iClientH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_ICE, 0, 0, 0);
                 }
 
                 m_pClientList[iClientH]->m_dwWarmEffectTime = dwTime;
@@ -4095,7 +4095,7 @@ void CGame::UseItemHandler(int iClientH, short sItemIndex, short dX, short dY, s
                     m_pClientList[iClientH]->m_bIsPoisoned = false;
                     SetPoisonFlag(iClientH, DEF_OWNERTYPE_PLAYER, false);
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_POISON, 0, 0, 0);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_POISON, 0, 0, 0);
                 }
                 break;
 
@@ -4333,15 +4333,15 @@ void CGame::UseItemHandler(int iClientH, short sItemIndex, short dX, short dY, s
         switch (iEffectResult)
         {
             case 1:
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_HP, 0, 0, 0, 0);
+                SendNotifyMsg(0, iClientH, DEF_NOTIFY_HP, 0, 0, 0, 0);
                 SendEventToNearClient_TypeA(iClientH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, 0, 0, 0);
                 break;
             case 2:
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MP, 0, 0, 0, 0);
+                SendNotifyMsg(0, iClientH, DEF_NOTIFY_MP, 0, 0, 0, 0);
                 SendEventToNearClient_TypeA(iClientH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, 0, 0, 0);
                 break;
             case 3:
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
+                SendNotifyMsg(0, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
                 SendEventToNearClient_TypeA(iClientH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTNULLACTION, 0, 0, 0);
                 break;
             default:
@@ -4372,35 +4372,35 @@ void CGame::UseItemHandler(int iClientH, short sItemIndex, short dX, short dY, s
                     case 1:
 
                         if (strcmp(m_pClientList[iClientH]->m_cMapName, "aresden") == 0)
-                            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 1, 0, 0);
+                            SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 1, 0, 0);
                         else
                             if (strcmp(m_pClientList[iClientH]->m_cMapName, "elvine") == 0)
-                                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 2, 0, 0);
+                                SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 2, 0, 0);
                             else
                                 if (strcmp(m_pClientList[iClientH]->m_cMapName, "middleland") == 0)
-                                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 3, 0, 0);
+                                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 3, 0, 0);
                                 else
                                     if (strcmp(m_pClientList[iClientH]->m_cMapName, "default") == 0)
-                                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 4, 0, 0);
+                                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 4, 0, 0);
                                     else
                                         if (strcmp(m_pClientList[iClientH]->m_cMapName, "huntzone2") == 0)
-                                            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 5, 0, 0);
+                                            SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 5, 0, 0);
                                         else
                                             if (strcmp(m_pClientList[iClientH]->m_cMapName, "huntzone1") == 0)
-                                                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 6, 0, 0);
+                                                SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 6, 0, 0);
                                             else
                                                 if (strcmp(m_pClientList[iClientH]->m_cMapName, "huntzone4") == 0)
-                                                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 7, 0, 0);
+                                                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 7, 0, 0);
                                                 else
                                                     if (strcmp(m_pClientList[iClientH]->m_cMapName, "huntzone3") == 0)
-                                                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 8, 0, 0);
+                                                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 8, 0, 0);
                                                     else
                                                         if (strcmp(m_pClientList[iClientH]->m_cMapName, "arefarm") == 0)
-                                                            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 9, 0, 0);
+                                                            SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 9, 0, 0);
                                                         else
                                                             if (strcmp(m_pClientList[iClientH]->m_cMapName, "elvfarm") == 0)
-                                                                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 10, 0, 0);
-                                                            else SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 0, 0, 0);
+                                                                SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 10, 0, 0);
+                                                            else SendNotifyMsg(0, iClientH, DEF_NOTIFY_SHOWMAP, iV1, 0, 0, 0);
                         break;
                         break;
                 }
@@ -4428,7 +4428,7 @@ void CGame::UseItemHandler(int iClientH, short sItemIndex, short dX, short dY, s
                 {
 
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMLIFESPANEND, DEF_EQUIPPOS_NONE, sItemIndex, 0, 0);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_ITEMLIFESPANEND, DEF_EQUIPPOS_NONE, sItemIndex, 0, 0);
                 }
                 else
                 {
@@ -4638,7 +4638,7 @@ void CGame::NpcKilledHandler(short sAttackerH, char cAttackerType, int iNpcH, sh
                     wsprintf(G_cTxt, "Enemy Npc Killed by player! Construction: +%d WarContribution: +%d", iConstructionPoint, iWarContribution);
                     log->info(G_cTxt);
 
-                    SendNotifyMsg(NULL, sAttackerH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[sAttackerH]->m_iConstructionPoint, m_pClientList[sAttackerH]->m_iWarContribution, 0, 0);
+                    SendNotifyMsg(0, sAttackerH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[sAttackerH]->m_iConstructionPoint, m_pClientList[sAttackerH]->m_iWarContribution, 0, 0);
                 }
                 else
                 {
@@ -4659,7 +4659,7 @@ void CGame::NpcKilledHandler(short sAttackerH, char cAttackerType, int iNpcH, sh
                     wsprintf(G_cTxt, "WarContribution: Friendly Npc Killed by player(%s)! ", m_pClientList[sAttackerH]->m_cAccountName);
                     log->info(G_cTxt);
 
-                    SendNotifyMsg(NULL, sAttackerH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[sAttackerH]->m_iConstructionPoint, m_pClientList[sAttackerH]->m_iWarContribution, 0, 0);
+                    SendNotifyMsg(0, sAttackerH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[sAttackerH]->m_iConstructionPoint, m_pClientList[sAttackerH]->m_iWarContribution, 0, 0);
                 }
                 break;
 
@@ -4683,7 +4683,7 @@ void CGame::NpcKilledHandler(short sAttackerH, char cAttackerType, int iNpcH, sh
                                 wsprintf(G_cTxt, "Enemy Npc Killed by Npc! Construct point +%d", iConstructionPoint);
                                 log->info(G_cTxt);
 
-                                SendNotifyMsg(NULL, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, 0, 0);
+                                SendNotifyMsg(0, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, 0, 0);
                                 goto NKH_GOTOPOINT1;
                             }
                     }

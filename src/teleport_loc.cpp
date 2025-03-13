@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "TeleportLoc.h"
+#include "teleport_loc.h"
 #include <cstring>
 
 CTeleportLoc::CTeleportLoc()

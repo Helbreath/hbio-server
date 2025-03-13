@@ -4,8 +4,8 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
+#include "game.h"
+#include "map.h"
 
 void CGame::NpcTalkHandler(int iClientH, int iWho)
 {
@@ -66,18 +66,18 @@ void CGame::NpcTalkHandler(int iClientH, int iWho)
         m_pClientList[iClientH]->m_iQuestRewardType = iRewardType;
         m_pClientList[iClientH]->m_iQuestRewardAmount = iRewardAmount;
 
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, iQuestType, iResMode, iRewardAmount, cRewardName, iContribution,
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, iQuestType, iResMode, iRewardAmount, cRewardName, iContribution,
             iTargetType, iTargetCount, iX, iY, iRange, cTargetName);
     }
     else
     {
         switch (iQuestNum)
         {
-            case  0: SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, (iWho + 130), 0, 0, 0, 0); break;
+            case  0: SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, (iWho + 130), 0, 0, 0, 0); break;
             case -1:
             case -2:
             case -3:
-            case -4: SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, abs(iQuestNum) + 100, 0, 0, 0, 0); break;
+            case -4: SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, abs(iQuestNum) + 100, 0, 0, 0, 0); break;
             case -5: break;
         }
     }
@@ -123,7 +123,7 @@ int CGame::_iTalkToNpcResult_Cityhall(int iClientH, int * pQuestType, int * pMod
                         m_pClientList[iClientH]->m_iContribution += m_pQuestConfigList[m_pClientList[iClientH]->m_iQuest]->m_iContribution;
 
 
-                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 1, m_pClientList[iClientH]->m_iQuestRewardAmount,
+                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 1, m_pClientList[iClientH]->m_iQuestRewardAmount,
                             m_pItemConfigList[m_pClientList[iClientH]->m_iQuestRewardType]->m_cName, m_pClientList[iClientH]->m_iContribution);
 
                         _ClearQuestStatus(iClientH);
@@ -137,7 +137,7 @@ int CGame::_iTalkToNpcResult_Cityhall(int iClientH, int * pQuestType, int * pMod
 
                         SendItemNotifyMsg(iClientH, DEF_NOTIFY_CANNOTCARRYMOREITEM, 0, 0);
 
-                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 0, m_pClientList[iClientH]->m_iQuestRewardAmount,
+                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 0, m_pClientList[iClientH]->m_iQuestRewardAmount,
                             m_pItemConfigList[m_pClientList[iClientH]->m_iQuestRewardType]->m_cName, m_pClientList[iClientH]->m_iContribution);
 
                         return -5;
@@ -150,7 +150,7 @@ int CGame::_iTalkToNpcResult_Cityhall(int iClientH, int * pQuestType, int * pMod
 
                     m_pClientList[iClientH]->m_iContribution += m_pQuestConfigList[m_pClientList[iClientH]->m_iQuest]->m_iContribution;
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 1, m_pClientList[iClientH]->m_iQuestRewardAmount,
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 1, m_pClientList[iClientH]->m_iQuestRewardAmount,
                         "°æÇèÄ¡              ", m_pClientList[iClientH]->m_iContribution);
 
 
@@ -169,7 +169,7 @@ int CGame::_iTalkToNpcResult_Cityhall(int iClientH, int * pQuestType, int * pMod
 
                     m_pClientList[iClientH]->m_iContribution += m_pQuestConfigList[m_pClientList[iClientH]->m_iQuest]->m_iContribution;
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 1, iExp,
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 1, iExp,
                         "°æÇèÄ¡              ", m_pClientList[iClientH]->m_iContribution);
 
 
@@ -182,7 +182,7 @@ int CGame::_iTalkToNpcResult_Cityhall(int iClientH, int * pQuestType, int * pMod
 
                     m_pClientList[iClientH]->m_iContribution += m_pQuestConfigList[m_pClientList[iClientH]->m_iQuest]->m_iContribution;
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 1, 0,
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_QUESTREWARD, 4, 1, 0,
                         "                     ", m_pClientList[iClientH]->m_iContribution);
 
 
@@ -227,14 +227,14 @@ int CGame::_iTalkToNpcResult_Guard(int iClientH, int * pQuestType, int * pMode, 
         if (memcmp(m_pClientList[iClientH]->m_cMapName, "aresden", 7) == 0)
         {
 
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, (200), 0, 0, 0, 0);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, (200), 0, 0, 0, 0);
             return 1000;
         }
         else
             if (memcmp(m_pClientList[iClientH]->m_cMapName, "elvine", 6) == 0)
             {
 
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, (201), 0, 0, 0, 0);
+                SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, (201), 0, 0, 0, 0);
                 return 1001;
             }
     }
@@ -244,14 +244,14 @@ int CGame::_iTalkToNpcResult_Guard(int iClientH, int * pQuestType, int * pMode, 
             if (memcmp(m_pClientList[iClientH]->m_cMapName, "aresden", 7) == 0)
             {
 
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, (202), 0, 0, 0, 0);
+                SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, (202), 0, 0, 0, 0);
                 return 1002;
             }
             else
                 if (memcmp(m_pClientList[iClientH]->m_cMapName, "elvine", 6) == 0)
                 {
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, (203), 0, 0, 0, 0);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, (203), 0, 0, 0, 0);
                     return 1003;
                 }
         }
@@ -261,21 +261,21 @@ int CGame::_iTalkToNpcResult_Guard(int iClientH, int * pQuestType, int * pMode, 
                 if (memcmp(m_pClientList[iClientH]->m_cMapName, "aresden", 7) == 0)
                 {
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, (204), 0, 0, 0, 0);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, (204), 0, 0, 0, 0);
                     return 1004;
                 }
                 else
                     if (memcmp(m_pClientList[iClientH]->m_cMapName, "elvine", 6) == 0)
                     {
 
-                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, (205), 0, 0, 0, 0);
+                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, (205), 0, 0, 0, 0);
                         return 1005;
                     }
                     else
                         if (memcmp(m_pClientList[iClientH]->m_cMapName, "default", 7) == 0)
                         {
 
-                            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NPCTALK, (206), 0, 0, 0, 0);
+                            SendNotifyMsg(0, iClientH, DEF_NOTIFY_NPCTALK, (206), 0, 0, 0, 0);
                             return 1006;
                         }
             }

@@ -1,1 +1,1 @@
-#define 10ARROW 
+#define ARROW 10

@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/daily_file_sink.h>
 #include <spdlog/async.h>

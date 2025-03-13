@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "DynamicObject.h"
+#include "dynamic_object.h"
 
 CDynamicObject::CDynamicObject(short sOwner, char cOwnerType, short sType, char cMapIndex, short sX, short sY, uint32_t dwRegisterTime, uint32_t dwLastTime, int iV1)
 {

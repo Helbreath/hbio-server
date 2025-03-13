@@ -6,16 +6,19 @@
 
 #pragma once
 
+#ifdef _WIN32
 #include <windows.h>
 #include <winbase.h>
 #include <process.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <memory.h>
 #include <direct.h>
+#endif
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <memory.h>
 #include <vector>
+#include <format>
 
 #include <memory>
 #include <string>
@@ -29,27 +32,26 @@
 #include <string_view>
 #include "socket_defines.h"
 
-#include "StrTok.h"
-#include "Client.h"
-#include "Npc.h"
-#include "ActionID.h"
-#include "NetMessages.h"
-#include "MessageIndex.h"
-#include "Misc.h"
-#include "Msg.h"
-#include "Magic.h"
-#include "Skill.h"
-#include "DynamicObject.h"
-#include "DelayEvent.h"
-#include "Fish.h"
-#include "DynamicObject.h"
-#include "DynamicObjectID.h"
-#include "Potion.h"
-#include "Mineral.h"
-#include "Quest.h"
-#include "BuildItem.h"
-#include "TeleportLoc.h"
-#include "GlobalDef.h"
+#include "str_tok.h"
+#include "client.h"
+#include "npc.h"
+#include "action_id.h"
+#include "net_messages.h"
+#include "message_index.h"
+#include "misc.h"
+#include "msg.h"
+#include "magic.h"
+#include "skill.h"
+#include "delay_event.h"
+#include "fish.h"
+#include "dynamic_object.h"
+#include "dynamic_object_id.h"
+#include "potion.h"
+#include "mineral.h"
+#include "quest.h"
+#include "build_item.h"
+#include "teleport_loc.h"
+#include "global_def.h"
 #include "englishitem.h"
 #include "koreaitem.h"
 #include "teleport.h"
@@ -62,7 +64,7 @@
 #define DEF_MAXITEMTYPES		5000
 #define DEF_MAXNPCTYPES			200//100
 #define DEF_MAXBUILDITEMS		300
-#define DEF_CLIENTTIMEOUT		1000*10		//(10ÃÊ)
+#define DEF_CLIENTTIMEOUT		3000*10		//(10ÃÊ)
 #define DEF_AUTOSAVETIME		60000//60000*30
 #define DEF_HPUPTIME			1000*15
 #define DEF_MPUPTIME			1000*20
@@ -376,7 +378,7 @@ public:
     bool m_bIsHeldenianTeleport;
     char m_cHeldenianType;
 
-    //BOOL _bDecodeNpcItemConfigFileContents(char * pData, DWORD dwMsgSize);
+    //bool _bDecodeNpcItemConfigFileContents(char * pData, DWORD dwMsgSize);
     //void CalculateEnduranceDecrement(short sTargetH, short sAttackerH, char cTargetType, int iArmorType);
     bool bCalculateEnduranceDecrement(short sTargetH, short sAttackerH, char cTargetType, int iArmorType);
     char _cCheckHeroItemEquipped(CClient * client);
@@ -384,7 +386,7 @@ public:
     void _CheckFarmingAction(short sAttackerH, short sTargetH, bool bType);
 
 
-    void CalcTotalItemEffect(CClient * client, int iEquipItemID, BOOL bNotify = TRUE)
+    void CalcTotalItemEffect(CClient * client, int iEquipItemID, bool bNotify = true)
     {
         CalcTotalItemEffect(get_client_handle(client), iEquipItemID, bNotify);
     }
@@ -821,7 +823,7 @@ public:
     void SetTimeOut(int iClientH);
     void ForceRecallProcess();
     void SkillCheck(int sTargetH);
-    BOOL IsEnemyZone(int i);
+    bool IsEnemyZone(int i);
 
     CGame();
     ~CGame();
@@ -852,10 +854,10 @@ public:
     int m_iTotalMaps;
     int m_iGateSockConnRetryTimes;
     CMisc m_Misc;
-    BOOL m_bIsGameStarted;
+    bool m_bIsGameStarted;
     bool m_bIsLogSockAvailable, m_bIsGateSockAvailable;
-    BOOL m_bIsItemAvailable, m_bIsBuildItemAvailable, m_bIsNpcAvailable, m_bIsMagicAvailable;
-    BOOL m_bIsSkillAvailable, m_bIsPortionAvailable, m_bIsQuestAvailable, m_bIsWLServerAvailable;
+    bool m_bIsItemAvailable, m_bIsBuildItemAvailable, m_bIsNpcAvailable, m_bIsMagicAvailable;
+    bool m_bIsSkillAvailable, m_bIsPortionAvailable, m_bIsQuestAvailable, m_bIsWLServerAvailable;
     CItem * m_pItemConfigList[DEF_MAXITEMTYPES];
     CNpc * m_pNpcConfigList[DEF_MAXNPCTYPES];
     CMagic * m_pMagicConfigList[DEF_MAXMAGICTYPE];

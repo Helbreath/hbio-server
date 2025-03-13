@@ -44,84 +44,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\ActionID.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\BuildItem.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\DelayEvent.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\DynamicObject.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\DynamicObjectID.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Fish.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\GuildsMan.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Item.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Magic.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\MessageIndex.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Mineral.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Misc.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\NetMessages.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\OccupyFlag.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Potion.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Quest.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Skill.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\StrategicPoint.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\StrTok.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Teleport.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TeleportLoc.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TempNpcItem.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Tile.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Client.h">
-      <Filter>src\units</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Map.h">
-      <Filter>src\map</Filter>
-    </ClInclude>
     <ClInclude Include="src\defines.h">
       <Filter>src</Filter>
     </ClInclude>
@@ -134,64 +56,97 @@
     <ClInclude Include="src\time_utils.h">
       <Filter>src\utilities</Filter>
     </ClInclude>
-    <ClInclude Include="src\Npc.h">
+    <ClInclude Include="src\map.h">
+      <Filter>src\map</Filter>
+    </ClInclude>
+    <ClInclude Include="src\client.h">
       <Filter>src\units</Filter>
     </ClInclude>
-    <ClInclude Include="src\Msg.h">
+    <ClInclude Include="src\npc.h">
+      <Filter>src\units</Filter>
+    </ClInclude>
+    <ClInclude Include="src\str_tok.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\potion.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\quest.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\skill.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\strategic_point.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\teleport.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\teleport_loc.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\temp_npc_item.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tile.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\action_id.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\build_item.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\delay_event.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dynamic_object.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dynamic_object_id.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\fish.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\game.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\guildsman.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\item.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\magic.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\message_index.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mineral.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\misc.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\msg.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\net_messages.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\occupy_flag.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\BuildItem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\DynamicObject.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Fish.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Item.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Mineral.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Misc.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\OccupyFlag.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Potion.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\StrTok.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Teleport.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\TeleportLoc.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Tile.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\sockets.cpp">
       <Filter>src\sockets</Filter>
     </ClCompile>
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Client.cpp">
-      <Filter>src\units</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Map.cpp">
-      <Filter>src\map</Filter>
     </ClCompile>
     <ClCompile Include="src\binary_messages.cpp">
       <Filter>src\sockets</Filter>
@@ -204,24 +159,6 @@
     </ClCompile>
     <ClCompile Include="src\login_server.cpp">
       <Filter>src\login</Filter>
-    </ClCompile>
-    <ClCompile Include="src\account_management.cpp">
-      <Filter>src\core\data</Filter>
-    </ClCompile>
-    <ClCompile Include="src\character_management.cpp">
-      <Filter>src\core\data</Filter>
-    </ClCompile>
-    <ClCompile Include="src\core.cpp">
-      <Filter>src\core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\sql.cpp">
-      <Filter>src\core\data</Filter>
-    </ClCompile>
-    <ClCompile Include="src\hbx_login.cpp">
-      <Filter>src\core\data</Filter>
-    </ClCompile>
-    <ClCompile Include="src\basic_login.cpp">
-      <Filter>src\core\data</Filter>
     </ClCompile>
     <ClCompile Include="src\config_parsing.cpp">
       <Filter>src</Filter>
@@ -271,13 +208,76 @@
     <ClCompile Include="src\event_handlers.cpp">
       <Filter>src\units</Filter>
     </ClCompile>
+    <ClCompile Include="src\sql.cpp">
+      <Filter>src\core\data</Filter>
+    </ClCompile>
+    <ClCompile Include="src\account_management.cpp">
+      <Filter>src\core\data</Filter>
+    </ClCompile>
+    <ClCompile Include="src\basic_login.cpp">
+      <Filter>src\core\data</Filter>
+    </ClCompile>
+    <ClCompile Include="src\character_management.cpp">
+      <Filter>src\core\data</Filter>
+    </ClCompile>
+    <ClCompile Include="src\hbx_login.cpp">
+      <Filter>src\core\data</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
     <ClCompile Include="src\timed_events.cpp">
       <Filter>src\core</Filter>
     </ClCompile>
-    <ClCompile Include="src\Npc.cpp">
+    <ClCompile Include="src\map.cpp">
+      <Filter>src\map</Filter>
+    </ClCompile>
+    <ClCompile Include="src\client.cpp">
       <Filter>src\units</Filter>
     </ClCompile>
-    <ClCompile Include="src\Msg.cpp">
+    <ClCompile Include="src\npc.cpp">
+      <Filter>src\units</Filter>
+    </ClCompile>
+    <ClCompile Include="src\str_tok.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\teleport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\teleport_loc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\build_item.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dynamic_object.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\fish.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\item.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\mineral.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\misc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\msg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\occupy_flag.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\potion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

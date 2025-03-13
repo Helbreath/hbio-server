@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 
 extern char G_cTxt[512];
 
@@ -87,7 +87,7 @@ void CGame::DelayEventProcessor()
                                 m_pDelayEventList[i]->m_iV1, iSkillNum, m_pDelayEventList[i]->m_cMapIndex, m_pDelayEventList[i]->m_dX, m_pDelayEventList[i]->m_dY);
 
 
-                            SendNotifyMsg(NULL, m_pDelayEventList[i]->m_iTargetH, DEF_NOTIFY_SKILLUSINGEND, iResult, 0, 0, 0);
+                            SendNotifyMsg(0, m_pDelayEventList[i]->m_iTargetH, DEF_NOTIFY_SKILLUSINGEND, iResult, 0, 0, 0);
                             break;
                     }
                     break;
@@ -102,7 +102,7 @@ void CGame::DelayEventProcessor()
                         case DEF_OWNERTYPE_PLAYER:
                             if (m_pClientList[m_pDelayEventList[i]->m_iTargetH] == 0) break;
 
-                            SendNotifyMsg(NULL, m_pDelayEventList[i]->m_iTargetH, DEF_NOTIFY_MAGICEFFECTOFF,
+                            SendNotifyMsg(0, m_pDelayEventList[i]->m_iTargetH, DEF_NOTIFY_MAGICEFFECTOFF,
                                 m_pDelayEventList[i]->m_iEffectType, m_pClientList[m_pDelayEventList[i]->m_iTargetH]->m_cMagicEffectStatus[m_pDelayEventList[i]->m_iEffectType], 0, 0);
 
                             m_pClientList[m_pDelayEventList[i]->m_iTargetH]->m_cMagicEffectStatus[m_pDelayEventList[i]->m_iEffectType] = 0;
@@ -276,7 +276,7 @@ void CGame::TimeHitPointsUp(int iClientH)
         if (m_pClientList[iClientH]->m_iHP > iMaxHP) m_pClientList[iClientH]->m_iHP = iMaxHP;
         if (m_pClientList[iClientH]->m_iHP <= 0)     m_pClientList[iClientH]->m_iHP = 0;
 
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_HP, 0, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_HP, 0, 0, 0, 0);
     }
 
     m_pClientList[iClientH]->m_iHPstock = 0;
@@ -311,7 +311,7 @@ void CGame::TimeManaPointsUp(int iClientH)
         if (m_pClientList[iClientH]->m_iMP > iMaxMP)
             m_pClientList[iClientH]->m_iMP = iMaxMP;
 
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MP, 0, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_MP, 0, 0, 0, 0);
     }
 }
 
@@ -358,6 +358,6 @@ void CGame::TimeStaminarPointsUp(int iClientH)
         if (m_pClientList[iClientH]->m_iSP > iMaxSP)
             m_pClientList[iClientH]->m_iSP = iMaxSP;
 
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
     }
 }

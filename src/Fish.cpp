@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Fish.h"
+#include "fish.h"
 
 CFish::CFish(char cMapIndex, short sX, short sY, short sType, CItem * pItem, int iDifficulty)
 {
@@ -25,5 +25,5 @@ CFish::CFish(char cMapIndex, short sX, short sY, short sType, CItem * pItem, int
 
 CFish::~CFish()
 {
-    if (m_pItem != NULL) delete m_pItem;
+    if (m_pItem != 0) delete m_pItem;
 }

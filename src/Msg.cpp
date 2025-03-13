@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Msg.h"
+#include "msg.h"
 #include <cstring>
 
 CMsg::CMsg()
@@ -21,7 +21,7 @@ CMsg::~CMsg()
 bool CMsg::bPut(char cFrom, char * pData, uint32_t dwSize, int iIndex)
 {
 	m_pData = new char [dwSize + 1];
-	if (m_pData == NULL) return false;
+	if (m_pData == 0) return false;
 	memset(m_pData, 0, dwSize + 1);
 	memcpy(m_pData, pData, dwSize);
 

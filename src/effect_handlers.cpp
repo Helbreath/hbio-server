@@ -4,8 +4,8 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
+#include "game.h"
+#include "map.h"
 
 void CGame::Effect_Damage_Spot(short sAttackerH, char cAttackerType, short sTargetH, char cTargetType, short sV1, short sV2, short sV3, bool bExp, int iAttr)
 {
@@ -325,12 +325,12 @@ void CGame::Effect_Damage_Spot(short sAttackerH, char cAttackerType, short sTarg
                             iMaxSuperAttack = (m_pClientList[sTargetH]->m_iLevel / 10);
                             if (m_pClientList[sTargetH]->m_iSuperAttackLeft < iMaxSuperAttack) m_pClientList[sTargetH]->m_iSuperAttackLeft++;
 
-                            SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_SUPERATTACKLEFT, 0, 0, 0, 0);
+                            SendNotifyMsg(0, sTargetH, DEF_NOTIFY_SUPERATTACKLEFT, 0, 0, 0, 0);
                         }
                     }
 
 
-                    SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_HP, 0, 0, 0, 0);
+                    SendNotifyMsg(0, sTargetH, DEF_NOTIFY_HP, 0, 0, 0, 0);
 
                     SendEventToNearClient_TypeA(sTargetH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, 0, 0);
 
@@ -346,7 +346,7 @@ void CGame::Effect_Damage_Spot(short sAttackerH, char cAttackerType, short sTarg
 
                         // 1: Hold-Person 
                         // 2: Paralyze
-                        SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_HOLDOBJECT, m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT], 0, 0);
+                        SendNotifyMsg(0, sTargetH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_HOLDOBJECT, m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT], 0, 0);
 
                         m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = 0;
                         bRemoveFromDelayEventList(sTargetH, DEF_OWNERTYPE_PLAYER, DEF_MAGICTYPE_HOLDOBJECT);
@@ -923,7 +923,7 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
                             iMaxSuperAttack = (m_pClientList[sTargetH]->m_iLevel / 10);
                             if (m_pClientList[sTargetH]->m_iSuperAttackLeft < iMaxSuperAttack) m_pClientList[sTargetH]->m_iSuperAttackLeft++;
 
-                            SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_SUPERATTACKLEFT, 0, 0, 0, 0);
+                            SendNotifyMsg(0, sTargetH, DEF_NOTIFY_SUPERATTACKLEFT, 0, 0, 0, 0);
                         }
                     }
 
@@ -961,15 +961,15 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
 
                         m_pClientList[sTargetH]->m_iLastDamage = iDamage;
 
-                        SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_HP, 0, 0, 0, 0);
+                        SendNotifyMsg(0, sTargetH, DEF_NOTIFY_HP, 0, 0, 0, 0);
 
-                        SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_DAMAGEMOVE, cDamageMoveDir, iDamage, 0, 0);
+                        SendNotifyMsg(0, sTargetH, DEF_NOTIFY_DAMAGEMOVE, cDamageMoveDir, iDamage, 0, 0);
                     }
                     else
                     {
                         EDSD_SKIPDAMAGEMOVE:;
 
-                        SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_HP, 0, 0, 0, 0);
+                        SendNotifyMsg(0, sTargetH, DEF_NOTIFY_HP, 0, 0, 0, 0);
 
                         SendEventToNearClient_TypeA(sTargetH, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, 0, 0);
                     }
@@ -986,7 +986,7 @@ void CGame::Effect_Damage_Spot_DamageMove(short sAttackerH, char cAttackerType, 
 
                         // 1: Hold-Person 
                         // 2: Paralyze
-                        SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_HOLDOBJECT, m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT], 0, 0);
+                        SendNotifyMsg(0, sTargetH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_HOLDOBJECT, m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT], 0, 0);
 
                         m_pClientList[sTargetH]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = 0;
                         bRemoveFromDelayEventList(sTargetH, DEF_OWNERTYPE_PLAYER, DEF_MAGICTYPE_HOLDOBJECT);
@@ -1193,7 +1193,7 @@ void CGame::Effect_HpUp_Spot(short sAttackerH, char cAttackerType, short sTarget
                 if (m_pClientList[sTargetH]->m_iHP > iMaxHP) m_pClientList[sTargetH]->m_iHP = iMaxHP;
                 if (m_pClientList[sTargetH]->m_iHP <= 0)     m_pClientList[sTargetH]->m_iHP = 1;
 
-                SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_HP, 0, 0, 0, 0);
+                SendNotifyMsg(0, sTargetH, DEF_NOTIFY_HP, 0, 0, 0, 0);
             }
             break;
 
@@ -1268,7 +1268,7 @@ void CGame::Effect_SpDown_Spot(short sAttackerH, char cAttackerType, short sTarg
                 {
                     m_pClientList[sTargetH]->m_iSP -= iSP;
                     if (m_pClientList[sTargetH]->m_iSP < 0) m_pClientList[sTargetH]->m_iSP = 0;
-                    SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_SP, 0, 0, 0, 0);
+                    SendNotifyMsg(0, sTargetH, DEF_NOTIFY_SP, 0, 0, 0, 0);
                 }
             }
             break;
@@ -1305,7 +1305,7 @@ void CGame::Effect_SpUp_Spot(short sAttackerH, char cAttackerType, short sTarget
                 if (m_pClientList[sTargetH]->m_iSP > iMaxSP)
                     m_pClientList[sTargetH]->m_iSP = iMaxSP;
 
-                SendNotifyMsg(NULL, sTargetH, DEF_NOTIFY_SP, 0, 0, 0, 0);
+                SendNotifyMsg(0, sTargetH, DEF_NOTIFY_SP, 0, 0, 0, 0);
             }
             break;
 

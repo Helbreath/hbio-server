@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Mineral.h"
+#include "mineral.h"
 
 CMineral::CMineral(char cType, char cMapIndex, int sX, int sY, int iRemain)
 {

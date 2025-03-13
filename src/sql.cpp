@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 
 int64_t CGame::create_db_character(pqxx::transaction_base & t, character_db & character)
 {

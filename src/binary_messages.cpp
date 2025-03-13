@@ -4,5 +4,5 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 #include "socket_defines.h"

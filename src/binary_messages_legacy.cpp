@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 #include "socket_defines.h"
 
 void CGame::process_binary_message(socket_message sm)

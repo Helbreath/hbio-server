@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 
 bool CGame::save_player_data(std::shared_ptr<CClient> client)
 {

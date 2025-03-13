@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 
 extern char G_cTxt[512];
 
@@ -13,7 +13,7 @@ extern char G_cTxt[512];
     if (m_pClientList[iClientH] == 0) return;
 
     //m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_iTotalAliveObject;
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_APOCGATEOPEN, 95, 31, 0, m_pClientList[iClientH]->m_cMapName);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_APOCGATEOPEN, 95, 31, 0, m_pClientList[iClientH]->m_cMapName);
 }*/
 
 void CGame::GlobalEndApocalypseMode()
@@ -40,7 +40,7 @@ void CGame::LocalEndApocalypse()
     {
         if (m_pClientList[i] != 0)
         {
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_APOCGATEENDMSG, 0, 0, 0, 0);
+            SendNotifyMsg(0, i, DEF_NOTIFY_APOCGATEENDMSG, 0, 0, 0, 0);
         }
     }
     wsprintf(G_cTxt, "(!)Apocalypse Mode OFF.");
@@ -64,9 +64,9 @@ void CGame::LocalStartApocalypse(uint32_t dwApocalypseGUID)
     {
         if (m_pClientList[i] != 0)
         {
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_APOCGATESTARTMSG, 0, 0, 0, 0);
+            SendNotifyMsg(0, i, DEF_NOTIFY_APOCGATESTARTMSG, 0, 0, 0, 0);
             //RequestTeleportHandler(i, "0   ");
-            //SendNotifyMsg(NULL, i, DEF_NOTIFY_APOCFORCERECALLPLAYERS, 0, 0, 0, 0);
+            //SendNotifyMsg(0, i, DEF_NOTIFY_APOCFORCERECALLPLAYERS, 0, 0, 0, 0);
         }
     }
     wsprintf(G_cTxt, "(!)Apocalypse Mode ON.");
@@ -157,7 +157,7 @@ void CGame::ApocalypseEnder()
  SYSTEMTIME SysTime;
 
     if (m_pClientList[iClientH]->m_iAdminUserLevel < 3) {
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ADMINUSERLEVELLOW, 0, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_ADMINUSERLEVELLOW, 0, 0, 0, 0);
     }
     if (m_bIsApocalypseMode == true) return;
     if (m_bIsHeldenianMode == true) return;

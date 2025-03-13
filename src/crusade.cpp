@@ -4,8 +4,8 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
+#include "game.h"
+#include "map.h"
 
 extern char G_cTxt[512];
 extern char	G_cData50000[50000];
@@ -35,7 +35,7 @@ void CGame::GrandMagicResultHandler(char * cMapName, int iCrashedStructureNum, i
     for (i = 1; i < DEF_MAXCLIENTS; i++)
         if (m_pClientList[i] != 0)
         {
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_GRANDMAGICRESULT, iCrashedStructureNum, iStructureDamageAmount, iCasualities, cMapName, iActiveStructure, 0, 0, 0, 0, iSTcount, pData);
+            SendNotifyMsg(0, i, DEF_NOTIFY_GRANDMAGICRESULT, iCrashedStructureNum, iStructureDamageAmount, iCasualities, cMapName, iActiveStructure, 0, 0, 0, 0, iSTcount, pData);
         }
 }
 
@@ -136,7 +136,7 @@ void CGame::KillCrusadeObjects()
                 case 46:
                 case 47:
                 case 51:
-                    NpcKilledHandler(NULL, 0, i, 0);
+                    NpcKilledHandler(0, 0, i, 0);
                     break;
             }
         }
@@ -319,7 +319,7 @@ void CGame::CheckCommanderConstructionPoint(int iClientH)
                     if (m_pClientList[i]->m_iWarContribution > DEF_MAXWARCONTRIBUTION)
                         m_pClientList[i]->m_iWarContribution = DEF_MAXWARCONTRIBUTION;
 
-                    SendNotifyMsg(NULL, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, 0, 0);
+                    SendNotifyMsg(0, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, 0, 0);
                     m_pClientList[iClientH]->m_iConstructionPoint = 0;
                     return;
                 }
@@ -344,7 +344,7 @@ bool CGame::__bSetConstructionKit(int iMapIndex, int dX, int dY, int iType, int 
     if (m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_iTotalCrusadeStructures >= DEF_MAXCRUSADESTRUCTURES)
     {
 
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NOMORECRUSADESTRUCTURE, 0, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_NOMORECRUSADESTRUCTURE, 0, 0, 0, 0);
         return false;
     }
 
@@ -433,9 +433,9 @@ void CGame::CheckCrusadeResultCalculation(int iClientH)
             {
 
                 m_pClientList[iClientH]->m_iExpStock += (m_pClientList[iClientH]->m_iWarContribution / 6);
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, m_pClientList[iClientH]->m_iWarContribution, 0);
+                SendNotifyMsg(0, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, m_pClientList[iClientH]->m_iWarContribution, 0);
 
-                _bCrusadeLog(DEF_CRUSADELOG_GETEXP, iClientH, (m_pClientList[iClientH]->m_iWarContribution / 6), NULL);
+                _bCrusadeLog(DEF_CRUSADELOG_GETEXP, iClientH, (m_pClientList[iClientH]->m_iWarContribution / 6), 0);
             }
             else
             {
@@ -458,8 +458,8 @@ void CGame::CheckCrusadeResultCalculation(int iClientH)
 
                     m_pClientList[iClientH]->m_iExpStock += (m_pClientList[iClientH]->m_iWarContribution) * (1.2);
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, m_pClientList[iClientH]->m_iWarContribution, 0);
-                    _bCrusadeLog(DEF_CRUSADELOG_GETEXP, iClientH, m_pClientList[iClientH]->m_iWarContribution, NULL);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, m_pClientList[iClientH]->m_iWarContribution, 0);
+                    _bCrusadeLog(DEF_CRUSADELOG_GETEXP, iClientH, m_pClientList[iClientH]->m_iWarContribution, 0);
                 }
                 else if (m_iCrusadeWinnerSide != m_pClientList[iClientH]->m_cSide)
                 {
@@ -479,16 +479,16 @@ void CGame::CheckCrusadeResultCalculation(int iClientH)
 
                     m_pClientList[iClientH]->m_iExpStock += m_pClientList[iClientH]->m_iWarContribution / 5;
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, -1 * m_pClientList[iClientH]->m_iWarContribution, 0);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, -1 * m_pClientList[iClientH]->m_iWarContribution, 0);
 
-                    _bCrusadeLog(DEF_CRUSADELOG_GETEXP, iClientH, (m_pClientList[iClientH]->m_iWarContribution / 10), NULL);
+                    _bCrusadeLog(DEF_CRUSADELOG_GETEXP, iClientH, (m_pClientList[iClientH]->m_iWarContribution / 10), 0);
                 }
             }
         }
         else
         {
 
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, 0, 0, -1);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, 0, 0, -1);
         }
 
         m_pClientList[iClientH]->m_iCrusadeDuty = 0;
@@ -522,7 +522,7 @@ void CGame::LocalStartCrusadeMode(uint32_t dwCrusadeGUID)
             m_pClientList[i]->m_iCrusadeDuty = 0;
             m_pClientList[i]->m_iConstructionPoint = 0;
             m_pClientList[i]->m_dwCrusadeGUID = m_dwCrusadeGUID;
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, m_pClientList[i]->m_iCrusadeDuty, 0, 0);
+            SendNotifyMsg(0, i, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, m_pClientList[i]->m_iCrusadeDuty, 0, 0);
         }
 
 
@@ -535,7 +535,7 @@ void CGame::LocalStartCrusadeMode(uint32_t dwCrusadeGUID)
     log->info("(!)Crusade Mode ON.");
 
 
-    _bCrusadeLog(DEF_CRUSADELOG_STARTCRUSADE, NULL, NULL, NULL);
+    _bCrusadeLog(DEF_CRUSADELOG_STARTCRUSADE, 0, 0, 0);
 }
 
 void CGame::LocalEndCrusadeMode(int iWinnerSide)
@@ -566,7 +566,7 @@ void CGame::LocalEndCrusadeMode(int iWinnerSide)
 
             m_pClientList[i]->m_iCrusadeDuty = 0;
             m_pClientList[i]->m_iConstructionPoint = 0;
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, 0, 0, m_iCrusadeWinnerSide);
+            SendNotifyMsg(0, i, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, 0, 0, m_iCrusadeWinnerSide);
         }
 
 
@@ -574,11 +574,11 @@ void CGame::LocalEndCrusadeMode(int iWinnerSide)
 
 
     if (iWinnerSide == 2)
-        _bCrusadeLog(DEF_CRUSADELOG_ENDCRUSADE, NULL, NULL, "Elvine Win!");
+        _bCrusadeLog(DEF_CRUSADELOG_ENDCRUSADE, 0, 0, "Elvine Win!");
     else if (iWinnerSide == 1)
-        _bCrusadeLog(DEF_CRUSADELOG_ENDCRUSADE, NULL, NULL, "Aresden Win!");
+        _bCrusadeLog(DEF_CRUSADELOG_ENDCRUSADE, 0, 0, "Aresden Win!");
     else
-        _bCrusadeLog(DEF_CRUSADELOG_ENDCRUSADE, NULL, NULL, "Drawn!");
+        _bCrusadeLog(DEF_CRUSADELOG_ENDCRUSADE, 0, 0, "Drawn!");
 }
 
 void CGame::CreateCrusadeStructures()
@@ -769,12 +769,12 @@ void CGame::MeteorStrikeMsgHandler(char cAttackerSide)
                         if (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cName, "elvine") == 0)
                         {
 
-                            SendNotifyMsg(NULL, i, DEF_NOTIFY_METEORSTRIKECOMING, 1, 0, 0, 0);
+                            SendNotifyMsg(0, i, DEF_NOTIFY_METEORSTRIKECOMING, 1, 0, 0, 0);
                         }
                         else
                         {
 
-                            SendNotifyMsg(NULL, i, DEF_NOTIFY_METEORSTRIKECOMING, 2, 0, 0, 0);
+                            SendNotifyMsg(0, i, DEF_NOTIFY_METEORSTRIKECOMING, 2, 0, 0, 0);
                         }
                     }
 
@@ -786,7 +786,7 @@ void CGame::MeteorStrikeMsgHandler(char cAttackerSide)
                     if (m_pClientList[i] != 0)
                     {
 
-                        SendNotifyMsg(NULL, i, DEF_NOTIFY_METEORSTRIKECOMING, 2, 0, 0, 0);
+                        SendNotifyMsg(0, i, DEF_NOTIFY_METEORSTRIKECOMING, 2, 0, 0, 0);
                     }
             }
             break;
@@ -803,12 +803,12 @@ void CGame::MeteorStrikeMsgHandler(char cAttackerSide)
                         if (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cName, "aresden") == 0)
                         {
 
-                            SendNotifyMsg(NULL, i, DEF_NOTIFY_METEORSTRIKECOMING, 3, 0, 0, 0);
+                            SendNotifyMsg(0, i, DEF_NOTIFY_METEORSTRIKECOMING, 3, 0, 0, 0);
                         }
                         else
                         {
 
-                            SendNotifyMsg(NULL, i, DEF_NOTIFY_METEORSTRIKECOMING, 4, 0, 0, 0);
+                            SendNotifyMsg(0, i, DEF_NOTIFY_METEORSTRIKECOMING, 4, 0, 0, 0);
                         }
                     }
 
@@ -820,7 +820,7 @@ void CGame::MeteorStrikeMsgHandler(char cAttackerSide)
                     if (m_pClientList[i] != 0)
                     {
 
-                        SendNotifyMsg(NULL, i, DEF_NOTIFY_METEORSTRIKECOMING, 4, 0, 0, 0);
+                        SendNotifyMsg(0, i, DEF_NOTIFY_METEORSTRIKECOMING, 4, 0, 0, 0);
                     }
             }
             break;
@@ -918,7 +918,7 @@ void CGame::MeteorStrikeHandler(int iMapIndex)
         for (i = 1; i < DEF_MAXCLIENTS; i++)
             if ((m_pClientList[i] != 0) && (m_pClientList[i]->m_bIsInitComplete == true) && (m_pClientList[i]->m_cMapIndex == iMapIndex))
             {
-                SendNotifyMsg(NULL, i, DEF_NOTIFY_METEORSTRIKEHIT, 0, 0, 0, 0);
+                SendNotifyMsg(0, i, DEF_NOTIFY_METEORSTRIKEHIT, 0, 0, 0, 0);
             }
 
         for (i = 0; i < iIndex; i++)
@@ -964,7 +964,7 @@ void CGame::MeteorStrikeHandler(int iMapIndex)
                     m_stMeteorStrikeResult.iStructureDamageAmount += (2 - iTotalESG);
 
                     iEffect = iDice(1, 5) - 1;
-                    iAddDynamicObjectList(NULL, DEF_OWNERTYPE_PLAYER_INDIRECT, DEF_DYNAMICOBJECT_FIRE2, iMapIndex,
+                    iAddDynamicObjectList(0, DEF_OWNERTYPE_PLAYER_INDIRECT, DEF_DYNAMICOBJECT_FIRE2, iMapIndex,
                         m_pMapList[iMapIndex]->m_stStrikePoint[iTargetIndex].iEffectX[iEffect] + (iDice(1, 3) - 2),
                         m_pMapList[iMapIndex]->m_stStrikePoint[iTargetIndex].iEffectY[iEffect] + (iDice(1, 3) - 2), 60 * 1000 * 50);
                 }
@@ -994,9 +994,9 @@ void CGame::MapStatusHandler(int iClientH, int iMode, char * pMapName)
             for (i = 0; i < DEF_MAXGUILDS; i++)
                 if ((m_pGuildTeleportLoc[i].m_iV1 != 0) && (m_pGuildTeleportLoc[i].m_iV1 == m_pClientList[iClientH]->m_iGuildGUID))
                 {
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_TCLOC, m_pGuildTeleportLoc[i].m_sDestX, m_pGuildTeleportLoc[i].m_sDestY,
-                        NULL, m_pGuildTeleportLoc[i].m_cDestMapName, m_pGuildTeleportLoc[i].m_sDestX2, m_pGuildTeleportLoc[i].m_sDestY2,
-                        NULL, 0, 0, 0, m_pGuildTeleportLoc[i].m_cDestMapName2);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_TCLOC, m_pGuildTeleportLoc[i].m_sDestX, m_pGuildTeleportLoc[i].m_sDestY,
+                        0, m_pGuildTeleportLoc[i].m_cDestMapName, m_pGuildTeleportLoc[i].m_sDestX2, m_pGuildTeleportLoc[i].m_sDestY2,
+                        0, 0, 0, 0, m_pGuildTeleportLoc[i].m_cDestMapName2);
 
                     memset(m_pClientList[iClientH]->m_cConstructMapName, 0, sizeof(m_pClientList[iClientH]->m_cConstructMapName));
                     memcpy(m_pClientList[iClientH]->m_cConstructMapName, m_pGuildTeleportLoc[i].m_cDestMapName2, 10);
@@ -1131,7 +1131,7 @@ void CGame::_SendMapStatus(int iClientH)
 
     cp = (char *)(cData + 12);
     *cp = (iDataSize / 6);
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MAPSTATUSNEXT, iDataSize + 13, 0, 0, cData);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_MAPSTATUSNEXT, iDataSize + 13, 0, 0, cData);
     return;
 
     SMS_ENDOFDATA:;
@@ -1139,7 +1139,7 @@ void CGame::_SendMapStatus(int iClientH)
 
     cp = (char *)(cData + 12);
     *cp = (iDataSize / 6);
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MAPSTATUSLAST, iDataSize + 13, 0, 0, cData);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_MAPSTATUSLAST, iDataSize + 13, 0, 0, cData);
     m_pClientList[iClientH]->m_bIsSendingMapStatus = false;
 
     return;
@@ -1216,7 +1216,7 @@ void CGame::DoMeteorStrikeDamageHandler(int iMapIndex)
                 if (iDamage > 0)
                 {
 
-                    SendNotifyMsg(NULL, i, DEF_NOTIFY_HP, 0, 0, 0, 0);
+                    SendNotifyMsg(0, i, DEF_NOTIFY_HP, 0, 0, 0, 0);
 
                     SendEventToNearClient_TypeA(i, DEF_OWNERTYPE_PLAYER, MSGID_EVENT_MOTION, DEF_OBJECTDAMAGE, iDamage, 0, 0);
 
@@ -1232,7 +1232,7 @@ void CGame::DoMeteorStrikeDamageHandler(int iMapIndex)
 
                         // 1: Hold-Person 
                         // 2: Paralyze
-                        SendNotifyMsg(NULL, i, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_HOLDOBJECT, m_pClientList[i]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT], 0, 0);
+                        SendNotifyMsg(0, i, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_HOLDOBJECT, m_pClientList[i]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT], 0, 0);
 
                         m_pClientList[i]->m_cMagicEffectStatus[DEF_MAGICTYPE_HOLDOBJECT] = 0;
                         bRemoveFromDelayEventList(i, DEF_OWNERTYPE_PLAYER, DEF_MAGICTYPE_HOLDOBJECT);

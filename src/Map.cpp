@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Map.h"
+#include "map.h"
 
 CMap::CMap(CGame * pGame, int map_index)
     : m_bIsSnowEnabled(false)

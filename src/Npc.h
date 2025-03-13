@@ -7,7 +7,7 @@
 #pragma once
 
 #include <cstdint>
-#include "Magic.h"
+#include "magic.h"
 #include "defines.h"
 
 #define DEF_MAXWAYPOINTS			10

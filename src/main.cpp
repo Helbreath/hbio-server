@@ -4,9 +4,9 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 #if !defined(WIN32)
-#include <signal.h>
+#include <csignal>
 #endif
 
 char G_cTxt[512];

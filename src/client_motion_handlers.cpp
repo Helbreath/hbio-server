@@ -4,9 +4,9 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Tile.h"
-#include "Map.h"
+#include "game.h"
+#include "tile.h"
+#include "map.h"
 
 int CGame::iClientMotion_Move_Handler(int iClientH, short sX, short sY, char cDir, bool bIsRun)
 {

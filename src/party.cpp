@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 
 extern char G_cTxt[512];
 
@@ -89,7 +89,7 @@ void CGame::PartyOperationResultHandler(char * pData)
             wsprintf(G_cTxt, "Party Status 0: %s", m_pClientList[iClientH]->m_cCharName);
             log->info(G_cTxt);
 
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PARTY, 8, 0, 0, 0);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_PARTY, 8, 0, 0, 0);
             break;
 
         case 4:
@@ -162,7 +162,7 @@ void CGame::PartyOperationResult_Create(int iClientH, char * pName, int iResult,
             m_pClientList[iClientH]->m_iPartyID = 0;
             m_pClientList[iClientH]->m_iPartyStatus = DEF_PARTYSTATUS_NULL;
             m_pClientList[iClientH]->m_iReqJoinPartyClientH = 0;
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PARTY, 1, 0, 0, 0);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_PARTY, 1, 0, 0, 0);
             break;
 
         case 1:
@@ -171,7 +171,7 @@ void CGame::PartyOperationResult_Create(int iClientH, char * pName, int iResult,
 
             m_pClientList[iClientH]->m_iPartyID = iPartyID;
             m_pClientList[iClientH]->m_iPartyStatus = DEF_PARTYSTATUS_CONFIRM;
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PARTY, 1, 1, 0, 0);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_PARTY, 1, 1, 0, 0);
 
 
             for (i = 0; i < DEF_MAXPARTYMEMBERS; i++)
@@ -210,7 +210,7 @@ void CGame::PartyOperationResult_Join(int iClientH, char * pName, int iResult, i
 
             m_pClientList[iClientH]->m_iPartyID = 0;
             m_pClientList[iClientH]->m_iPartyStatus = DEF_PARTYSTATUS_NULL;
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PARTY, 4, 0, 0, pName);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_PARTY, 4, 0, 0, pName);
 
             m_pClientList[iClientH]->m_iReqJoinPartyClientH = 0;
             memset(m_pClientList[iClientH]->m_cReqJoinPartyName, 0, sizeof(m_pClientList[iClientH]->m_cReqJoinPartyName));
@@ -222,7 +222,7 @@ void CGame::PartyOperationResult_Join(int iClientH, char * pName, int iResult, i
 
             m_pClientList[iClientH]->m_iPartyID = iPartyID;
             m_pClientList[iClientH]->m_iPartyStatus = DEF_PARTYSTATUS_CONFIRM;
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PARTY, 4, 1, 0, pName);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_PARTY, 4, 1, 0, pName);
 
             m_pClientList[iClientH]->m_iReqJoinPartyClientH = 0;
             memset(m_pClientList[iClientH]->m_cReqJoinPartyName, 0, sizeof(m_pClientList[iClientH]->m_cReqJoinPartyName));
@@ -244,7 +244,7 @@ void CGame::PartyOperationResult_Join(int iClientH, char * pName, int iResult, i
             for (i = 1; i < DEF_MAXCLIENTS; i++)
                 if ((i != iClientH) && (m_pClientList[i] != 0) && (m_pClientList[i]->m_iPartyID != 0) && (m_pClientList[i]->m_iPartyID == iPartyID))
                 {
-                    SendNotifyMsg(NULL, i, DEF_NOTIFY_PARTY, 4, 1, 0, pName);
+                    SendNotifyMsg(0, i, DEF_NOTIFY_PARTY, 4, 1, 0, pName);
                 }
             break;
     }
@@ -303,7 +303,7 @@ void CGame::PartyOperationResult_Dismiss(int iClientH, char * pName, int iResult
                 for (i = 1; i < DEF_MAXCLIENTS; i++)
                     if ((m_pClientList[i] != 0) && (m_pClientList[i]->m_iPartyID != 0) && (m_pClientList[i]->m_iPartyID == iPartyID))
                     {
-                        SendNotifyMsg(NULL, i, DEF_NOTIFY_PARTY, 6, 1, 0, pName);
+                        SendNotifyMsg(0, i, DEF_NOTIFY_PARTY, 6, 1, 0, pName);
                     }
                 return;
             }
@@ -315,7 +315,7 @@ void CGame::PartyOperationResult_Dismiss(int iClientH, char * pName, int iResult
             for (i = 1; i < DEF_MAXCLIENTS; i++)
                 if ((m_pClientList[i] != 0) && (m_pClientList[i]->m_iPartyID != 0) && (m_pClientList[i]->m_iPartyID == iPartyID))
                 {
-                    SendNotifyMsg(NULL, i, DEF_NOTIFY_PARTY, 6, 1, 0, pName);
+                    SendNotifyMsg(0, i, DEF_NOTIFY_PARTY, 6, 1, 0, pName);
                 }
 
 
@@ -362,7 +362,7 @@ void CGame::PartyOperationResult_Delete(int iPartyID)
     for (i = 1; i < DEF_MAXCLIENTS; i++)
         if ((m_pClientList[i] != 0) && (m_pClientList[i]->m_iPartyID == iPartyID))
         {
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_PARTY, 2, 0, 0, 0);
+            SendNotifyMsg(0, i, DEF_NOTIFY_PARTY, 2, 0, 0, 0);
             m_pClientList[i]->m_iPartyID = 0;
             m_pClientList[i]->m_iPartyStatus = DEF_PARTYSTATUS_NULL;
             m_pClientList[i]->m_iReqJoinPartyClientH = 0;
@@ -381,5 +381,5 @@ void CGame::PartyOperationResult_Info(int iClientH, char * pName, int iTotal, ch
     if (strcmp(m_pClientList[iClientH]->m_cCharName, pName) != 0) return;
     if (m_pClientList[iClientH]->m_iPartyStatus != DEF_PARTYSTATUS_CONFIRM) return;
 
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PARTY, 5, 1, iTotal, pNameList);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_PARTY, 5, 1, iTotal, pNameList);
 }

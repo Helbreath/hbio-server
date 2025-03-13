@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 
 void CGame::UserCommand_BanGuildsman(int iClientH, char * pData, uint32_t dwMsgSize)
 {
@@ -19,7 +19,7 @@ void CGame::UserCommand_BanGuildsman(int iClientH, char * pData, uint32_t dwMsgS
     if (m_pClientList[iClientH]->m_iGuildRank != 0)
     {
 
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_NOGUILDMASTERLEVEL, 0, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_NOGUILDMASTERLEVEL, 0, 0, 0, 0);
         return;
     }
 
@@ -47,7 +47,7 @@ void CGame::UserCommand_BanGuildsman(int iClientH, char * pData, uint32_t dwMsgS
                 {
 
 
-                    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CANNOTBANGUILDMAN, 0, 0, 0, 0);
+                    SendNotifyMsg(0, iClientH, DEF_NOTIFY_CANNOTBANGUILDMAN, 0, 0, 0, 0);
                     delete pStrTok;
                     return;
                 }
@@ -61,7 +61,7 @@ void CGame::UserCommand_BanGuildsman(int iClientH, char * pData, uint32_t dwMsgS
                 m_pClientList[i]->m_iGuildGUID = -1;
 
 
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SUCCESSBANGUILDMAN, 0, 0, 0, 0);
+                SendNotifyMsg(0, iClientH, DEF_NOTIFY_SUCCESSBANGUILDMAN, 0, 0, 0, 0);
 
 
                 SendNotifyMsg(iClientH, i, DEF_COMMONTYPE_BANGUILD, 0, 0, 0, 0);
@@ -74,7 +74,7 @@ void CGame::UserCommand_BanGuildsman(int iClientH, char * pData, uint32_t dwMsgS
                 return;
             }
 
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_PLAYERNOTONGAME, 0, 0, 0, cTargetName);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_PLAYERNOTONGAME, 0, 0, 0, cTargetName);
     }
 
     delete pStrTok;

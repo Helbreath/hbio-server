@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "StrTok.h"
+#include "str_tok.h"
 #include <cstring>
 
 CStrTok::CStrTok(char * pData, char * pSeps)
@@ -44,7 +44,7 @@ char * CStrTok::pGet()
             {
                 if (m_iCurLoc <= (m_iDataLength - 2))
                     cNextData = m_pData[m_iCurLoc + 1];
-                else cNextData = NULL;
+                else cNextData = 0;
                 if (_bIsSeperator(m_pData[m_iCurLoc], cNextData) == true)
                 {
                     m_iCurLoc++;

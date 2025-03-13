@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 #include <ixwebsocket/IXHttpClient.h>
 
 using json = nlohmann::json;

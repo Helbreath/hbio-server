@@ -4,8 +4,8 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
+#include "game.h"
+#include "map.h"
 
 extern char G_cTxt[512];
 
@@ -4625,7 +4625,7 @@ bool CGame::__bReadMapInfo(int iMapIndex)
                                 delete pStrTok;
                                 return false;
                             }
-                            m_pMapList[iMapIndex]->m_bRandomMobGenerator = (BOOL)atoi(token);
+                            m_pMapList[iMapIndex]->m_bRandomMobGenerator = (bool)atoi(token);
                             cReadModeB = 2;
                             break;
 
@@ -5018,7 +5018,7 @@ bool CGame::__bReadMapInfo(int iMapIndex)
                     break;
 
                 case 11:
-                    m_pMapList[iMapIndex]->m_bIsFixedDayMode = (BOOL)atoi(token);
+                    m_pMapList[iMapIndex]->m_bIsFixedDayMode = (bool)atoi(token);
                     if (m_pMapList[iMapIndex]->m_bIsFixedDayMode == true)
                         m_pMapList[iMapIndex]->m_bIsSnowEnabled = false;
                     cReadModeA = 0;
@@ -5128,7 +5128,7 @@ bool CGame::__bReadMapInfo(int iMapIndex)
                                 delete pStrTok;
                                 return false;
                             }
-                            m_pMapList[iMapIndex]->m_bMineralGenerator = (BOOL)atoi(token);
+                            m_pMapList[iMapIndex]->m_bMineralGenerator = (bool)atoi(token);
                             cReadModeB = 2;
                             break;
 
@@ -6390,15 +6390,15 @@ bool CGame::bReadProgramConfigFile(char * cFn)
 
     cReadMode = 0;
 
-    hFile = CreateFile(cFn, GENERIC_READ, NULL, NULL, OPEN_EXISTING, NULL, NULL);
-    dwFileSize = GetFileSize(hFile, NULL);
+    hFile = CreateFile(cFn, GENERIC_READ, 0, 0, OPEN_EXISTING, 0, 0);
+    dwFileSize = GetFileSize(hFile, 0);
     if (hFile != INVALID_HANDLE_VALUE) CloseHandle(hFile);
 
     pFile = fopen(cFn, "rt");
-    if (pFile == NULL)
+    if (pFile == 0)
     {
         log->info("(!) Cannot open configuration file.");
-        return FALSE;
+        return false;
     }
     else
     {
@@ -6409,7 +6409,7 @@ bool CGame::bReadProgramConfigFile(char * cFn)
 
         pStrTok = new CStrTok(cp, seps);
         token = pStrTok->pGet();
-        while (token != NULL)
+        while (token != 0)
         {
 
             if (cReadMode != 0)
@@ -6479,7 +6479,7 @@ bool CGame::bReadProgramConfigFile(char * cFn)
         delete pStrTok;
         delete cp;
     }
-    if (pFile != NULL) fclose(pFile);
+    if (pFile != 0) fclose(pFile);
 
     return true;
 }

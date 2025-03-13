@@ -4,10 +4,9 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
-#include "Npc.h"
-#include <windows.h>
+#include "game.h"
+#include "map.h"
+#include "npc.h"
 
 extern char G_cTxt[512];
 

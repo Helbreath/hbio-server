@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Npc.h"
+#include "npc.h"
 
 CNpc::CNpc(char * pName5)
 {

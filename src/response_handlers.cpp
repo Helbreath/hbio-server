@@ -4,9 +4,9 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
-#include "Tile.h"
+#include "game.h"
+#include "map.h"
+#include "tile.h"
 
 extern char G_cTxt[512];
 

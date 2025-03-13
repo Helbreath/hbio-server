@@ -4,8 +4,8 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
+#include "game.h"
+#include "map.h"
 #include "time_utils.h"
 
 void CGame::run()
@@ -981,7 +981,7 @@ void CGame::CheckConnectionHandler(int iClientH, char * pData)
     char * cp;
     DWORD * dwp, dwTimeRcv, dwTime, dwTimeGapClient, dwTimeGapServer;
 
-    if (m_pClientList[iClientH] == NULL) return;
+    if (m_pClientList[iClientH] == 0) return;
     //m_pClientList[iClientH]->m_cConnectionCheck = 0;
 
     dwTime = timeGetTime();
@@ -989,7 +989,7 @@ void CGame::CheckConnectionHandler(int iClientH, char * pData)
     dwp = (DWORD *)cp;
     dwTimeRcv = *dwp;
 
-    if (m_pClientList[iClientH]->m_dwInitCCTimeRcv == NULL)
+    if (m_pClientList[iClientH]->m_dwInitCCTimeRcv == 0)
     {
         m_pClientList[iClientH]->m_dwInitCCTimeRcv = dwTimeRcv;
         m_pClientList[iClientH]->m_dwInitCCTime = dwTime;
@@ -1002,7 +1002,7 @@ void CGame::CheckConnectionHandler(int iClientH, char * pData)
         if (dwTimeGapClient < dwTimeGapServer) return;
         if ((abs((long long)(dwTimeGapClient - dwTimeGapServer))) >= (DEF_CLIENTTIMEOUT))
         {
-            DeleteClient(iClientH, TRUE, TRUE);
+            DeleteClient(iClientH, true, true);
             return;
         }
     }

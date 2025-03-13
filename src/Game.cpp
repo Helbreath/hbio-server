@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/daily_file_sink.h>
 #include <spdlog/async.h>
@@ -12,8 +12,8 @@
 #include <fstream>
 #include "streams.h"
 #include "defines.h"
-#include "Tile.h"
-#include "Map.h"
+#include "tile.h"
+#include "map.h"
 
 extern char G_cTxt[512];
 extern char	G_cData50000[50000];
@@ -408,35 +408,35 @@ bool CGame::bInit()
     m_iLimitedUserExp = m_iLevelExpTable[DEF_LEVELLIMIT + 1];
     m_iLevelExp20 = m_iLevelExpTable[20];
 
-    if (bReadProgramConfigFile("GServer.cfg") == FALSE)
+    if (bReadProgramConfigFile("GServer.cfg") == false)
     {
         log->info(" ");
         log->info("(!!!) CRITICAL ERROR! Cannot execute server! GServer.cfg file contents error!");
-        return FALSE;
+        return false;
     }
-    if (bReadSettingsConfigFile("GameConfigs\\Settings.cfg") == FALSE)
+    if (bReadSettingsConfigFile("GameConfigs\\Settings.cfg") == false)
     {
         log->info(" ");
         log->info("(!!!) CRITICAL ERROR! Cannot execute server! Settings.cfg file contents error!");
-        return FALSE;
+        return false;
     }
-    if (bReadAdminListConfigFile("GameConfigs\\AdminList.cfg") == FALSE)
+    if (bReadAdminListConfigFile("GameConfigs\\AdminList.cfg") == false)
     {
         log->info(" ");
         log->info("(!!!) CRITICAL ERROR! Cannot execute server! AdminList.cfg file contents error!");
-        return FALSE;
+        return false;
     }
-    if (bReadBannedListConfigFile("GameConfigs\\BannedList.cfg") == FALSE)
+    if (bReadBannedListConfigFile("GameConfigs\\BannedList.cfg") == false)
     {
         log->info(" ");
         log->info("(!!!) CRITICAL ERROR! Cannot execute server! BannedList.cfg file contents error!");
-        return FALSE;
+        return false;
     }
-    if (bReadAdminSetConfigFile("GameConfigs\\AdminSettings.cfg") == FALSE)
+    if (bReadAdminSetConfigFile("GameConfigs\\AdminSettings.cfg") == false)
     {
         log->info(" ");
         log->info("(!!!) CRITICAL ERROR! Cannot execute server! AdminSettings.cfg file contents error!");
-        return FALSE;
+        return false;
     }
 
     srand((unsigned)time(0));
@@ -923,11 +923,7 @@ void CGame::SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, uint32_t
 
             //if ((m_pClientList[i] != 0) && (m_pClientList[i]->m_bIsInitComplete == true))
             if ((bFlag == true) && (m_pClientList[i] != 0) && (m_pClientList[i]->m_bIsInitComplete == true))
-                if ((m_pClientList[i]->m_cMapIndex == m_pClientList[sOwnerH]->m_cMapIndex) &&
-                    (m_pClientList[i]->m_sX >= m_pClientList[sOwnerH]->m_sX - 10 - sRange) &&
-                    (m_pClientList[i]->m_sX <= m_pClientList[sOwnerH]->m_sX + 10 + sRange) &&
-                    (m_pClientList[i]->m_sY >= m_pClientList[sOwnerH]->m_sY - 8 - sRange) &&
-                    (m_pClientList[i]->m_sY <= m_pClientList[sOwnerH]->m_sY + 8 + sRange))
+                if ((m_pClientList[i]->m_cMapIndex == m_pClientList[sOwnerH]->m_cMapIndex))
                 {
                     if (m_pClientList[sOwnerH]->m_cSide != m_pClientList[i]->m_cSide)
                     {
@@ -957,138 +953,66 @@ void CGame::SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, uint32_t
                     *ipStatus = iTemp;
 
 
-                    if ((m_pClientList[i]->m_sX >= m_pClientList[sOwnerH]->m_sX - 9) &&
-                        (m_pClientList[i]->m_sX <= m_pClientList[sOwnerH]->m_sX + 9) &&
-                        (m_pClientList[i]->m_sY >= m_pClientList[sOwnerH]->m_sY - 7) &&
-                        (m_pClientList[i]->m_sY <= m_pClientList[sOwnerH]->m_sY + 7))
+                    switch (wMsgType)
                     {
+                        case DEF_MSGTYPE_CONFIRM:
+                        case DEF_MSGTYPE_REJECT:
+                        case DEF_OBJECTNULLACTION:
 
-                        switch (wMsgType)
-                        {
-                            case DEF_MSGTYPE_CONFIRM:
-                            case DEF_MSGTYPE_REJECT:
-                            case DEF_OBJECTNULLACTION:
-
-                                if (bOwnerSend == true)
+                            if (bOwnerSend == true)
+                                iRet = m_pClientList[i]->iSendMsg(cData_All, 43 + 8, cKey);
+                            else
+                            {
+                                if (i != sOwnerH)
                                     iRet = m_pClientList[i]->iSendMsg(cData_All, 43 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_All, 43 + 8, cKey);
-                                }
-                                break;
+                            }
+                            break;
 
-                            case DEF_OBJECTMAGIC:
-                            case DEF_OBJECTDAMAGE:
-                            case DEF_OBJECTDAMAGEMOVE:
-                                //case DEF_OBJECTDYING:
-                                if (bOwnerSend == true)
+                        case DEF_OBJECTMAGIC:
+                        case DEF_OBJECTDAMAGE:
+                        case DEF_OBJECTDAMAGEMOVE:
+                            //case DEF_OBJECTDYING:
+                            if (bOwnerSend == true)
+                                iRet = m_pClientList[i]->iSendMsg(cData_Srt, 11 + 8, cKey);
+                            else
+                            {
+                                if (i != sOwnerH)
                                     iRet = m_pClientList[i]->iSendMsg(cData_Srt, 11 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_Srt, 11 + 8, cKey);
-                                }
-                                break;
+                            }
+                            break;
 
-                            case DEF_OBJECTDYING:
-                                if (bOwnerSend == true)
+                        case DEF_OBJECTDYING:
+                            if (bOwnerSend == true)
+                                iRet = m_pClientList[i]->iSendMsg(cData_Srt, 15 + 8, cKey);
+                            else
+                            {
+                                if (i != sOwnerH)
                                     iRet = m_pClientList[i]->iSendMsg(cData_Srt, 15 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_Srt, 15 + 8, cKey);
-                                }
-                                break;
+                            }
+                            break;
 
-                            case DEF_OBJECTATTACK:
-                            case DEF_OBJECTATTACKMOVE:
+                        case DEF_OBJECTATTACK:
+                        case DEF_OBJECTATTACKMOVE:
 
-                                if (bOwnerSend == true)
+                            if (bOwnerSend == true)
+                                iRet = m_pClientList[i]->iSendMsg(cData_Srt_Av, 13 + 8, cKey);
+                            else
+                            {
+                                if (i != sOwnerH)
                                     iRet = m_pClientList[i]->iSendMsg(cData_Srt_Av, 13 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_Srt_Av, 13 + 8, cKey);
-                                }
-                                break;
+                            }
+                            break;
 
-                            default:
+                        default:
 
-                                if (bOwnerSend == true)
+                            if (bOwnerSend == true)
+                                iRet = m_pClientList[i]->iSendMsg(cData_Srt, 9 + 8, cKey);
+                            else
+                            {
+                                if (i != sOwnerH)
                                     iRet = m_pClientList[i]->iSendMsg(cData_Srt, 9 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_Srt, 9 + 8, cKey);
-                                }
-                                break;
-                        }
-                    }
-                    else
-                    {
-
-                        switch (wMsgType)
-                        {
-                            case DEF_MSGTYPE_CONFIRM:
-                            case DEF_MSGTYPE_REJECT:
-                            case DEF_OBJECTNULLACTION:
-
-                                if (bOwnerSend == true)
-                                    iRet = m_pClientList[i]->iSendMsg(cData_All, 43 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_All, 43 + 8, cKey);
-                                }
-                                break;
-
-                            case DEF_OBJECTMAGIC:
-                            case DEF_OBJECTDAMAGE:
-                            case DEF_OBJECTDAMAGEMOVE:
-                                //case DEF_OBJECTDYING:	
-                                if (bOwnerSend == true)
-                                    iRet = m_pClientList[i]->iSendMsg(cData_Srt, 11 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_Srt, 11 + 8, cKey);
-                                }
-                                break;
-
-                            case DEF_OBJECTDYING:
-                                if (bOwnerSend == true)
-                                    iRet = m_pClientList[i]->iSendMsg(cData_Srt, 15 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_Srt, 15 + 8, cKey);
-                                }
-                                break;
-
-                            case DEF_OBJECTATTACK:
-                            case DEF_OBJECTATTACKMOVE:
-
-                                if (bOwnerSend == true)
-                                    iRet = m_pClientList[i]->iSendMsg(cData_Srt_Av, 13 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_Srt_Av, 13 + 8, cKey);
-                                }
-                                break;
-
-                            default:
-
-                                if (bOwnerSend == true)
-                                    iRet = m_pClientList[i]->iSendMsg(cData_All, 43 + 8, cKey);
-                                else
-                                {
-                                    if (i != sOwnerH)
-                                        iRet = m_pClientList[i]->iSendMsg(cData_All, 43 + 8, cKey);
-                                }
-                                break;
-                        }
+                            }
+                            break;
                     }
                 }
         }
@@ -1199,17 +1123,11 @@ void CGame::SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, uint32_t
 
         //Change HP Bar
 
-        for (i = 1; i < DEF_MAXCLIENTS/*DEF_MAXNPCS*/; i++)
+        for (i = 1; i < DEF_MAXCLIENTS; i++)
         {
             if ((m_pClientList[i] != 0))
-                if ((m_pClientList[i]->m_cMapIndex == m_pNpcList[sOwnerH]->m_cMapIndex) &&
-                    (m_pClientList[i]->m_sX >= m_pNpcList[sOwnerH]->m_sX - 10 - sRange) &&
-                    (m_pClientList[i]->m_sX <= m_pNpcList[sOwnerH]->m_sX + 10 + sRange) &&
-                    (m_pClientList[i]->m_sY >= m_pNpcList[sOwnerH]->m_sY - 8 - sRange) &&
-                    (m_pClientList[i]->m_sY <= m_pNpcList[sOwnerH]->m_sY + 8 + sRange))
+                if (m_pClientList[i]->m_cMapIndex == m_pNpcList[sOwnerH]->m_cMapIndex)
                 {
-
-
                     iTemp = *ipStatus;
                     iTemp = 0x0FFFFFF & iTemp;
 
@@ -1217,75 +1135,34 @@ void CGame::SendEventToNearClient_TypeA(short sOwnerH, char cOwnerType, uint32_t
                     iTemp = (iTemp | (iTemp2 << 28));
                     *ipStatus = iTemp;
 
-
-                    if ((m_pClientList[i]->m_sX >= m_pNpcList[sOwnerH]->m_sX - 9) &&
-                        (m_pClientList[i]->m_sX <= m_pNpcList[sOwnerH]->m_sX + 9) &&
-                        (m_pClientList[i]->m_sY >= m_pNpcList[sOwnerH]->m_sY - 7) &&
-                        (m_pClientList[i]->m_sY <= m_pNpcList[sOwnerH]->m_sY + 7))
+                    switch (wMsgType)
                     {
+                        case DEF_MSGTYPE_CONFIRM:
+                        case DEF_MSGTYPE_REJECT:
+                        case DEF_OBJECTNULLACTION:
 
-                        switch (wMsgType)
-                        {
-                            case DEF_MSGTYPE_CONFIRM:
-                            case DEF_MSGTYPE_REJECT:
-                            case DEF_OBJECTNULLACTION:
+                            iRet = m_pClientList[i]->iSendMsg(cData_All, 27 + 8, cKey);
+                            break;
 
-                                iRet = m_pClientList[i]->iSendMsg(cData_All, 27 + 8, cKey);
-                                break;
+                        case DEF_OBJECTDYING:
+                            iRet = m_pClientList[i]->iSendMsg(cData_Srt, 15 + 8, cKey);
+                            break;
 
-                            case DEF_OBJECTDYING:
-                                iRet = m_pClientList[i]->iSendMsg(cData_Srt, 15 + 8, cKey);
-                                break;
+                        case DEF_OBJECTDAMAGE:
+                        case DEF_OBJECTDAMAGEMOVE:
+                            iRet = m_pClientList[i]->iSendMsg(cData_Srt, 11 + 8, cKey);
+                            break;
 
-                            case DEF_OBJECTDAMAGE:
-                            case DEF_OBJECTDAMAGEMOVE:
-                                iRet = m_pClientList[i]->iSendMsg(cData_Srt, 11 + 8, cKey);
-                                break;
+                        case DEF_OBJECTATTACK:
+                        case DEF_OBJECTATTACKMOVE:
 
-                            case DEF_OBJECTATTACK:
-                            case DEF_OBJECTATTACKMOVE:
+                            iRet = m_pClientList[i]->iSendMsg(cData_Srt_Av, 13 + 8, cKey);
+                            break;
 
-                                iRet = m_pClientList[i]->iSendMsg(cData_Srt_Av, 13 + 8, cKey);
-                                break;
+                        default:
 
-                            default:
-
-                                iRet = m_pClientList[i]->iSendMsg(cData_Srt, 9 + 8, cKey);
-                                break;
-                        }
-                    }
-                    else
-                    {
-
-                        switch (wMsgType)
-                        {
-                            case DEF_MSGTYPE_CONFIRM:
-                            case DEF_MSGTYPE_REJECT:
-                            case DEF_OBJECTNULLACTION:
-
-                                iRet = m_pClientList[i]->iSendMsg(cData_All, 27 + 8, cKey);
-                                break;
-
-                            case DEF_OBJECTDYING:
-                                iRet = m_pClientList[i]->iSendMsg(cData_Srt, 15 + 8, cKey);
-                                break;
-
-                            case DEF_OBJECTDAMAGE:
-                            case DEF_OBJECTDAMAGEMOVE:
-                                iRet = m_pClientList[i]->iSendMsg(cData_Srt, 11 + 8, cKey);
-                                break;
-
-                            case DEF_OBJECTATTACK:
-                            case DEF_OBJECTATTACKMOVE:
-
-                                iRet = m_pClientList[i]->iSendMsg(cData_Srt_Av, 13 + 8, cKey);
-                                break;
-
-                            default:
-
-                                iRet = m_pClientList[i]->iSendMsg(cData_All, 27 + 8, cKey);
-                                break;
-                        }
+                            iRet = m_pClientList[i]->iSendMsg(cData_Srt, 9 + 8, cKey);
+                            break;
                     }
                 }
         }
@@ -6315,15 +6192,8 @@ void CGame::SendEventToNearClient_TypeB(uint32_t dwMsgID, uint16_t wMsgType, cha
 
         if ((bFlag == true) && (m_pClientList[i] != 0))
         {
-            if ((m_pClientList[i]->m_cMapIndex == cMapIndex) &&
-                (m_pClientList[i]->m_sX >= sX - 10) &&
-                (m_pClientList[i]->m_sX <= sX + 10) &&
-                (m_pClientList[i]->m_sY >= sY - 8) &&
-                (m_pClientList[i]->m_sY <= sY + 8))
-            {
-
+            if (m_pClientList[i]->m_cMapIndex == cMapIndex)
                 iRet = m_pClientList[i]->iSendMsg(cData, 18, cKey);
-            }
         }
     }
 }
@@ -10584,7 +10454,7 @@ void CGame::MobGenerator()
 
                             case 58:   strcpy(cNpcName, "Mountain-Giant");	iProbSA = 25; iKindSA = 1; break;
                             case 59:   strcpy(cNpcName, "Ettin");			iProbSA = 20; iKindSA = 8; break;
-                            case 60:   strcpy(cNpcName, "Cannibal_Plant");	iProbSA = 20; iKindSA = 5; break;
+                            case 60:   strcpy(cNpcName, "Cannibal-Plant");	iProbSA = 20; iKindSA = 5; break;
                                 //v2.19 2002-12-9 ·çµ¹ÇÁ Ãß°¡ °ü·Ã
                             case 61:   strcpy(cNpcName, "Rudolph");			iProbSA = 20; iKindSA = 1; break;
                                 //v2.20 2002-12-9 ¸ó½ºÅÍ Ãß°¡ °ü·Ã (npc.cfg¶û ¹Ø¿¡ ¼ýÀÚ´Â °°Áö°¡ ¾ÊÀ½.. -_-;;)
@@ -15230,14 +15100,14 @@ bool CGame::_bDepleteDestTypeItemUseEffect(int iClientH, int dX, int dY, short s
 
 
 
-            if ((BOOL)m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2 == true)
+            if ((bool)m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2 == true)
                 m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemSpecEffectValue1 = 100;
 
             bRet = __bSetOccupyFlag(m_pClientList[iClientH]->m_cMapIndex, dX, dY,                                 // 
                 m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue1,        //
                 m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemSpecEffectValue1,    //!!! SpecValue!!!
                 iClientH,
-                (BOOL)m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2); //
+                (bool)m_pClientList[iClientH]->m_pItemList[sItemIndex]->m_sItemEffectValue2); //
             if (bRet == true)
             {
 
@@ -17611,7 +17481,7 @@ int CGame::iGetMaxHP(int iClientH)
 void CGame::GetMapInitialPoint(int iMapIndex, short * pX, short * pY, char * pPlayerLocation)
 {
     int i, iTotalPoint;
-    POINT  pList[DEF_MAXINITIALPOINT];
+    hbxpoint pList[DEF_MAXINITIALPOINT];
 
     if (m_pMapList[iMapIndex] == 0) return;
 
@@ -19010,7 +18880,7 @@ bool CGame::bGetItemNameWhenDeleteNpc(int & iItemID, short sNpcType, int iItempr
     int	iNumNpcitem;
     int	iIndex;
     int	iDiceValue;
-    BOOL	bFirstDice = false, bSecondDice = false;
+    bool bFirstDice = false, bSecondDice = false;
 
     for (iNpcIndex = 0; iNpcIndex < DEF_MAXNPCTYPES; iNpcIndex++)
     {
@@ -20763,7 +20633,7 @@ void CGame::RemoveOccupyFlags(int iMapIndex)
     CTile * pTile;
     int iy, ix;
 
-    if (m_pMapList[iMapIndex] == NULL) return;
+    if (m_pMapList[iMapIndex] == 0) return;
     for (i = 1; i < DEF_MAXOCCUPYFLAG; i++)
         if (m_pMapList[iMapIndex]->m_pOccupyFlag[i] != FALSE) return;
     if (m_pMapList[iMapIndex]->m_pOccupyFlag[i] != FALSE)
@@ -20789,7 +20659,7 @@ void CGame::RemoveOccupyFlags(int iMapIndex)
                 for (iy = dY - 2; iy <= dY + 2; iy++)
                 {
                     pTile = (CTile *)(m_pMapList[iMapIndex]->m_pTile + ix + iy * m_pMapList[iMapIndex]->m_sSizeY);
-                    pTile->m_sOwner = NULL;
+                    pTile->m_sOwner = 0;
                 }
         }
     }
@@ -20799,7 +20669,7 @@ int CGame::iGetPlayerABSStatus(int iClientH)
 {
     int iRet;
 
-    if (m_pClientList[iClientH] == NULL) return 0;
+    if (m_pClientList[iClientH] == 0) return 0;
 
     iRet = 0;
 
@@ -20829,23 +20699,23 @@ void CGame::ForceRecallProcess()
     int i;
     int iMapSide = 0;
 
-    DWORD * dwp{}, dwTime;
+    uint32_t * dwp{}, dwTime;
 
     dwTime = timeGetTime();
 
     for (i = 1; i < DEF_MAXCLIENTS; i++)
     {
-        if (m_pClientList[i] != NULL)
+        if (m_pClientList[i] != 0)
         {
-            if (m_pClientList[i]->m_bIsInitComplete == TRUE)
+            if (m_pClientList[i]->m_bIsInitComplete == true)
             {
                 //force recall in enemy buidlings at crusade
                 iMapSide = iGetMapLocationSide(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cName);
-                if ((memcmp(m_pClientList[i]->m_cLocation, "are", 3) == 0) && (iMapSide == 2) && (m_pClientList[i]->m_iAdminUserLevel == 0) && (m_bIsCrusadeMode == TRUE))
+                if ((memcmp(m_pClientList[i]->m_cLocation, "are", 3) == 0) && (iMapSide == 2) && (m_pClientList[i]->m_iAdminUserLevel == 0) && (m_bIsCrusadeMode == true))
                 {
                     RequestTeleportHandler(i, "2   ", "aresden", -1, -1);
                 }
-                if ((memcmp(m_pClientList[i]->m_cLocation, "elv", 3) == 0) && (iMapSide == 1) && (m_pClientList[i]->m_iAdminUserLevel == 0) && (m_bIsCrusadeMode == TRUE))
+                if ((memcmp(m_pClientList[i]->m_cLocation, "elv", 3) == 0) && (iMapSide == 1) && (m_pClientList[i]->m_iAdminUserLevel == 0) && (m_bIsCrusadeMode == true))
                 {
                     RequestTeleportHandler(i, "2   ", "elvine", -1, -1);
                 }
@@ -20865,12 +20735,12 @@ void CGame::ForceRecallProcess()
                     || (memcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cName, "wzdtwr", 6) == 0)
                     || (memcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cName, "gldhall", 7) == 0))
                 {
-                    //SetIllusionFlag(i, DEF_OWNERTYPE_PLAYER, FALSE);
+                    //SetIllusionFlag(i, DEF_OWNERTYPE_PLAYER, false);
                     if (m_pClientList[i]->m_iStatus & 0x00200000)
                     {
-                        SetIllusionMovementFlag(i, DEF_OWNERTYPE_PLAYER, FALSE);
+                        SetIllusionMovementFlag(i, DEF_OWNERTYPE_PLAYER, false);
                         bRemoveFromDelayEventList(i, DEF_OWNERTYPE_PLAYER, DEF_MAGICTYPE_CONFUSE);
-                        bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_CONFUSE, dwTime + 2, i, DEF_OWNERTYPE_PLAYER, NULL, NULL, NULL, 4, NULL, NULL);
+                        bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_CONFUSE, dwTime + 2, i, DEF_OWNERTYPE_PLAYER, 0, 0, 0, 4, 0, 0);
                     }
                 }
             }
@@ -20915,13 +20785,13 @@ void CGame::SetTimeOut(int iClientH)
     time_t seconds;
     SYSTEMTIME SysTime;
 
-    seconds = time(NULL);
+    seconds = time(0);
     GetLocalTime(&SysTime);
 
-    if (m_pClientList[iClientH] == NULL) return;
+    if (m_pClientList[iClientH] == 0) return;
 
     m_pClientList[iClientH]->m_iForceStart = seconds;
-    m_pClientList[iClientH]->isForceSet = TRUE;
+    m_pClientList[iClientH]->isForceSet = true;
 
     switch (SysTime.wDayOfWeek)
     {
@@ -20945,10 +20815,10 @@ void CGame::CheckTimeOut(int iClientH)
     time_t seconds;
     SYSTEMTIME SysTime;
 
-    seconds = time(NULL);
+    seconds = time(0);
     GetLocalTime(&SysTime);
 
-    if (m_pClientList[iClientH] == NULL) return;
+    if (m_pClientList[iClientH] == 0) return;
 
     switch (SysTime.wDayOfWeek)
     {
@@ -21065,21 +20935,21 @@ void CGame::SkillCheck(int sTargetH)
     }
 }
 
-BOOL CGame::IsEnemyZone(int i)
+bool CGame::IsEnemyZone(int i)
 {
     if (memcmp(m_pClientList[i]->m_cLocation, "elv", 3) == 0)
     {
         if ((strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "aresden") == 0) || (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "aresdend1") == 0) || (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "areuni") == 0) || (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "huntzone2") == 0) || (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "huntzone4") == 0))
         {
-            return TRUE;
+            return true;
         }
     }
     else if (memcmp(m_pClientList[i]->m_cLocation, "are", 3) == 0)
     {
         if ((strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "elvine") == 0) || (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "elvined1") == 0) || (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "elvuni") == 0) || (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "huntzone1") == 0) || (strcmp(m_pMapList[m_pClientList[i]->m_cMapIndex]->m_cLocationName, "huntzone3") == 0))
         {
-            return TRUE;
+            return true;
         }
     }
-    return FALSE;
+    return false;
 }

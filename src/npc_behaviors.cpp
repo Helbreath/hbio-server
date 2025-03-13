@@ -4,8 +4,8 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
+#include "game.h"
+#include "map.h"
 
 extern char G_cTxt[512];
 
@@ -53,7 +53,7 @@ bool CGame::_bNpcBehavior_ManaCollector(int iNpcH)
                                 if (m_pClientList[sOwnerH]->m_iMP > iMaxMP)
                                     m_pClientList[sOwnerH]->m_iMP = iMaxMP;
 
-                                SendNotifyMsg(NULL, sOwnerH, DEF_NOTIFY_MP, 0, 0, 0, 0);
+                                SendNotifyMsg(0, sOwnerH, DEF_NOTIFY_MP, 0, 0, 0, 0);
                             }
                         }
                         break;
@@ -613,7 +613,7 @@ void CGame::NpcBehavior_Attack(int iNpcH)
                                         bRegisterDelayEvent(DEF_DELAYEVENTTYPE_MAGICRELEASE, DEF_MAGICTYPE_ICE, dwTime + (5 * 1000),
                                             m_pNpcList[iNpcH]->m_iTargetIndex, DEF_OWNERTYPE_PLAYER, 0, 0, 0, 1, 0, 0);
 
-                                        SendNotifyMsg(NULL, m_pNpcList[iNpcH]->m_iTargetIndex, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
+                                        SendNotifyMsg(0, m_pNpcList[iNpcH]->m_iTargetIndex, DEF_NOTIFY_MAGICEFFECTON, DEF_MAGICTYPE_ICE, 1, 0, 0);
                                     }
                                 }
                                 break;

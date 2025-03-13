@@ -6,13 +6,13 @@
 
 #pragma once
 
-#include "OccupyFlag.h"
-#include "Tile.h"
-#include "StrategicPoint.h"
-#include "Game.h"
-#include "StrTok.h"
-#include "TeleportLoc.h"
-#include "GlobalDef.h"
+#include "occupy_flag.h"
+#include "tile.h"
+#include "strategic_point.h"
+#include "game.h"
+#include "str_tok.h"
+#include "teleport_loc.h"
+#include "global_def.h"
 #include "defines.h"
 
 class CMap
@@ -104,16 +104,16 @@ public:
     hbxpoint m_FishPointList[DEF_MAXFISHPOINT];
     int m_iTotalFishPoint, m_iMaxFish, m_iCurFish;
 
-    int	  m_iApocalypseMobGenType, m_iApocalypseBossMobNpcID;
+    int m_iApocalypseMobGenType, m_iApocalypseBossMobNpcID;
     short m_sApocalypseBossMobRectX1, m_sApocalypseBossMobRectY1, m_sApocalypseBossMobRectX2, m_sApocalypseBossMobRectY2;
-    char  m_cDynamicGateType;
+    char m_cDynamicGateType;
     short m_sDynamicGateCoordRectX1, m_sDynamicGateCoordRectY1, m_sDynamicGateCoordRectX2, m_sDynamicGateCoordRectY2;
-    char  m_cDynamicGateCoordDestMap[11];
+    char m_cDynamicGateCoordDestMap[11];
     short m_sDynamicGateCoordTgtX, m_sDynamicGateCoordTgtY;
-    BOOL  m_bIsCitizenLimit;
+    bool m_bIsCitizenLimit;
     short m_sHeldenianTowerType, m_sHeldenianTowerXPos, m_sHeldenianTowerYPos;
-    char  m_cHeldenianTowerSide;
-    char  m_cHeldenianModeMap;
+    char m_cHeldenianTowerSide;
+    char m_cHeldenianModeMap;
 
     bool m_bMineralGenerator;
     char m_cMineralGeneratorLevel;

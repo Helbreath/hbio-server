@@ -4,9 +4,11 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
+#include "game.h"
+#include "map.h"
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 extern char G_cTxt[512];
 
@@ -620,17 +622,17 @@ void CGame::RequestInitDataHandler(int iClientH, char * pData, char cKey, bool b
 
     if (m_pClientList[iClientH]->m_iTimeLeft_ForceRecall > 0)
     {
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_FORCERECALLTIME, m_pClientList[iClientH]->m_iTimeLeft_ForceRecall, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_FORCERECALLTIME, m_pClientList[iClientH]->m_iTimeLeft_ForceRecall, 0, 0, 0);
         wsprintf(G_cTxt, "(!) Game Server Force Recall Time  %d (%d)min", m_pClientList[iClientH]->m_iTimeLeft_ForceRecall, m_pClientList[iClientH]->m_iTimeLeft_ForceRecall / 20);
         log->info(G_cTxt);
     }
 
 
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SAFEATTACKMODE, 0, 0, 0, 0);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_SAFEATTACKMODE, 0, 0, 0, 0);
     // v1.3
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_DOWNSKILLINDEXSET, m_pClientList[iClientH]->m_iDownSkillIndex, 0, 0, 0);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_DOWNSKILLINDEXSET, m_pClientList[iClientH]->m_iDownSkillIndex, 0, 0, 0);
     // V1.3
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ITEMPOSLIST, 0, 0, 0, 0);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_ITEMPOSLIST, 0, 0, 0, 0);
     // v1.4 
     _SendQuestContents(iClientH);
     _CheckQuestEnvironment(iClientH);
@@ -638,7 +640,7 @@ void CGame::RequestInitDataHandler(int iClientH, char * pData, char cKey, bool b
     // v1.432
     if (m_pClientList[iClientH]->m_iSpecialAbilityTime == 0)
     {
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SPECIALABILITYENABLED, 0, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_SPECIALABILITYENABLED, 0, 0, 0, 0);
     }
 
 
@@ -661,9 +663,9 @@ void CGame::RequestInitDataHandler(int iClientH, char * pData, char cKey, bool b
             m_pClientList[iClientH]->m_iWarContribution = 0;
             m_pClientList[iClientH]->m_dwCrusadeGUID = m_dwCrusadeGUID;
 
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, 0, 0, -1);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, 0, 0, -1);
         }
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, m_pClientList[iClientH]->m_iCrusadeDuty, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, m_pClientList[iClientH]->m_iCrusadeDuty, 0, 0);
     }
     else
     {
@@ -676,7 +678,7 @@ void CGame::RequestInitDataHandler(int iClientH, char * pData, char cKey, bool b
         else if ((m_pClientList[iClientH]->m_dwCrusadeGUID != 0) && (m_pClientList[iClientH]->m_dwCrusadeGUID != m_dwCrusadeGUID))
         {
 
-            SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, 0, 0, -1);
+            SendNotifyMsg(0, iClientH, DEF_NOTIFY_CRUSADE, (DWORD)m_bIsCrusadeMode, 0, 0, 0, -1);
             m_pClientList[iClientH]->m_iWarContribution = 0;
             m_pClientList[iClientH]->m_dwCrusadeGUID = 0;
         }
@@ -691,10 +693,10 @@ void CGame::RequestInitDataHandler(int iClientH, char * pData, char cKey, bool b
     }
 
     // Crusade
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[iClientH]->m_iConstructionPoint, m_pClientList[iClientH]->m_iWarContribution, 1, 0);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[iClientH]->m_iConstructionPoint, m_pClientList[iClientH]->m_iWarContribution, 1, 0);
 
     // v2.15
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_GIZONITEMUPGRADELEFT, m_pClientList[iClientH]->m_iGizonItemUpgradeLeft, 0, 0, 0);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_GIZONITEMUPGRADELEFT, m_pClientList[iClientH]->m_iGizonItemUpgradeLeft, 0, 0, 0);
 }
 
 void CGame::ClientMotionHandler(int iClientH, char * pData)
@@ -911,7 +913,7 @@ void CGame::ChatMsgHandler(int iClientH, char * pData, uint32_t dwMsgSize)
                 //v1.42 
                 //if (m_pClientList[iClientH]->m_iTimeLeft_FirmStaminar == 0) {
                 //	m_pClientList[iClientH]->m_iSP -= 3;
-                //	SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
+                //	SendNotifyMsg(0, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
                 //}
                 cSendMode = 1;
             }
@@ -930,7 +932,7 @@ void CGame::ChatMsgHandler(int iClientH, char * pData, uint32_t dwMsgSize)
             {
                 //if (m_pClientList[iClientH]->m_iTimeLeft_FirmStaminar == 0) {
                 //	m_pClientList[iClientH]->m_iSP -= 3;
-                //	SendNotifyMsg(NULL,iClientH,DEF_NOTIFY_SP,NULL,NULL,NULL,NULL);
+                //	SendNotifyMsg(0,iClientH,DEF_NOTIFY_SP,0,0,0,0);
                 //}
                 cSendMode = 4;
             }
@@ -961,7 +963,7 @@ void CGame::ChatMsgHandler(int iClientH, char * pData, uint32_t dwMsgSize)
             {
                 //if (m_pClientList[iClientH]->m_iTimeLeft_FirmStaminar == 0) {
                 //	m_pClientList[iClientH]->m_iSP -= 3;
-                //	SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
+                //	SendNotifyMsg(0, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
                 //}
                 cSendMode = 1;
             }
@@ -1008,7 +1010,7 @@ void CGame::ChatMsgHandler(int iClientH, char * pData, uint32_t dwMsgSize)
                 //v1.42 
                 //if (m_pClientList[iClientH]->m_iTimeLeft_FirmStaminar == 0) {
                 //	m_pClientList[iClientH]->m_iSP -= 5;
-                //	SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
+                //	SendNotifyMsg(0, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
                 //}
                 cSendMode = 2;	// Â¸ÃžÂ½ÃƒÃÃ¶ ÃƒÂ¢Â¿Â¡ Â¶Ã§Â¿Ã®Â´Ã™.
             }
@@ -1035,7 +1037,7 @@ void CGame::ChatMsgHandler(int iClientH, char * pData, uint32_t dwMsgSize)
                 //v1.42 
                 //if (m_pClientList[iClientH]->m_iTimeLeft_FirmStaminar == 0) {
                 //	m_pClientList[iClientH]->m_iSP -= 3;
-                //	SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
+                //	SendNotifyMsg(0, iClientH, DEF_NOTIFY_SP, 0, 0, 0, 0);
                 //}
                 cSendMode = 3;
             }
@@ -1159,7 +1161,7 @@ void CGame::ChatMsgHandler(int iClientH, char * pData, uint32_t dwMsgSize)
 
             if (msg == "/who")
             {
-                SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_TOTALUSERS, 0, 0, 0, 0);
+                SendNotifyMsg(0, iClientH, DEF_NOTIFY_TOTALUSERS, 0, 0, 0, 0);
                 return;
             }
 
@@ -2428,7 +2430,7 @@ void CGame::RequestTeleportHandler(int iClientH, char * pData, char * cMapName, 
 
     SetPoisonFlag(iClientH, DEF_OWNERTYPE_PLAYER, false);
 
-    SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_POISON, 0, 0, 0);
+    SendNotifyMsg(0, iClientH, DEF_NOTIFY_MAGICEFFECTOFF, DEF_MAGICTYPE_POISON, 0, 0, 0);
 
     iSetSide(iClientH);
 
@@ -2445,7 +2447,7 @@ void CGame::RequestTeleportHandler(int iClientH, char * pData, char * cMapName, 
 
 
     // Crusade
-    if (bIsLockedMapNotify == true) SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_LOCKEDMAP, m_pClientList[iClientH]->m_iLockedMapTime, 0, 0, m_pClientList[iClientH]->m_cLockedMapName);
+    if (bIsLockedMapNotify == true) SendNotifyMsg(0, iClientH, DEF_NOTIFY_LOCKEDMAP, m_pClientList[iClientH]->m_iLockedMapTime, 0, 0, m_pClientList[iClientH]->m_cLockedMapName);
 
     pBuffer = new char[DEF_MSGBUFFERSIZE + 1];
     memset(pBuffer, 0, DEF_MSGBUFFERSIZE + 1);
@@ -2696,7 +2698,7 @@ void CGame::RequestTeleportHandler(int iClientH, char * pData, char * cMapName, 
 
     if (m_pClientList[iClientH]->m_iTimeLeft_ForceRecall > 0)
     {
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_FORCERECALLTIME, m_pClientList[iClientH]->m_iTimeLeft_ForceRecall, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_FORCERECALLTIME, m_pClientList[iClientH]->m_iTimeLeft_ForceRecall, 0, 0, 0);
         wsprintf(G_cTxt, "(!) Game Server Force Recall Time  %d (%d)min", m_pClientList[iClientH]->m_iTimeLeft_ForceRecall, m_pClientList[iClientH]->m_iTimeLeft_ForceRecall / 20);
         log->info(G_cTxt);
     }

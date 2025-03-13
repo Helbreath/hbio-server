@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Tile.h"
+#include "tile.h"
 
 CTile::CTile()
 {

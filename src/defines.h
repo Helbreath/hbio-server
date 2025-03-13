@@ -1058,7 +1058,7 @@ enum class mail_type
     system
 };
 
-#include "netmessages.h"
+#include "net_messages.h"
 
 //#define TOTALCHARACTERS		120
 // todo - make sure this is what it should be

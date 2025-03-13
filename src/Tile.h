@@ -7,7 +7,7 @@
 #pragma once
 
 #include <cstdint>
-#include "Item.h"
+#include "item.h"
 
 #define DEF_TILE_PER_ITEMS	12
 

@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "OccupyFlag.h"
+#include "occupy_flag.h"
 
 COccupyFlag::COccupyFlag(int dX, int dY, char cSide, int iEKNum, int iDOI)
 {

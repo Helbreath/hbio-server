@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Item.h"
+#include "item.h"
 
 CItem::CItem()
 {

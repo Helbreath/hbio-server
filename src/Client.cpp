@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Client.h"
+#include "client.h"
 #include "streams.h"
 #include "time_utils.h"
 #include <ixwebsocket/IXWebSocket.h>

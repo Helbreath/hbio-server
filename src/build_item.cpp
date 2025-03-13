@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "BuildItem.h"
+#include "build_item.h"
 #include <cstring>
 
 CBuildItem::CBuildItem()

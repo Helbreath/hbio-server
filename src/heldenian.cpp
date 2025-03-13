@@ -4,8 +4,8 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
-#include "Map.h"
+#include "game.h"
+#include "map.h"
 
 extern char G_cTxt[512];
 
@@ -24,7 +24,7 @@ void CGame::LocalEndHeldenianMode()
     m_bIsHeldenianMode = false;
     m_bHeldenianInitiated = true;
 
-    m_dwHeldenianFinishTime = time(NULL);
+    m_dwHeldenianFinishTime = time(0);
     if (var_88C == 1)
     {
         if (m_cHeldenianModeType == 1)
@@ -71,7 +71,7 @@ void CGame::LocalEndHeldenianMode()
         for (x = 0; x < DEF_MAXCLIENTS; x++)
             if ((m_pClientList[x] != 0) && (m_pClientList[x]->m_bIsInitComplete == true))
             {
-                SendNotifyMsg(NULL, x, DEF_NOTIFY_HELDENIANEND, 0, 0, 0, 0);
+                SendNotifyMsg(0, x, DEF_NOTIFY_HELDENIANEND, 0, 0, 0, 0);
                 if (m_pMapList[m_pClientList[x]->m_cMapIndex]->m_bIsHeldenianMap == true)
                 {
                     for (n = 0; n < DEF_MAXNPCS; n++)
@@ -419,11 +419,11 @@ void CGame::LocalStartHeldenianMode(short sV1, short sV2, uint32_t dwHeldenianGU
         {
             if (m_pClientList[i]->m_bIsInitComplete != true) break;
             m_pClientList[i]->m_cVar = 2;
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_HELDENIANTELEPORT, 0, 0, 0, 0);
+            SendNotifyMsg(0, i, DEF_NOTIFY_HELDENIANTELEPORT, 0, 0, 0, 0);
             m_pClientList[i]->m_iWarContribution = 0;
             m_pClientList[i]->m_iConstructionPoint = (m_pClientList[i]->m_iCharisma * 300);
             if (m_pClientList[i]->m_iConstructionPoint > 12000) m_pClientList[i]->m_iConstructionPoint = 12000;
-            SendNotifyMsg(NULL, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, 1, 0);
+            SendNotifyMsg(0, i, DEF_NOTIFY_CONSTRUCTIONPOINT, m_pClientList[i]->m_iConstructionPoint, m_pClientList[i]->m_iWarContribution, 1, 0);
         }
     }
 
@@ -438,7 +438,7 @@ void CGame::LocalStartHeldenianMode(short sV1, short sV2, uint32_t dwHeldenianGU
                 if (m_pClientList[i]->m_bIsInitComplete != true) break;
                 if (m_pClientList[i]->m_iAdminUserLevel >= 1) break;
                 if (m_pClientList[i]->m_cMapIndex != x) break;
-                SendNotifyMsg(NULL, i, DEF_NOTIFY_0BE8, 0, 0, 0, 0);
+                SendNotifyMsg(0, i, DEF_NOTIFY_0BE8, 0, 0, 0, 0);
                 RequestTeleportHandler(i, "1   ", 0, -1, -1);
             }
             for (i = 0; i < DEF_MAXNPCS; i++)
@@ -548,7 +548,7 @@ void CGame::LocalStartHeldenianMode(short sV1, short sV2, uint32_t dwHeldenianGU
     m_bIsHeldenianMode = true;
     wsprintf(G_cTxt, "(!) HELDENIAN Start.");
     log->info(G_cTxt);
-    m_dwHeldenianStartTime = time(NULL);
+    m_dwHeldenianStartTime = time(0);
 }
 
 void CGame::ManualStartHeldenianMode(int iClientH, char * pData, uint32_t dwMsgSize)
@@ -559,7 +559,7 @@ void CGame::ManualStartHeldenianMode(int iClientH, char * pData, uint32_t dwMsgS
     int iV1;
 
     if (m_pClientList[iClientH]->m_iAdminUserLevel < 3)
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ADMINUSERLEVELLOW, 0, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_ADMINUSERLEVELLOW, 0, 0, 0, 0);
 
     if (m_bIsHeldenianMode == true) return;
     if (m_bIsApocalypseMode == true) return;
@@ -601,7 +601,7 @@ void CGame::ManualEndHeldenianMode(int iClientH, char * pData, uint32_t dwMsgSiz
 {
     if (m_pClientList[iClientH]->m_iAdminUserLevel < 3)
     {
-        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_ADMINUSERLEVELLOW, 0, 0, 0, 0);
+        SendNotifyMsg(0, iClientH, DEF_NOTIFY_ADMINUSERLEVELLOW, 0, 0, 0, 0);
     }
 
     if (m_bIsHeldenianMode == true)
@@ -618,7 +618,7 @@ void CGame::AutomatedHeldenianTimer()
     uint32_t dwTime;
     int x, i;
 
-    dwTime = time(NULL);
+    dwTime = time(0);
     if ((dwTime == m_dwHeldenianStartTime - 300) && (m_bHeldenianInitiated != true) && (m_bIsHeldenianMode != true))
     {
         wsprintf(G_cTxt, "Heldenian Fight Start");
@@ -634,7 +634,7 @@ void CGame::AutomatedHeldenianTimer()
                 if (m_pClientList[i]->m_bIsInitComplete != true) return;
                 if (m_pClientList[i]->m_cMapIndex == x)
                 {
-                    SendNotifyMsg(NULL, i, DEF_NOTIFY_HELDENIANSTART, 0, 0, 0, 0);
+                    SendNotifyMsg(0, i, DEF_NOTIFY_HELDENIANSTART, 0, 0, 0, 0);
                 }
             }
         }
@@ -654,7 +654,7 @@ void CGame::AutomatedHeldenianTimer()
                 if (m_pClientList[i]->m_bIsInitComplete != true) return;
                 if (m_pClientList[i]->m_cMapIndex == x)
                 {
-                    SendNotifyMsg(NULL, i, DEF_NOTIFY_0BE8, 0, 0, 0, 0);
+                    SendNotifyMsg(0, i, DEF_NOTIFY_0BE8, 0, 0, 0, 0);
                     RequestTeleportHandler(i, "1   ", 0, -1, -1);
                 }
             }
@@ -706,7 +706,7 @@ void CGame::NotifyStartHeldenianMode()
                 if (m_pClientList[x]->m_bIsInitComplete != true) return;
                 if (m_pClientList[x]->m_cMapIndex == i)
                 {
-                    SendNotifyMsg(NULL, x, DEF_NOTIFY_HELDENIANSTART, 0, 0, 0, 0);
+                    SendNotifyMsg(0, x, DEF_NOTIFY_HELDENIANSTART, 0, 0, 0, 0);
                 }
             }
         }
@@ -740,7 +740,7 @@ bool CGame::UpdateHeldenianStatus()
                 {
                     if ((m_pClientList[iClientH] != 0) && (m_pClientList[iClientH]->m_bIsInitComplete == true) && (strcmp(m_pMapList[m_pClientList[iClientH]->m_cMapIndex]->m_cName, "BtField") == 0))
                     {
-                        SendNotifyMsg(NULL, iClientH, DEF_NOTIFY_HELDENIANCOUNT, m_iHeldenianAresdenLeftTower, m_iHeldenianElvineLeftTower, m_iHeldenianAresdenDead, 0, m_iHeldenianElvineDead, 0);
+                        SendNotifyMsg(0, iClientH, DEF_NOTIFY_HELDENIANCOUNT, m_iHeldenianAresdenLeftTower, m_iHeldenianElvineLeftTower, m_iHeldenianAresdenDead, 0, m_iHeldenianElvineDead, 0);
                     }
                 }
             }

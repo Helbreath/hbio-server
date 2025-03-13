@@ -9,9 +9,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
-#include "Item.h"
-#include "GuildsMan.h"
-#include "Magic.h"
+#include "item.h"
+#include "guildsman.h"
+#include "magic.h"
 #include "defines.h"
 #include "time_utils.h"
 
@@ -357,7 +357,7 @@ public:
     char m_cAttackBonus_L;
 
     CItem * m_pItemList[DEF_MAXITEMS];
-    POINT m_ItemPosList[DEF_MAXITEMS];
+    hbxpoint m_ItemPosList[DEF_MAXITEMS];
     CItem * m_pItemInBankList[DEF_MAXBANKITEMS];
 
     bool  m_bIsItemEquipped[DEF_MAXITEMS];

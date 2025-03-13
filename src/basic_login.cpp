@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 
 #if !defined(HELBREATHX)
 uint64_t CGame::check_account_auth(std::shared_ptr<CClient> player, std::string & account, std::string & pass)

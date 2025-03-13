@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Potion.h"
+#include "potion.h"
 #include <cstring>
 
 CPotion::CPotion()

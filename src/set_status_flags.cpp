@@ -4,7 +4,7 @@
 // Distributed under the MIT License. (See accompanying file LICENSE)
 //
 
-#include "Game.h"
+#include "game.h"
 
 // todo: reduce down to a single function?
 void CGame::SetInvisibilityFlag(short sOwnerH, char cOwnerType, bool bStatus)
