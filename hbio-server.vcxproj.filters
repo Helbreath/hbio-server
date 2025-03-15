@@ -140,6 +140,18 @@
     <ClInclude Include="src\occupy_flag.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\timer_manager.h">
+      <Filter>src\utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="src\manager_client.h">
+      <Filter>src\utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="src\types.h">
+      <Filter>src\utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="src\websocket_sink.h">
+      <Filter>src\utilities</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\sockets.cpp">
@@ -279,6 +291,12 @@
     </ClCompile>
     <ClCompile Include="src\potion.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\timer_manager.cpp">
+      <Filter>src\utilities</Filter>
+    </ClCompile>
+    <ClCompile Include="src\manager.cpp">
+      <Filter>src\utilities</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

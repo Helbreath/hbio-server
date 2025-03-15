@@ -57,7 +57,7 @@ void CGame::handle_login_server_message(socket_message & sm)
 
         static auto check_login_status = [&]() -> bool
             {
-                if (get_login_server_state() != login_server_status::running && get_login_server_state() != login_server_status::running_queue)
+                if (get_login_server_state() != server_status_t::RUNNING && get_login_server_state() != server_status_t::RUNNING_QUEUE)
                 {
                     sw.write_uint32(MSGID_RESPONSE_LOG);
                     sw.write_uint16(DEF_LOGRESMSGTYPE_REJECT);
@@ -71,7 +71,7 @@ void CGame::handle_login_server_message(socket_message & sm)
 
         static auto check_game_status = [&]() -> bool
             {
-                if (get_game_server_state() != game_server_status::running)
+                if (get_game_server_state() != server_status_t::RUNNING)
                 {
                     sw.write_uint32(MSGID_RESPONSE_LOG);
                     sw.write_uint16(DEF_LOGRESMSGTYPE_REJECT);
@@ -186,7 +186,7 @@ void CGame::handle_login_server_message(socket_message & sm)
                 }
 
                 player->logged_in = true;
-                player->currentstatus = client_status::login_screen;
+                player->client_status = client_status_t::LOGIN_SCREEN;
 
                 sw.write_uint32(MSGID_RESPONSE_LOG);
                 sw.write_int16(DEF_MSGTYPE_CONFIRM);

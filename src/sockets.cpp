@@ -82,3 +82,66 @@ void CGame::on_message(std::shared_ptr<CClient> player, ix::WebSocket & websocke
 //             process_json_message(std::move(sm));
     }
 }
+
+void CGame::on_manager_message(std::shared_ptr<manager_client> manager, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message)
+{
+    auto f = [](ix::WebSocketMessageType t) -> std::string
+        {
+            switch (t)
+            {
+                case ix::WebSocketMessageType::Open:
+                    return "Open";
+                case ix::WebSocketMessageType::Close:
+                    return "Close";
+                case ix::WebSocketMessageType::Error:
+                    return "Error";
+                case ix::WebSocketMessageType::Message:
+                    return "Message";
+                default:
+                    return "Unknown";
+            }
+        };
+
+    if (message->type == ix::WebSocketMessageType::Open)
+    {
+        log->info("Manager Connection opened");
+
+        std::lock_guard<std::recursive_mutex> l(manager_websocket_list_mtx);
+        for (auto & ws : manager_server->getClients())
+            if (ws.get() == &websocket)
+            {
+                manager->connecttime = now();
+                websocket_manager_clients.insert(std::make_pair(ws, manager));
+                log->info("Manager added to internal list");
+                break;
+            }
+    }
+    else if (message->type == ix::WebSocketMessageType::Close)
+    {
+        log->info("Manager Connection closed - {}", message->closeInfo.reason);
+        std::lock_guard<std::recursive_mutex> l(manager_websocket_list_mtx);
+        for (auto & wspair : websocket_manager_clients)
+            if (wspair.first.get() == &websocket)
+            {
+                websocket_manager_clients.erase(wspair);
+                break;
+            }
+    }
+    else if (message->type == ix::WebSocketMessageType::Error)
+    {
+        log->error("Manager Error on websocket - {}", message->errorInfo.reason);
+        std::lock_guard<std::recursive_mutex> l(manager_websocket_list_mtx);
+        for (auto & wspair : websocket_manager_clients)
+            if (wspair.first.get() == &websocket)
+            {
+                websocket_manager_clients.erase(wspair);
+                break;
+            }
+    }
+    else if (message->type == ix::WebSocketMessageType::Message)
+    {
+        manager->lastpackettime = now();
+
+        process_manager_message(manager, websocket, message);
+    }
+}

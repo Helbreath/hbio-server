@@ -56,6 +56,9 @@
 #include "koreaitem.h"
 #include "teleport.h"
 
+#include "manager_client.h"
+#include "timer_manager.h"
+
 #define DEF_MAXBANNED 500
 #define DEF_MAXADMINS				50
 #define DEF_MAXCLIENTS			2000
@@ -220,32 +223,6 @@
 #define DEF_XSOCKEVENT_UNSENTDATASENDBLOCK		-135
 #define DEF_XSOCKEVENT_UNSENTDATASENDCOMPLETE	-136
 
-enum class server_status
-{
-    uninitialized = 0,
-    running,
-    shutdown,
-    offline
-};
-
-enum class game_server_status
-{
-    uninitialized = 0,
-    running,
-    running_full,
-    shutdown,
-    offline
-};
-
-enum class login_server_status
-{
-    uninitialized = 0,
-    running,
-    running_queue,
-    shutdown,
-    offline
-};
-
 class CMap;
 
 class CGame
@@ -255,8 +232,11 @@ public:
     std::shared_ptr<spdlog::logger> log;
 
     std::unique_ptr<ix::WebSocketServer> server;
+    std::unique_ptr<ix::WebSocketServer> manager_server{};
     std::set<std::pair<std::shared_ptr<ix::WebSocket>, std::shared_ptr<CClient>>> websocket_clients;
+    std::set<std::pair<std::shared_ptr<ix::WebSocket>, std::shared_ptr<manager_client>>> websocket_manager_clients;
     std::recursive_mutex websocket_list;
+    std::recursive_mutex manager_websocket_list_mtx{};
 
     spdlog::level::level_enum loglevel = spdlog::level::level_enum::info;
     std::string log_formatting;
@@ -293,18 +273,34 @@ public:
     void auto_save(std::vector<character_db> char_data);
     character_db build_character_data_for_save(std::shared_ptr<CClient> client);
 
-    server_status get_server_state() const noexcept { return server_status_; }
-    void set_server_state(server_status s) noexcept { server_status_ = s; }
+    server_status_t get_server_state() const noexcept { return server_status_; }
+    void set_server_state(server_status_t s) noexcept { server_status_ = s; }
 
-    game_server_status get_game_server_state() const noexcept { return game_status_; }
-    void set_game_server_state(game_server_status s) noexcept { game_status_ = s; }
+    server_status_t get_game_server_state() const noexcept { return game_status_; }
+    void set_game_server_state(server_status_t s) noexcept { game_status_ = s; }
 
-    login_server_status get_login_server_state() const noexcept { return login_status_; }
-    void set_login_server_state(login_server_status s) noexcept { login_status_ = s; }
+    server_status_t get_login_server_state() const noexcept { return login_status_; }
+    void set_login_server_state(server_status_t s) noexcept { login_status_ = s; }
 
-    server_status server_status_ = server_status::uninitialized;
-    game_server_status game_status_ = game_server_status::uninitialized;
-    login_server_status login_status_ = login_server_status::uninitialized;
+    server_status_t server_status_ = server_status_t::UNINITIALIZED;
+    server_status_t game_status_ = server_status_t::UNINITIALIZED;
+    server_status_t login_status_ = server_status_t::UNINITIALIZED;
+
+    std::unique_ptr<timer_manager> timers{};
+
+    std::condition_variable cv_exit{};
+    std::mutex cv_mtx{};
+
+    bool manager_enabled = false;
+    std::string manager_bindip{};
+    uint16_t manager_bindport{};
+    std::string manager_password{};
+
+    void start_websocket();
+    void start_manager_websocket();
+    void on_manager_message(std::shared_ptr<manager_client> manager, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message);
+    void process_manager_message(std::shared_ptr<manager_client> manager, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message);
+    void server_stop();
 
     void on_message(std::shared_ptr<CClient> player, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message);
     void process_binary_message(socket_message sm);

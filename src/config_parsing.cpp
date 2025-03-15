@@ -106,6 +106,9 @@ void CGame::load_config()
 
         std::string bindip_old = bindip;
         uint16_t bindport_old = bindport;
+        std::string manager_bindip_old = manager_bindip;
+        uint16_t manager_bindport_old = manager_bindport;
+        std::string manager_password_old = manager_password;
 
         {
             if (!cfg["world_name"].is_null())
@@ -178,6 +181,25 @@ void CGame::load_config()
             else
                 throw std::runtime_error("No port set");
 
+            if (!cfg["manager_enabled"].is_null())
+                manager_enabled = cfg["manager_enabled"].get<bool>();
+
+            if (manager_enabled)
+            {
+                if (!cfg["manager_bind_ip"].is_null())
+                    manager_bindip = cfg["manager_bind_ip"].get<std::string>();
+                else
+                    throw std::runtime_error("No manager_bind_ip set");
+                if (!cfg["manager_port"].is_null())
+                    manager_bindport = cfg["manager_port"].get<uint16_t>();
+                else
+                    throw std::runtime_error("No manager_port set");
+                if (!cfg["manager_password"].is_null())
+                    manager_password = cfg["manager_password"].get<std::string>();
+                else
+                    throw std::runtime_error("No manager_password set");
+            }
+
 #if defined(HELBREATHX)
             if (!cfg["login_auth_url"].is_null())
                 login_auth_url = cfg["login_auth_url"].get<std::string>();
@@ -208,6 +230,12 @@ void CGame::load_config()
             if (game_sqlport_old != game_sqlport) { log->info("SQL port changed from {} to {}", game_sqlport_old, game_sqlport); reconnect_sql = true; }
             if (bindip_old != bindip) log->info("Bind ip changed from {} to {}", bindip_old, bindip);
             if (bindport_old != bindport) log->info("Bind port changed from {} to {}", bindport_old, bindport);
+            if (manager_enabled)
+            {
+                if (manager_bindip_old != manager_bindip) log->info("Manager bind ip changed from {} to {}", manager_bindip_old, manager_bindip);
+                if (manager_bindport_old != manager_bindport) log->info("Manager bind port changed from {} to {}", manager_bindport_old, manager_bindport);
+                if (manager_password_old != manager_password) log->info("Manager password changed");
+            }
 
             if (reconnect_sql)
             {
@@ -236,6 +264,19 @@ void CGame::load_config()
 
                 log->info("Connected to SQL");
             }
+
+            if (manager_bindip_old != manager_bindip || manager_bindport_old != manager_bindport || !manager_enabled)
+            {
+                if (manager_server)
+                {
+                    manager_server->stop();
+                }
+                if (manager_enabled)
+                {
+                    start_manager_websocket();
+                }
+            }
+            else manager_server.reset();
         }
     }
     catch (std::exception & e)
@@ -245,7 +286,7 @@ void CGame::load_config()
 
         // allows reloading of configurations to not break state since there should already be a valid value from a prior
         // successful load
-        if (get_server_state() == server_status::uninitialized)
+        if (get_server_state() == server_status_t::UNINITIALIZED)
             state_valid = false;
     }
     config_loaded = true;

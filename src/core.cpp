@@ -8,6 +8,69 @@
 #include "map.h"
 #include "time_utils.h"
 
+using json = nlohmann::json;
+using namespace std::chrono;
+using namespace std::chrono_literals;
+
+void CGame::start_websocket()
+{
+    server = std::make_unique<ix::WebSocketServer>(bindport, bindip);
+
+    server->setConnectionStateFactory([&]()
+        {
+            log->info("Client connection state factory called");
+            return std::make_shared<CClient>();
+        });
+
+    server->setOnClientMessageCallback(
+        [&](std::shared_ptr<ix::ConnectionState> connection_state, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message)
+        {
+            log->info("Message received - {} bytes", message->str.length());
+            on_message((reinterpret_cast<CClient *>(connection_state.get()))->shared_from_this(), websocket, message);
+        }
+    );
+
+    auto res = server->listen();
+    if (!res.first)
+        throw std::runtime_error(res.second);
+
+    log->info(std::format("Listening on {}:{}", bindip, bindport));
+
+    server->start();
+}
+
+void CGame::start_manager_websocket()
+{
+    manager_server = std::make_unique<ix::WebSocketServer>(manager_bindport, manager_bindip);
+
+    manager_server->setConnectionStateFactory([&]()
+        {
+            log->info("Manager client connection state factory called");
+            return std::make_shared<manager_client>();
+        });
+
+    manager_server->setOnClientMessageCallback(
+        [&](std::shared_ptr<ix::ConnectionState> connection_state, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message)
+        {
+            on_manager_message((reinterpret_cast<manager_client *>(connection_state.get()))->shared_from_this(), websocket, message);
+        }
+    );
+
+    auto res = manager_server->listen();
+    if (!res.first)
+        throw std::runtime_error(res.second);
+
+    log->info(std::format("Manager Listening on {}:{}", manager_bindip, manager_bindport));
+
+    manager_server->start();
+}
+
+void CGame::server_stop()
+{
+    set_server_state(server_status_t::SHUTDOWN);
+    cv_exit.notify_one();
+}
+
 void CGame::run()
 {
     if (!state_valid)
@@ -21,12 +84,12 @@ void CGame::run()
         std::unique_lock<std::shared_mutex> l(game_sql_mtx, std::defer_lock);
         std::unique_lock<std::shared_mutex> l2(login_sql_mtx, std::defer_lock);
         std::lock(l, l2);
-        pq_login = std::make_unique<pqxx::connection>(fmt::format("postgresql://{}:{}@{}:{}/{}", login_sqluser, login_sqlpass, login_sqlhost, login_sqlport, login_sqldb));
-        pq_game = std::make_unique<pqxx::connection>(fmt::format("postgresql://{}:{}@{}:{}/{}", game_sqluser, game_sqlpass, game_sqlhost, game_sqlport, game_sqldb));
+        pq_login = std::make_unique<pqxx::connection>(std::format("postgresql://{}:{}@{}:{}/{}", login_sqluser, login_sqlpass, login_sqlhost, login_sqlport, login_sqldb));
+        pq_game = std::make_unique<pqxx::connection>(std::format("postgresql://{}:{}@{}:{}/{}", game_sqluser, game_sqlpass, game_sqlhost, game_sqlport, game_sqldb));
     }
     catch (pqxx::broken_connection & ex)
     {
-        throw std::runtime_error(fmt::format("Unable to connect to SQL - {}", ex.what()));
+        throw std::runtime_error(std::format("Unable to connect to SQL - {}", ex.what()));
     }
 
     try
@@ -41,26 +104,6 @@ void CGame::run()
 
     log->info("Connected to SQL");
 
-    set_server_state(server_status::running);
-
-    // todo - make a way to change these externally - maybe by admin client?
-    set_login_server_state(login_server_status::running);
-    set_game_server_state(game_server_status::running);
-
-    server = std::make_unique<ix::WebSocketServer>(bindport, bindip);
-
-    server->setConnectionStateFactory([&]()
-        {
-            return std::make_shared<CClient>();
-        });
-
-    server->setOnClientMessageCallback(
-        [&](std::shared_ptr<ix::ConnectionState> connection_state, ix::WebSocket & websocket, const ix::WebSocketMessagePtr & message)
-        {
-            on_message((reinterpret_cast<CClient *>(connection_state.get()))->shared_from_this(), websocket, message);
-        }
-    );
-
     if (bInit() == false)
     {
         log->critical("Server failed to start");
@@ -69,65 +112,46 @@ void CGame::run()
 
     load_configs();
 
-    server->start();
+    set_server_state(server_status_t::RUNNING);
+
+    // todo - make a way to change these externally - maybe by admin client?
+    set_login_server_state(server_status_t::RUNNING);
+    set_game_server_state(server_status_t::RUNNING);
+
+    start_websocket();
+    if (manager_enabled) start_manager_websocket();
 
     log->info("Server started");
 
     OnStartGameSignal();
 
-    auto res = server->listen();
-    if (!res.first)
-        throw std::runtime_error(res.second);
+    auto timer_mgr = timers.get();
 
-    log->info(fmt::format("Listening on {}:{}", bindip, bindport));
+    int32_t on_timer_error_count = 0;
 
-    time_point current_time = now();
-    time_point player_timeout_timer = now();
-    time_point player_count_report_timer = now();
-    time_point auto_save_timer = now();
-
-    std::unique_ptr<std::thread> on_timer_thread = std::make_unique<std::thread>([&]()
+    timer_mgr->add_recurring_timer(10ms, [&](time_point<system_clock> current_time)
         {
-            int32_t error_count = 0;
-            while (get_server_state() == server_status::running)
+            try
             {
-                try
-                {
-                    OnTimer();
-                    std::this_thread::sleep_for(10ms);
-                }
-                catch (std::exception & ex)
-                {
-                    log->error(ex.what());
-                    error_count++;
+                OnTimer();
+            }
+            catch (std::exception & ex)
+            {
+                log->error(ex.what());
 
-                    if (error_count > 100)
-                    {
-                        log->error("on_timer error count > 100 - exiting thread");
-                        return;
-                    }
+                if (++on_timer_error_count > 100)
+                {
+                    log->error("on_timer error count > 100 - exiting thread");
+                    return;
                 }
             }
         });
 
-    while (get_server_state() == server_status::running)
-    {
-        // todo - better handle timers
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(1ms);
-        current_time = now();
-
-//         if (duration_cast<seconds>(current_time - player_count_report_timer).count() > 5)
-//         {
-//             log->info(std::format("Online - players: {} - sockets: {}", client_list.size(), websocket_clients.size()));
-//             player_count_report_timer = steady_clock::now();
-//         }
-
-        // check the client list every 10ms for timed out users - if this becomes a performance issue (unlikely) then change to a regular for
-        // so that it can do a full set iteration at once rather than break out of it when a single change is made. unfortunately ranged-for has
-        // iteration limitations
-        if (std::chrono::duration_cast<milliseconds>(current_time - player_timeout_timer).count() > 1)
+    timer_mgr->add_recurring_timer(1ms, [&](time_point<system_clock> current_time)
         {
+            // check the client list every 10ms for timed out users - if this becomes a performance issue (unlikely) then change to a regular for
+            // so that it can do a full set iteration at once rather than break out of it when a single change is made. unfortunately ranged-for has
+            // iteration limitations
             std::unique_lock<std::recursive_mutex> l(websocket_list, std::defer_lock);
             std::unique_lock<std::recursive_mutex> l2(client_list_mtx, std::defer_lock);
             std::lock(l, l2);
@@ -194,28 +218,29 @@ void CGame::run()
                     break;
                 }
             }
-            player_timeout_timer = now();
+        });
 
-            // other timers
-            if (time_count(now() - auto_save_timer) > 20)
+    timer_mgr->add_recurring_timer(20s, [&](time_point<system_clock> current_time)
+        {
+            std::vector<character_db> char_data;
+            for (auto & player : client_list)
             {
-                std::vector<character_db> char_data;
-                for (auto & player : client_list)
+                if (player->m_bInitComplete)
                 {
-                    if (player->m_bInitComplete)
-                    {
-                        char_data.push_back(build_character_data_for_save(player));
-                        player->auto_save_time = now();
-                    }
+                    char_data.push_back(build_character_data_for_save(player));
+                    player->auto_save_time = now();
                 }
-
-                auto_save(char_data);
-
-                auto_save_timer = now();
             }
-        }
-    }
-    on_timer_thread->join();
+
+            auto_save(char_data);
+        });
+
+    std::unique_lock<std::mutex> lock(cv_mtx);
+    cv_exit.wait(lock, [&]
+        {
+            return server_status_ != server_status_t::RUNNING && game_status_ != server_status_t::RUNNING && login_status_ != server_status_t::RUNNING;
+        });
+
     Quit();
 }
 
@@ -495,7 +520,7 @@ bool CGame::is_account_in_use(int64_t account_id)
 {
     for (auto & client : client_list)
     {
-        if (client->account_id == account_id && client->currentstatus == client_status::in_game)
+        if (client->account_id == account_id && client->client_status == client_status_t::PLAYING)
             return true;
     }
     return false;
@@ -507,7 +532,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
 
     try
     {
-        if (server_status_ != server_status::running)
+        if (server_status_ != server_status_t::RUNNING)
         {
             sw.write_uint32(MSGID_RESPONSE_ENTERGAME);
             sw.write_uint16(DEF_LOGRESMSGTYPE_REJECT);
@@ -708,7 +733,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
                     client != clnt.get()
                     && clnt->account_id == client->account_id
                     && clnt->m_cMapIndex > 0
-                    && (clnt->currentstatus == client_status::dead || clnt->currentstatus == client_status::in_game)
+                    && (clnt->character_status == character_status_t::DEAD || clnt->client_status == client_status_t::PLAYING)
                     )
                 {
                     //BUG: potential bug point if charID == 0 - only occurs on unsuccessful login
@@ -761,7 +786,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
 
                 if (clientfound->m_cMapIndex != 0)
                 {
-                    clientfound->currentstatus = client_status::in_game;
+                    clientfound->client_status = client_status_t::PLAYING;
                     strcpy(clientfound->m_cCharName, character_name.c_str());
                     //pgs->clientlist.push_back(client);
                     //clientlist.remove(client);
@@ -798,7 +823,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
         {
             if (client->m_cMapIndex != 0)
             {
-                client->currentstatus = client_status::in_game;
+                client->client_status = client_status_t::PLAYING;
                 strcpy(client->m_cCharName, character_name.c_str());
 
                 client->m_bIsInitComplete = true;

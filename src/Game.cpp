@@ -14,6 +14,7 @@
 #include "defines.h"
 #include "tile.h"
 #include "map.h"
+#include "websocket_sink.h"
 
 extern char G_cTxt[512];
 extern char	G_cData50000[50000];
@@ -43,11 +44,20 @@ CGame::CGame()
     auto rotating = std::make_shared<spdlog::sinks::daily_file_sink_mt>("logs/helbreath.log", 0, 0, false, 30);
     sinks.push_back(rotating);
 
+    // make a sink that can write to the manager websocket
+    auto manager_sink = std::make_shared<websocket_sink_mt>(this);
+    sinks.push_back(manager_sink);
+
     log = std::make_shared<spdlog::async_logger>("helbreath", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
     spdlog::register_logger(log);
 
     log->set_pattern(log_formatting);
     log->set_level(loglevel);
+    log->info("Logging initialized");
+
+    timers = std::make_unique<timer_manager>();
+    timers->start();
+    log->info("Timer manager initialized");
 
     m_bIsGameStarted = false;
     m_bIsLogSockAvailable = false;
@@ -164,7 +174,9 @@ CGame::CGame()
 
 CGame::~CGame()
 {
-
+    if (server) server->stop();
+    if (manager_server) manager_server->stop();
+    if (timers) timers->stop();
 }
 
 bool CGame::bInit()
@@ -2265,7 +2277,7 @@ bool CGame::bCreateNewNpc(char * pNpcName, char * pName, char * pMapName, short 
 
 void CGame::NpcProcess()
 {
-    int i, iMaxHP;
+    int i, iMaxHP{};
     uint32_t dwTime, dwActionTime;
 
     dwTime = timeGetTime();
@@ -4964,7 +4976,7 @@ void CGame::MsgProcess()
 
         log->info("Game Packet [{:X}]", *dwpMsgID);
 
-        if (client == nullptr || client->currentstatus == client_status::login_screen)
+        if (client == nullptr || client->client_status == client_status_t::LOGIN_SCREEN)
         {
             handle_login_server_message(sm);
             continue;
@@ -4978,7 +4990,7 @@ void CGame::MsgProcess()
             continue;
         }
 
-        if (client->currentstatus != client_status::in_game)
+        if (client->client_status != client_status_t::PLAYING)
         {
             log->error(std::format("Client's status is not in game - Game Packet [{:X}]", *dwpMsgID));
             if (sm.websocket.getReadyState() == ix::ReadyState::Open)
@@ -5230,10 +5242,11 @@ void CGame::MsgProcess()
                 break;
 
             case MSGID_REQUEST_PKLIST:
+            {
                 if (m_pClientList[iClientH] == 0)
                     break;
                 bool bFlag;
-                int iShortCutIndex;
+                int iShortCutIndex{};
                 bFlag = true;
 
                 memset(cCharListBuffer, 0, 5000);
@@ -5280,6 +5293,7 @@ void CGame::MsgProcess()
                 *iptmp = itmp2;
 
                 iRet = m_pClientList[iClientH]->iSendMsg(cCharListBuffer, 14 + (itmp2 * 18));
+            }
 
                 break;
             case MSGID_REQUEST_CHARLIST:
@@ -8089,7 +8103,7 @@ int CGame::_iGetMagicNumber(char * pMagicName, int * pReqInt, int * pCost)
 
 void CGame::TrainSkillResponse(bool bSuccess, int iClientH, int iSkillNum, int iSkillLevel)
 {
-    char * cp, cData[100];
+    char * cp, cData[100]{};
     uint32_t * dwp;
     uint16_t * wp;
     int   iRet;
@@ -8819,7 +8833,7 @@ void CGame::GetRewardMoneyHandler(int iClientH)
     int iRet, iEraseReq, iWeightLeft, iRewardGoldLeft;
     uint32_t * dwp;
     uint16_t * wp;
-    char * cp, cData[100], cItemName[21];
+    char * cp, cData[100]{}, cItemName[21];
     CItem * pItem;
     short * sp;
 
@@ -11040,7 +11054,7 @@ bool CGame::bCheckResistingIceSuccess(char cAttackerDir, short sTargetH, char cT
 {
 
     int    iTargetIceResistRatio = 0, iResult;
-    char   cTargetDir;
+    char   cTargetDir{};
 
     switch (cTargetType)
     {
@@ -11084,7 +11098,7 @@ bool CGame::bSetItemToBankItem(int iClientH, CItem * pItem)
     uint16_t * wp;
     char * cp;
     short * sp;
-    char cData[100];
+    char cData[100]{};
 
 
     if (m_pClientList[iClientH] == 0) return false;
@@ -11346,7 +11360,7 @@ int CGame::iGetFollowerNumber(short sOwnerH, char cOwnerType)
 
 void CGame::SendObjectMotionRejectMsg(int iClientH)
 {
-    char * cp, cData[30];
+    char * cp, cData[30]{};
     uint32_t * dwp;
     uint16_t * wp;
     short * sp;
@@ -15702,7 +15716,7 @@ void CGame::SetSummonMobAction(int iClientH, int iMode, uint32_t dwMsgSize, char
 void CGame::GetOccupyFlagHandler(int iClientH)
 {
     int   i, iNum, iRet, iEraseReq, iEKNum;
-    char * cp, cData[256], cItemName[21];
+    char * cp, cData[256]{}, cItemName[21];
     CItem * pItem;
     uint32_t * dwp;
     short * sp;
@@ -16312,7 +16326,7 @@ void CGame::ConfirmExchangeItem(int iClientH)
 {
     int iExH;
     int iItemWeightA, iItemWeightB, iWeightLeftA, iWeightLeftB, iAmountLeft;
-    CItem * pItemA[4], * pItemB[4], * pItemAcopy[4], * pItemBcopy[4];
+    CItem * pItemA[4]{}, * pItemB[4]{}, * pItemAcopy[4]{}, * pItemBcopy[4]{};
 
     if (m_pClientList[iClientH] == 0) return;
     if (m_pClientList[iClientH]->m_bIsOnServerChange == true) return;
@@ -17091,7 +17105,7 @@ void CGame::_ClearExchangeStatus(int iToH)
 
 int CGame::__iSearchForQuest(int iClientH, int iWho, int * pQuestType, int * pMode, int * pRewardType, int * pRewardAmount, int * pContribution, char * pTargetName, int * pTargetType, int * pTargetCount, int * pX, int * pY, int * pRange)
 {
-    int i, iQuestList[DEF_MAXQUESTTYPE], iIndex, iQuest, iReward, iQuestIndex;
+    int i, iQuestList[DEF_MAXQUESTTYPE]{}, iIndex, iQuest, iReward, iQuestIndex;
 
     if (m_pClientList[iClientH] == 0) return -1;
 
@@ -19632,7 +19646,7 @@ void CGame::GetExp(int iClientH, int iExp, bool bIsAttackerOwn)
     double dV1, dV2, dV3;
     int i, iH, iUnitValue, iPartyTotalMember = 0;
     uint32_t dwTime = timeGetTime();
-    char cMapName[12];
+    char cMapName[12]{};
 
 
     if (m_pClientList[iClientH] == 0) return;
@@ -20342,7 +20356,7 @@ int CGame::iSetSide(int iClientH)
 //v2.19 2002-12-16 ³ó»ç½ºÅ³..
 bool CGame::__bSetAgricultureItem(int iMapIndex, int dX, int dY, int iType, int iSsn, int iClientH)
 {
-    int iNamingValue, ix, iy, tX, tY;
+    int iNamingValue, ix{}, iy{}, tX, tY;
     char cNpcName[21], cName[21], cNpcWaypoint[11], cOwnerType;
     short sOwnerH;
     BOOL	iRet;

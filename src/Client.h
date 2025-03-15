@@ -14,6 +14,7 @@
 #include "magic.h"
 #include "defines.h"
 #include "time_utils.h"
+#include "types.h"
 
 #include <chrono>
 #include <ixwebsocket/IXWebSocket.h>
@@ -33,121 +34,6 @@ class stream_write;
 
 #define DEF_SPECABLTYTIMESEC	1200
 
-struct account_db
-{
-    int64_t id{};
-    std::string email{};
-    int32_t admin_level{};
-    int64_t created{};
-    int64_t last_login{};
-    bool banned{};
-    int64_t xcoins{};
-    int64_t external_member_id{};
-};
-
-struct skill_db
-{
-    int64_t id{};
-    int64_t character_id{};
-    int64_t skill_id{};
-    int32_t skill_level{};
-    int32_t skill_exp{};
-};
-
-struct character_db
-{
-    int64_t id{};
-    int64_t account_id{};
-    std::string name{};
-    int32_t id1{};
-    int32_t id2{};
-    int32_t id3{};
-    int32_t level{};
-    int32_t strength{};
-    int32_t vitality{};
-    int32_t dexterity{};
-    int32_t intelligence{};
-    int32_t magic{};
-    int32_t charisma{};
-    int64_t experience{};
-    int16_t gender{};
-    int32_t skin{};
-    int32_t hairstyle{};
-    int32_t haircolor{};
-    int32_t underwear{};
-    int32_t apprcolor{};
-    int32_t appr1{};
-    int32_t appr2{};
-    int32_t appr3{};
-    int32_t appr4{};
-    std::string nation{};
-    std::string maploc{};
-    int32_t locx{};
-    int32_t locy{};
-    std::string profile{};
-    int32_t adminlevel{};
-    int32_t contribution{};
-    int32_t leftspectime{};
-    std::string lockmapname{};
-    int32_t lockmaptime{};
-    int64_t lastsavedate{};
-    int64_t blockdate{};
-    int64_t guild_id{};
-    int32_t fightnum{};
-    int32_t fightdate{};
-    int32_t fightticket{};
-    int32_t questnum{};
-    int32_t questid{};
-    int32_t questcount{};
-    int32_t questrewardtype{};
-    int32_t questrewardamount{};
-    int32_t questcompleted{};
-    int32_t eventid{};
-    int32_t warcon{};
-    int32_t crusadejob{};
-    int32_t crusadeid{};
-    int32_t crusadeconstructpoint{};
-    int32_t reputation{};
-    int32_t hp{};
-    int32_t mp{};
-    int32_t sp{};
-    int32_t ek{};
-    int32_t pk{};
-    int32_t rewardgold{};
-    int32_t downskillid{};
-    int32_t hunger{};
-    int32_t leftsac{};
-    int32_t leftshutuptime{};
-    int32_t leftreptime{};
-    int32_t leftforcerecalltime{};
-    int32_t leftfirmstaminatime{};
-    int32_t leftdeadpenaltytime{};
-    std::string magicmastery{};
-    int64_t party_id{};
-    int32_t itemupgradeleft{};
-    int32_t totalek{};
-    int32_t totalpk{};
-    int32_t mmr{};
-    int32_t altmmr{};
-    int32_t head_appr{};
-    int32_t body_appr{};
-    int32_t arm_appr{};
-    int32_t leg_appr{};
-    int64_t gold{};
-    int32_t luck{};
-    std::string world_name{};
-    std::vector<skill_db> skills{};
-    std::vector<item_db> items{};
-    std::vector<item_db> bank_items{};
-};
-
-enum class client_status
-{
-    dead = 0,
-    login_screen = 1,
-    in_game = 2
-};
-
 class CClient : public std::enable_shared_from_this<CClient>, public ix::ConnectionState
 {
 public:
@@ -161,7 +47,8 @@ public:
 
     // 0 = dead connect, 1 = login screen, 2 = in game
 // can switch between 1 and 2 but can only be 0 when connection closing
-    client_status currentstatus = client_status::login_screen;
+    client_status_t client_status = client_status_t::LOGIN_SCREEN;
+    character_status_t character_status = character_status_t::ALIVE;
 
     std::shared_ptr<CClient> get_ptr()
     {

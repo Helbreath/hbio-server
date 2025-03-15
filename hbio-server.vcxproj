@@ -31,6 +31,7 @@
     <ClInclude Include="src\guildsman.h" />
     <ClInclude Include="src\item.h" />
     <ClInclude Include="src\magic.h" />
+    <ClInclude Include="src\manager_client.h" />
     <ClInclude Include="src\map.h" />
     <ClInclude Include="src\message_index.h" />
     <ClInclude Include="src\mineral.h" />
@@ -50,7 +51,10 @@
     <ClInclude Include="src\teleport_loc.h" />
     <ClInclude Include="src\temp_npc_item.h" />
     <ClInclude Include="src\tile.h" />
+    <ClInclude Include="src\timer_manager.h" />
     <ClInclude Include="src\time_utils.h" />
+    <ClInclude Include="src\types.h" />
+    <ClInclude Include="src\websocket_sink.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\account_management.cpp" />
@@ -77,6 +81,7 @@
     <ClCompile Include="src\item.cpp" />
     <ClCompile Include="src\login_server.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\manager.cpp" />
     <ClCompile Include="src\map.cpp" />
     <ClCompile Include="src\mineral.cpp" />
     <ClCompile Include="src\misc.cpp" />
@@ -98,6 +103,7 @@
     <ClCompile Include="src\teleport_loc.cpp" />
     <ClCompile Include="src\tile.cpp" />
     <ClCompile Include="src\timed_events.cpp" />
+    <ClCompile Include="src\timer_manager.cpp" />
     <ClCompile Include="src\user_commands.cpp" />
   </ItemGroup>
   <ItemGroup>

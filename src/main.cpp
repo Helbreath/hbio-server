@@ -12,6 +12,20 @@
 char G_cTxt[512];
 char G_cData50000[50000];
 
+CGame * game;
+
+#if !defined(WIN32)
+static void signal_handler(int signum)
+{
+    if (signum == SIGINT)
+    {
+        std::lock_guard<std::mutex> lock(server->cv_mtx);
+        server->set_server_state(server_status_t::SHUTDOWN);
+        server->cv_exit.notify_one();
+    }
+}
+#endif
+
 int main(int argc, char * argv[])
 {
     srand((uint32_t)time(nullptr));
@@ -19,10 +33,15 @@ int main(int argc, char * argv[])
 #if defined(WIN32)
     ix::initNetSystem();
 #else
-    signal(SIGPIPE, SIG_IGN);
+    struct sigaction sa {};
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, nullptr);
 #endif
 
-    CGame * game = new CGame();
+    game = new CGame();
+
     try
     {
         game->run();
