@@ -16,6 +16,17 @@ void CGame::start_websocket()
 {
     server = std::make_unique<ix::WebSocketServer>(bindport, bindip);
 
+    if (tls_enabled)
+    {
+        ix::SocketTLSOptions tlsOptions;
+        tlsOptions.keyFile = "server.key";
+        tlsOptions.certFile = "server.crt";
+        tlsOptions.caFile = "NONE";
+        tlsOptions.tls = true;
+
+        server->setTLSOptions(tlsOptions);
+    }
+
     server->setConnectionStateFactory([&]()
         {
             log->info("Client connection state factory called");

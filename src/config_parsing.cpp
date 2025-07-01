@@ -181,6 +181,11 @@ void CGame::load_config()
             else
                 throw std::runtime_error("No port set");
 
+            if (!cfg["tls"].is_null())
+                tls_enabled = cfg["tls"].get<bool>();
+            else
+                throw std::runtime_error("No tls set");
+
             if (!cfg["manager_enabled"].is_null())
                 manager_enabled = cfg["manager_enabled"].get<bool>();
 

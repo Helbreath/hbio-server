@@ -242,6 +242,7 @@ public:
     std::string log_formatting;
     bool state_valid = true;
     bool config_loaded = false;
+    bool tls_enabled = false;
 
     std::string world_name;
 
