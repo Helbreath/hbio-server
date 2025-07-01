@@ -25,6 +25,7 @@
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include <ixwebsocket/IXWebSocketServer.h>
+#include <ciso646>
 #include <pqxx/pqxx>
 #include <pqxx/except>
 #include <shared_mutex>

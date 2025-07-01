@@ -39,7 +39,7 @@ include/
 xtreme-server
 *.lua
 
-/vcpkg_installed/x64-windows
+/vcpkg_installed
 /x64
 /src/hbx-check-login.cpp
 *.cbp

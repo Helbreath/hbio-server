@@ -61,7 +61,7 @@ uint64_t CGame::check_account_auth(std::shared_ptr<CClient> player, std::string 
         {
             std::shared_lock<std::shared_mutex> l(game_sql_mtx);
             pqxx::work txn{ *pq_game };
-            pqxx::row r{ txn.exec_params1("SELECT * FROM accounts WHERE forum_member_id=$1 LIMIT 1", external_member_id) };
+            pqxx::row r{ txn.exec("SELECT * FROM accounts WHERE forum_member_id=$1 LIMIT 1", {external_member_id}).one_row()};
             txn.commit();
 
             return r["id"].as<int64_t>();
@@ -71,11 +71,10 @@ uint64_t CGame::check_account_auth(std::shared_ptr<CClient> player, std::string 
             std::shared_lock<std::shared_mutex> l(game_sql_mtx);
             // no rows exist - create new account
             pqxx::work txn{ *pq_game };
-            pqxx::row r{ txn.exec_params1(
+            pqxx::row r{ txn.exec(
                 "INSERT INTO accounts (email, forum_member_id) VALUES ($1, $2) RETURNING *",
-                account,
-                external_member_id
-            ) };
+                {account,external_member_id}
+            ).one_row()};
             txn.commit();
 
             return r["id"].as<int64_t>();

@@ -9,17 +9,17 @@
 int64_t CGame::create_db_character(pqxx::transaction_base & t, character_db & character)
 {
     pqxx::row r{
-        t.exec_prepared1("create_db_character", character.account_id, character.world_name, character.name,
+        t.exec(pqxx::prepped{"create_db_character"}, {character.account_id, character.world_name, character.name,
             character.strength, character.vitality, character.dexterity, character.intelligence, character.magic, character.charisma,
             character.appr1, character.gender, character.skin, character.hairstyle, character.haircolor, character.underwear,
-            character.hp, character.mp, character.sp)
+            character.hp, character.mp, character.sp}).one_row()
     };
     return r["id"].as<uint64_t>();
 }
 
 void CGame::update_db_character(pqxx::transaction_base & t, character_db & character)
 {
-    t.exec_prepared("update_db_character", character.name, character.id1, character.id2, character.id3, character.level,
+    t.exec(pqxx::prepped{"update_db_character"}, { character.name, character.id1, character.id2, character.id3, character.level,
         character.strength, character.vitality, character.dexterity, character.intelligence, character.magic, character.charisma,
         character.experience, character.gender, character.skin, character.hairstyle, character.haircolor, character.underwear,
         character.apprcolor, character.appr1, character.appr2, character.appr3, character.appr4, character.nation,
@@ -32,7 +32,7 @@ void CGame::update_db_character(pqxx::transaction_base & t, character_db & chara
         character.leftsac, character.leftshutuptime, character.leftreptime, character.leftforcerecalltime, character.leftfirmstaminatime,
         character.leftdeadpenaltytime, character.magicmastery, character.party_id, character.itemupgradeleft, character.totalek,
         character.totalpk, character.mmr, character.altmmr, character.head_appr, character.body_appr, character.arm_appr, character.leg_appr,
-        character.gold, character.luck, character.world_name, character.id, character.account_id);
+        character.gold, character.luck, character.world_name, character.id, character.account_id });
 }
 
 /**
@@ -42,15 +42,15 @@ void CGame::update_db_character(pqxx::transaction_base & t, character_db & chara
 */
 void CGame::delete_db_character(pqxx::transaction_base & t, character_db & character)
 {
-    t.exec_params0("DELETE FROM characters WHERE name=$1 AND account_id=$2", character.name, character.account_id);
+    t.exec("DELETE FROM characters WHERE name=$1 AND account_id=$2", { character.name, character.account_id });
 }
 
 int64_t CGame::create_db_item(pqxx::transaction_base & t, item_db & _item)
 {
     pqxx::row r{
-        t.exec_prepared1("create_db_item", _item.char_id, _item.name, _item.count, _item.type, _item.id1, _item.id2, _item.id3,
+        t.exec(pqxx::prepped{"create_db_item"}, {_item.char_id, _item.name, _item.count, _item.type, _item.id1, _item.id2, _item.id3,
         _item.color, _item.effect1, _item.effect2, _item.effect3, _item.durability, _item.attribute, _item.equipped, _item.itemposx,
-        _item.itemposy, _item.itemloc, _item.item_id)
+        _item.itemposy, _item.itemloc, _item.item_id}).one_row()
     };
     return r["id"].as<int64_t>();
 }
@@ -86,9 +86,9 @@ int64_t CGame::create_db_item(CItem * _item, int32_t x, int32_t y, int32_t chara
 
 void CGame::update_db_item(pqxx::transaction_base & t, item_db & _item)
 {
-    t.exec_prepared("update_db_item", _item.id, _item.char_id, _item.name, _item.count, _item.type, _item.id1, _item.id2, _item.id3,
+    t.exec(pqxx::prepped{ "update_db_item" }, { _item.id, _item.char_id, _item.name, _item.count, _item.type, _item.id1, _item.id2, _item.id3,
         _item.color, _item.effect1, _item.effect2, _item.effect3, _item.durability, _item.attribute, _item.equipped, _item.itemposx,
-        _item.itemposy, _item.itemloc, _item.item_id);
+        _item.itemposy, _item.itemloc, _item.item_id });
 }
 
 void CGame::update_db_bag_item(CItem * _item, int32_t x, int32_t y, int32_t character_handle, bool equipped)
@@ -149,51 +149,51 @@ void CGame::update_db_bank_item(CItem * _item, int32_t character_handle)
 
 void CGame::delete_db_item(pqxx::transaction_base & t, int64_t id)
 {
-    t.exec_prepared("delete_db_item", id);
+    t.exec(pqxx::prepped{ "delete_db_item" }, {id});
 }
 
 void CGame::delete_db_item(int64_t id)
 {
     std::shared_lock<std::shared_mutex> l(game_sql_mtx);
     pqxx::work txn{ *pq_game };
-    txn.exec_prepared("delete_db_item", id);
+    txn.exec(pqxx::prepped{"delete_db_item"}, {id});
     txn.commit();
 }
 
 void CGame::force_delete_db_item(pqxx::transaction_base & t, int64_t id)
 {
-    t.exec_prepared("force_delete_db_item", id);
+    t.exec(pqxx::prepped{"force_delete_db_item"}, {id});
 }
 
 void CGame::force_delete_db_item(int64_t id)
 {
     std::shared_lock<std::shared_mutex> l(game_sql_mtx);
     pqxx::work txn{ *pq_game };
-    txn.exec_prepared("force_delete_db_item", id);
+    txn.exec(pqxx::prepped{"force_delete_db_item"}, {id});
     txn.commit();
 }
 
 int64_t CGame::create_db_skill(pqxx::transaction_base & t, skill_db & skill)
 {
     pqxx::row r{
-        t.exec_prepared1("create_db_skill", skill.character_id, skill.skill_id, skill.skill_level, skill.skill_exp)
+        t.exec(pqxx::prepped{"create_db_skill"}, {skill.character_id, skill.skill_id, skill.skill_level, skill.skill_exp}).one_row()
     };
     return r["id"].as<int64_t>();
 }
 
 void CGame::update_db_skill(pqxx::transaction_base & t, skill_db & skill)
 {
-    t.exec_prepared("update_db_skill", skill.id, skill.character_id, skill.skill_id, skill.skill_level, skill.skill_exp);
+    t.exec(pqxx::prepped{"update_db_skill"}, { skill.id, skill.character_id, skill.skill_id, skill.skill_level, skill.skill_exp });
 }
 
 void CGame::delete_db_skills(pqxx::transaction_base & t, int64_t id)
 {
-    t.exec_prepared("delete_db_skills", id);
+    t.exec(pqxx::prepped{"delete_db_skills"}, {id});
 }
 
 std::vector<item_db> CGame::get_db_items(pqxx::transaction_base & t, uint64_t character_id)
 {
-    pqxx::result result{ t.exec_prepared("get_items_by_character_id", character_id) };
+    pqxx::result result{ t.exec(pqxx::prepped{"get_items_by_character_id"}, {character_id}) };
 
     std::vector<item_db> items;
     for (const auto & row : result)
@@ -226,7 +226,7 @@ std::vector<item_db> CGame::get_db_items(pqxx::transaction_base & t, uint64_t ch
 
 std::vector<skill_db> CGame::get_db_skills(pqxx::transaction_base & t, uint64_t character_id)
 {
-    pqxx::result result{ t.exec_prepared("get_skills_by_character_id", character_id) };
+    pqxx::result result{ t.exec(pqxx::prepped{"get_skills_by_character_id"}, {character_id}) };
 
     std::vector<skill_db> skills;
     for (const auto & row : result)

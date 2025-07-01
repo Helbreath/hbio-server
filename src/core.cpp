@@ -303,7 +303,7 @@ void CGame::build_character_list(CClient * client, stream_write & sw)
     {
         std::shared_lock<std::shared_mutex> l(login_sql_mtx);
         pqxx::work txn{ *pq_login };
-        pqxx::result r{ txn.exec_params("SELECT * FROM characters WHERE account_id=$1;", client->account_id) };
+        pqxx::result r{ txn.exec("SELECT * FROM characters WHERE account_id=$1;", {client->account_id}) };
         txn.commit();
 
         sw.write_byte((uint8_t)r.size());
@@ -374,7 +374,7 @@ void CGame::create_character(CClient * client, stream_read & sr)
 
             {
                 pqxx::row r{
-                    txn.exec_prepared1("check_character_count_by_account_id_wn", character.account_id, character.world_name)
+                    txn.exec("check_character_count_by_account_id_wn", {character.account_id, character.world_name}).one_row()
                 };
                 auto [charcount] = r.as<uint16_t>();
 
@@ -389,7 +389,7 @@ void CGame::create_character(CClient * client, stream_read & sr)
 
             {
                 pqxx::row r{
-                    txn.exec_prepared1("check_character_count_by_name_wn", character.name, character.world_name)
+                    txn.exec(pqxx::prepped{"check_character_count_by_name_wn"}, {character.name, character.world_name}).one_row()
                 };
                 auto [charcount] = r.as<uint16_t>();
 
@@ -440,11 +440,11 @@ void CGame::create_character(CClient * client, stream_read & sr)
             for (uint16_t s = 0; s < 24; ++s)//24 skills total
             {
                 if (/*s == 4 ||*/ s == 5 || s == 6 || s == 7 || s == 8 || s == 9 || s == 10 || s == 11 || s == 14 || s == 19 || s == 21)// All attack skills starts at 20%
-                    txn.exec_params("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 20, 0)", character.id, s);
+                    txn.exec("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 20, 0)", {character.id, s});
                 else if (s == 3 || s == 23) // Magic Res / Poison Res starts at 2%
-                    txn.exec_params("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 2, 0)", character.id, s);
+                    txn.exec("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 2, 0)", {character.id, s});
                 else// All crafting skills starts at 0% Magic skills starts at 0%
-                    txn.exec_params("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 0, 0)", character.id, s);
+                    txn.exec("INSERT INTO skill (char_id, skill_id, mastery, experience) VALUES ($1, $2, 0, 0)", {character.id, s});
             }
         }
 
@@ -487,7 +487,7 @@ void CGame::delete_character(CClient * client, stream_read & sr)
         pqxx::work txn{ *pq_game };
 
         pqxx::row r{
-            txn.exec_prepared1("get_character_by_name_wn", character.name, character.world_name)
+            txn.exec(pqxx::prepped{"get_character_by_name_wn"}, {character.name, character.world_name}).one_row()
         };
         auto charid = r["id"].as<uint32_t>();
         if (charid == 0)
@@ -570,7 +570,7 @@ void CGame::enter_game(CClient * client, stream_read & sr)
             std::shared_lock<std::shared_mutex> l(game_sql_mtx);
             pqxx::work txn{ *pq_game};
             pqxx::row row{
-                txn.exec_params1("SELECT * FROM characters WHERE account_id=$1 AND name=$2 LIMIT 1", client->account_id, character_name)
+                txn.exec("SELECT * FROM characters WHERE account_id=$1 AND name=$2 LIMIT 1", {client->account_id, character_name}).one_row()
             };
 
             client->id = row["id"].as<uint64_t>();
